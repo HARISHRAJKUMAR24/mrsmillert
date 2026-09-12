@@ -2,6 +2,7 @@
    MRS MILL@ — EDIT APARTMENT UX
    File: ./js/edit-apartment.js
    Loads apartment by id/code, edits divisions, saves via AJAX
+   Errors shown in POPUP + auto-fill charge from first row
    ========================================================= */
 
 (function () {
@@ -12,44 +13,143 @@
             ? window.ADMIN_URL
             : "./";
 
-    const APARTMENT_ID = Number(window.APARTMENT_ID || 0);
+    const APARTMENT_ID   = Number(window.APARTMENT_ID || 0);
     const APARTMENT_CODE = String(window.APARTMENT_CODE || "");
 
     /* =========================================
        DOM
     ========================================= */
 
-    const form = document.getElementById("apartmentForm");
-    const formLoading = document.getElementById("formLoading");
-    const alertBox = document.getElementById("formAlert");
-    const saveBtn = document.getElementById("saveBtn");
-    const saveText = document.getElementById("saveBtnText");
+    const form         = document.getElementById("apartmentForm");
+    const formLoading  = document.getElementById("formLoading");
+    const saveBtn      = document.getElementById("saveBtn");
+    const saveText     = document.getElementById("saveBtnText");
     const aptCodeBadge = document.getElementById("aptCodeBadge");
 
     const divisionRows = document.getElementById("divisionRows");
-    const addDivBtn = document.getElementById("addDivisionBtn");
-    const emptyState = document.getElementById("divisionsEmpty");
+    const addDivBtn    = document.getElementById("addDivisionBtn");
+    const emptyState   = document.getElementById("divisionsEmpty");
 
     const successOverlay = document.getElementById("successOverlay");
-    const successText = document.getElementById("successText");
-    const successCode = document.getElementById("successCode");
-    const editAgainBtn = document.getElementById("editAgainBtn");
+    const successText    = document.getElementById("successText");
+    const successCode    = document.getElementById("successCode");
+    const editAgainBtn   = document.getElementById("editAgainBtn");
 
     if (!form) return;
 
     /* =========================================
-       ALERT
+       BUILD ERROR POPUP (injected once)
+    ========================================= */
+
+    let errorOverlay = null;
+    let errorText    = null;
+
+    function buildErrorPopup() {
+
+        if (errorOverlay) return;
+
+        errorOverlay = document.createElement("div");
+        errorOverlay.className = "mm-modal-overlay";
+        errorOverlay.setAttribute("aria-hidden", "true");
+        errorOverlay.id = "errorOverlay";
+
+        errorOverlay.innerHTML = `
+            <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="errorTitle">
+
+                <div class="mm-modal-icon mm-modal-icon-error">
+                    <i class="bi bi-exclamation-lg"></i>
+                </div>
+
+                <h3 class="mm-modal-title" id="errorTitle">
+                    Oops! Something's missing
+                </h3>
+
+                <p class="mm-modal-text" id="errorText">
+                    Please check the form and try again.
+                </p>
+
+                <div class="mm-modal-actions">
+                    <button type="button"
+                            class="mm-btn mm-btn-danger"
+                            id="errorOkBtn">
+                        <i class="bi bi-check2"></i>
+                        Got it
+                    </button>
+                </div>
+
+            </div>
+        `;
+
+        document.body.appendChild(errorOverlay);
+
+        errorText = errorOverlay.querySelector("#errorText");
+
+        /* Close on backdrop click */
+        errorOverlay.addEventListener("click", function (e) {
+            if (e.target === errorOverlay) closeErrorPopup();
+        });
+
+        /* Close on ESC */
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" &&
+                errorOverlay.classList.contains("show")) {
+                closeErrorPopup();
+            }
+        });
+
+        /* Close on OK button */
+        errorOverlay.querySelector("#errorOkBtn")
+            .addEventListener("click", closeErrorPopup);
+
+        /* Inject error-specific styles once */
+        if (!document.getElementById("mmErrorStyles")) {
+
+            const style = document.createElement("style");
+            style.id = "mmErrorStyles";
+            style.textContent = `
+                .mm-modal-icon-error {
+                    background: #fdecec;
+                    color: #b51f2c;
+                }
+
+                .mm-btn-danger {
+                    background: #b51f2c;
+                    color: #fff;
+                    box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
+                }
+
+                .mm-btn-danger:hover {
+                    background: #8e1722;
+                    color: #fff;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    /* =========================================
+       ERROR POPUP — SHOW / HIDE
     ========================================= */
 
     function showError(message) {
-        alertBox.className = "alert-box show error";
-        alertBox.textContent = message;
-        alertBox.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        buildErrorPopup();
+
+        if (errorText) {
+            errorText.textContent = message || "Please check the form and try again.";
+        }
+
+        errorOverlay.classList.add("show");
+        errorOverlay.setAttribute("aria-hidden", "false");
+
+        const ok = errorOverlay.querySelector("#errorOkBtn");
+        if (ok) setTimeout(() => ok.focus(), 60);
     }
 
-    function clearError() {
-        alertBox.className = "alert-box";
-        alertBox.textContent = "";
+    function closeErrorPopup() {
+        if (!errorOverlay) return;
+        errorOverlay.classList.remove("show");
+        errorOverlay.setAttribute("aria-hidden", "true");
     }
 
     /* =========================================
@@ -114,7 +214,7 @@
     }
 
     /* =========================================
-       DIVISION ROW
+       HELPERS
     ========================================= */
 
     function escapeAttr(str) {
@@ -124,6 +224,22 @@
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;");
     }
+
+    /* =========================================
+       GET FIRST DIVISION CHARGE (for auto-fill)
+    ========================================= */
+
+    function getFirstDivisionCharge() {
+        const firstCharge = divisionRows.querySelector(".division-charge");
+        if (!firstCharge) return "";
+
+        const val = firstCharge.value.trim();
+        return val === "" ? "" : val;
+    }
+
+    /* =========================================
+       DIVISION ROW
+    ========================================= */
 
     function createDivisionRow(division, charge) {
 
@@ -166,10 +282,25 @@
         return row;
     }
 
-    function addDivisionRow(division, charge) {
+    /* =========================================
+       ADD DIVISION ROW
+       - If charge passed → use it (needed for load)
+       - Else → copy from FIRST division row
+    ========================================= */
+
+    function addDivisionRow(division, charge, skipAutoFill) {
+
+        let finalCharge = charge;
+
+        if (!skipAutoFill &&
+            (finalCharge === undefined || finalCharge === null || finalCharge === "")) {
+            finalCharge = getFirstDivisionCharge();
+        }
+
         divisionRows.appendChild(
-            createDivisionRow(division || "", charge || "")
+            createDivisionRow(division || "", finalCharge || "")
         );
+
         refreshEmptyState();
     }
 
@@ -195,14 +326,14 @@
     function collectDivisions() {
 
         const rows = divisionRows.querySelectorAll(".division-row");
-        const out = [];
+        const out  = [];
         const seen = {};
 
         for (let i = 0; i < rows.length; i++) {
 
-            const row = rows[i];
+            const row      = rows[i];
             const division = row.querySelector(".division-name").value.trim();
-            const charge = row.querySelector(".division-charge").value.trim();
+            const charge   = row.querySelector(".division-charge").value.trim();
 
             if (!division) {
                 return { ok: false, message: "Division name is required for row " + (i + 1) + "." };
@@ -265,15 +396,15 @@
                     aptCodeBadge.textContent = "#" + (apt.apartment_code || "");
                 }
 
-                // fill divisions
+                /* fill divisions — skipAutoFill so DB charges are kept exactly */
                 divisionRows.innerHTML = "";
                 const divs = Array.isArray(apt.divisions) ? apt.divisions : [];
 
                 if (divs.length === 0) {
-                    addDivisionRow();
+                    addDivisionRow("", "", true);
                 } else {
                     divs.forEach(function (d) {
-                        addDivisionRow(d.division, d.charge);
+                        addDivisionRow(d.division, d.charge, true);
                     });
                 }
 
@@ -300,15 +431,14 @@
     form.addEventListener("submit", function (e) {
 
         e.preventDefault();
-        clearError();
 
-        const id = Number(document.getElementById("apartment_id").value || 0);
-        const name = document.getElementById("apartment_name").value.trim();
+        const id      = Number(document.getElementById("apartment_id").value || 0);
+        const name    = document.getElementById("apartment_name").value.trim();
         const address = document.getElementById("apartment_address").value.trim();
-        const status = document.getElementById("status").value;
+        const status  = document.getElementById("status").value;
 
-        if (id <= 0) return showError("Invalid apartment ID.");
-        if (!name) return showError("Apartment name is required.");
+        if (id <= 0)  return showError("Invalid apartment ID.");
+        if (!name)    return showError("Apartment name is required.");
         if (!address) return showError("Apartment address is required.");
 
         const collected = collectDivisions();

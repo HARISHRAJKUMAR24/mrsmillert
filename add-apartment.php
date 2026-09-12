@@ -223,13 +223,14 @@ require_once './config/function.php';
             flex-wrap: wrap;
         }
 
+        /* ---- Inline title + asterisk, subtitle below ---- */
         .divisions-header-title {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
         }
 
-        .divisions-header-title i {
+        .divisions-header-title>i {
             width: 34px;
             height: 34px;
             border-radius: 10px;
@@ -239,6 +240,14 @@ require_once './config/function.php';
             align-items: center;
             justify-content: center;
             font-size: 15px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .divisions-header-title .title-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
 
         .divisions-header-title h4 {
@@ -246,13 +255,25 @@ require_once './config/function.php';
             font-size: 13px;
             font-weight: 800;
             color: #302923;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            line-height: 1.2;
         }
 
-        .divisions-header-title span {
+        .divisions-header-title h4 .required {
+            color: #b51f2c;
+            font-weight: 800;
+            font-size: 13px;
+            line-height: 1;
+        }
+
+        .divisions-header-title span.subtitle {
             display: block;
             font-size: 10px;
             color: #817a71;
-            margin-top: 2px;
+            margin: 0;
+            line-height: 1.4;
         }
 
         .add-division-btn {
@@ -298,6 +319,7 @@ require_once './config/function.php';
                 opacity: 0;
                 transform: translateY(-6px);
             }
+
             to {
                 opacity: 1;
                 transform: translateY(0);
@@ -513,6 +535,7 @@ require_once './config/function.php';
                 transform: scale(.5);
                 opacity: 0;
             }
+
             100% {
                 transform: scale(1);
                 opacity: 1;
@@ -754,9 +777,9 @@ require_once './config/function.php';
 
                             <div class="divisions-header-title">
                                 <i class="bi bi-grid-3x3-gap"></i>
-                                <div>
+                                <div class="title-text">
                                     <h4>Apartment Divisions <span class="required">*</span></h4>
-                                    <span>Each division has its own delivery charge.</span>
+                                    <span class="subtitle">Each division has its own delivery charge.</span>
                                 </div>
                             </div>
 
@@ -846,9 +869,7 @@ require_once './config/function.php';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>
-    <script src="<?= ADMIN_URL; ?>js/add-apartment.js">
-        
-    </script>
+    <script src="<?= ADMIN_URL; ?>js/add-apartment.js"></script>
 
 </body>
 

@@ -253,6 +253,7 @@ require_once './config/function.php';
             color: #817a71;
             cursor: pointer;
             transition: .2s ease;
+            text-decoration: none;
         }
 
         .table-action:hover {
@@ -298,6 +299,137 @@ require_once './config/function.php';
         }
 
         @keyframes spin { to { transform: rotate(360deg); } }
+
+
+        /* =====================================================
+           PAGINATION
+        ===================================================== */
+
+        .apartment-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #f2ede5;
+            flex-wrap: wrap;
+        }
+
+        .pagination-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .pagination-info {
+            font-size: 11px;
+            color: #817a71;
+        }
+
+        .pagination-info strong {
+            color: #302923;
+            font-weight: 700;
+        }
+
+        /* Rows per page selector */
+        .pagination-perpage {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #817a71;
+        }
+
+        .pagination-perpage select {
+            height: 32px;
+            border: 1px solid #eee7dc;
+            border-radius: 8px;
+            background: #fffdf9;
+            padding: 0 26px 0 10px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color: #4c4640;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 9px center;
+            transition: .2s ease;
+        }
+
+        .pagination-perpage select:hover {
+            border-color: #e4ddd3;
+            background-color: #fff;
+        }
+
+        .pagination-perpage select:focus {
+            border-color: #d98a91;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pagination-controls button {
+            min-width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            border: 1px solid #eee7dc;
+            background: #fff;
+            color: #6f675f;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: .2s ease;
+            padding: 0 8px;
+            font-family: inherit;
+        }
+
+        .pagination-controls button:hover:not(:disabled):not(.active) {
+            background: #faf7f0;
+            border-color: #e4ddd3;
+            color: #302923;
+        }
+
+        .pagination-controls button.active {
+            background: #b51f2c;
+            border-color: #b51f2c;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
+            cursor: default;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .pagination-controls .page-ellipsis {
+            min-width: 26px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #b5aca2;
+            font-size: 12px;
+            font-weight: 700;
+            user-select: none;
+        }
+
+        .pagination-controls i {
+            font-size: 12px;
+        }
 
 
         /* =====================================================
@@ -484,6 +616,10 @@ require_once './config/function.php';
             .apartment-search { width: 100%; }
             .table-responsive { overflow-x: auto; }
             .apartment-table { min-width: 850px; }
+            .apartment-pagination { flex-direction: column; align-items: stretch; }
+            .pagination-left { justify-content: center; }
+            .pagination-info { text-align: center; }
+            .pagination-controls { justify-content: center; flex-wrap: wrap; }
         }
 
         @media (max-width: 480px) {
@@ -494,6 +630,12 @@ require_once './config/function.php';
             }
 
             .mm-toast { min-width: 0; width: 100%; }
+
+            .pagination-controls button {
+                min-width: 30px;
+                height: 30px;
+                font-size: 10px;
+            }
         }
     </style>
 
@@ -595,6 +737,38 @@ require_once './config/function.php';
                         </tbody>
 
                     </table>
+
+                </div>
+
+
+                <!-- =====================================================
+                     PAGINATION
+                ====================================================== -->
+
+                <div class="apartment-pagination" id="apartmentPagination" style="display:none;">
+
+                    <div class="pagination-left">
+
+                        <div class="pagination-info" id="paginationInfo">
+                            Showing <strong>0</strong>–<strong>0</strong> of <strong>0</strong>
+                        </div>
+
+                        <label class="pagination-perpage">
+                            Show
+                            <select id="perPageSelect">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            entries
+                        </label>
+
+                    </div>
+
+                    <div class="pagination-controls" id="paginationControls">
+                        <!-- filled by JS -->
+                    </div>
 
                 </div>
 

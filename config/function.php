@@ -51,7 +51,6 @@ if (!function_exists('generateApartmentCode')) {
             $num = (int) substr($last['apartment_code'], 3);
 
             return 'APT' . str_pad($num + 1, 3, '0', STR_PAD_LEFT);
-
         } catch (PDOException $e) {
 
             return 'APT001';
@@ -82,7 +81,6 @@ if (!function_exists('getAllApartments')) {
             }
 
             return $rows;
-
         } catch (PDOException $e) {
 
             return [];
@@ -114,7 +112,6 @@ if (!function_exists('getApartment')) {
             }
 
             return $row;
-
         } catch (PDOException $e) {
 
             return null;
@@ -170,3 +167,28 @@ if (!function_exists('e')) {
         return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
     }
 }
+
+
+/* -----------------------------------------
+   REQUIRE ADMIN LOGIN
+----------------------------------------- */
+
+if (!function_exists('requireLogin')) {
+
+    function requireLogin($pdo)
+    {
+        // If user is not logged in or token is invalid
+        if (!isLoggedIn() || !verifyToken($pdo)) {
+
+            // Prevent redirect loop if already on login page
+            $currentPage = basename($_SERVER['PHP_SELF']);
+
+            if ($currentPage !== 'login.php') {
+                header('Location: login.php');
+                exit;
+            }
+        }
+    }
+}
+
+requireLogin($pdo);

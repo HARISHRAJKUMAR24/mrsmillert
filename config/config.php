@@ -5,7 +5,7 @@
 // =========================================
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'mr_millet');
+define('DB_NAME', 'mrs_millet');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 
@@ -16,7 +16,7 @@ define('DB_PASS', '');
 
 define(
     'ADMIN_URL',
-    'http://localhost/mr.millet.admin/'
+    'http://localhost/mrs.millet.admin/'
 );
 
 

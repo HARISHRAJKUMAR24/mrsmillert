@@ -23,7 +23,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
            APARTMENT EDIT PAGE
         ===================================================== */
 
-        .apartment-page { padding: 30px 32px 40px; }
+        .apartment-page {
+            padding: 30px 32px 40px;
+        }
 
         .apartment-header {
             display: flex;
@@ -62,7 +64,10 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: .2s;
         }
 
-        .back-btn:hover { background: #faf7f0; color: #302923; }
+        .back-btn:hover {
+            background: #faf7f0;
+            color: #302923;
+        }
 
         .apartment-form-card {
             background: #fff;
@@ -125,7 +130,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             margin-bottom: 7px;
         }
 
-        .required { color: #b51f2c; }
+        .required {
+            color: #b51f2c;
+        }
 
         .apartment-input,
         .apartment-textarea {
@@ -141,8 +148,14 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: .2s ease;
         }
 
-        .apartment-input { height: 45px; }
-        .apartment-textarea { min-height: 95px; resize: vertical; }
+        .apartment-input {
+            height: 45px;
+        }
+
+        .apartment-textarea {
+            min-height: 95px;
+            resize: vertical;
+        }
 
         .apartment-input:focus,
         .apartment-textarea:focus {
@@ -151,9 +164,11 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
-        .input-icon-wrap { position: relative; }
+        .input-icon-wrap {
+            position: relative;
+        }
 
-        .input-icon-wrap > i {
+        .input-icon-wrap>i {
             position: absolute;
             left: 13px;
             top: 50%;
@@ -163,7 +178,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             pointer-events: none;
         }
 
-        .input-icon-wrap .apartment-input { padding-left: 40px; }
+        .input-icon-wrap .apartment-input {
+            padding-left: 40px;
+        }
 
         .field-help {
             font-size: 9px;
@@ -180,7 +197,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             font-size: 12px;
         }
 
-        .alert-box.show { display: block; }
+        .alert-box.show {
+            display: block;
+        }
 
         .alert-box.error {
             background: #fff1f1;
@@ -198,7 +217,11 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             display: inline-block;
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
 
         /* =====================================================
@@ -222,11 +245,12 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
 
         .divisions-header-title {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
         }
 
-        .divisions-header-title i {
+
+        .divisions-header-title>i {
             width: 34px;
             height: 34px;
             border-radius: 10px;
@@ -236,6 +260,14 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             align-items: center;
             justify-content: center;
             font-size: 15px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .divisions-header-title .title-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
         }
 
         .divisions-header-title h4 {
@@ -243,6 +275,25 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             font-size: 13px;
             font-weight: 800;
             color: #302923;
+            display: inline-flex;
+            align-items: center;
+            gap: 3px;
+            line-height: 1.2;
+        }
+
+        .divisions-header-title h4 .required {
+            color: #b51f2c;
+            font-weight: 800;
+            font-size: 13px;
+            line-height: 1;
+        }
+
+        .divisions-header-title span.subtitle {
+            display: block;
+            font-size: 10px;
+            color: #817a71;
+            margin: 0;
+            line-height: 1.4;
         }
 
         .divisions-header-title span {
@@ -291,13 +342,22 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
         }
 
         @keyframes fadeSlide {
-            from { opacity: 0; transform: translateY(-6px); }
-            to   { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(-6px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
 
-        .division-field { position: relative; }
+        .division-field {
+            position: relative;
+        }
 
-        .division-field > i {
+        .division-field>i {
             position: absolute;
             left: 13px;
             top: 50%;
@@ -321,7 +381,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: .2s ease;
         }
 
-        .division-field.charge input { padding-left: 32px; }
+        .division-field.charge input {
+            padding-left: 32px;
+        }
 
         .division-field input:focus {
             border-color: #d98a91;
@@ -401,8 +463,13 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
         }
 
         @media (max-width: 620px) {
-            .division-row { grid-template-columns: 1fr; }
-            .remove-division { width: 100%; }
+            .division-row {
+                grid-template-columns: 1fr;
+            }
+
+            .remove-division {
+                width: 100%;
+            }
         }
 
 
@@ -445,8 +512,14 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: .2s;
         }
 
-        .btn-save:hover { background: #8e1722; }
-        .btn-save:disabled { opacity: .7; cursor: not-allowed; }
+        .btn-save:hover {
+            background: #8e1722;
+        }
+
+        .btn-save:disabled {
+            opacity: .7;
+            cursor: not-allowed;
+        }
 
 
         /* =====================================================
@@ -468,7 +541,10 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: opacity .2s ease, visibility .2s ease;
         }
 
-        .mm-modal-overlay.show { opacity: 1; visibility: visible; }
+        .mm-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
 
         .mm-modal {
             background: #fff;
@@ -482,7 +558,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: transform .25s cubic-bezier(.2, .9, .3, 1.2);
         }
 
-        .mm-modal-overlay.show .mm-modal { transform: translateY(0) scale(1); }
+        .mm-modal-overlay.show .mm-modal {
+            transform: translateY(0) scale(1);
+        }
 
         .mm-modal-icon {
             width: 66px;
@@ -499,8 +577,15 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
         }
 
         @keyframes popIn {
-            0%   { transform: scale(.5); opacity: 0; }
-            100% { transform: scale(1);  opacity: 1; }
+            0% {
+                transform: scale(.5);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .mm-modal-title {
@@ -530,7 +615,10 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             letter-spacing: 1px;
         }
 
-        .mm-modal-actions { display: flex; gap: 10px; }
+        .mm-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
 
         .mm-btn {
             flex: 1;
@@ -554,7 +642,10 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
         }
 
-        .mm-btn-primary:hover { background: #8e1722; color: #fff; }
+        .mm-btn-primary:hover {
+            background: #8e1722;
+            color: #fff;
+        }
 
         .mm-btn-ghost {
             background: #fff;
@@ -562,15 +653,36 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             color: #6f675f;
         }
 
-        .mm-btn-ghost:hover { background: #faf7f0; color: #302923; }
+        .mm-btn-ghost:hover {
+            background: #faf7f0;
+            color: #302923;
+        }
 
 
         @media (max-width: 768px) {
-            .apartment-page { padding: 20px 15px 30px; }
-            .apartment-header { flex-direction: column; align-items: flex-start; }
-            .apartment-form-card { padding: 17px; border-radius: 17px; }
-            .form-actions { flex-direction: column-reverse; }
-            .btn-cancel, .btn-save { width: 100%; justify-content: center; }
+            .apartment-page {
+                padding: 20px 15px 30px;
+            }
+
+            .apartment-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .apartment-form-card {
+                padding: 17px;
+                border-radius: 17px;
+            }
+
+            .form-actions {
+                flex-direction: column-reverse;
+            }
+
+            .btn-cancel,
+            .btn-save {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 
@@ -712,9 +824,9 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
 
                             <div class="divisions-header-title">
                                 <i class="bi bi-grid-3x3-gap"></i>
-                                <div>
+                                <div class="title-text">
                                     <h4>Apartment Divisions <span class="required">*</span></h4>
-                                    <span>Each division has its own delivery charge.</span>
+                                    <span class="subtitle">Each division has its own delivery charge.</span>
                                 </div>
                             </div>
 

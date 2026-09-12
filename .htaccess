@@ -1,14 +1,14 @@
 RewriteEngine On
-RewriteBase /mr.millet.admin/
+RewriteBase /mrs.millet.admin/
 
 # -----------------------------------------
 # Remove .php extension from URL
-# Example: /mr.millet.admin/login.php
-# becomes: /mr.millet.admin/login
+# Example: /mrs.millet.admin/login.php
+# becomes: /mrs.millet.admin/login
 # -----------------------------------------
-RewriteCond %{THE_REQUEST} \s/+mr\.millet\.admin/(.+?)\.php[\s?] [NC]
+RewriteCond %{THE_REQUEST} \s/+mrs\.millet\.admin/(.+?)\.php[\s?] [NC]
 RewriteCond %{REQUEST_METHOD} GET
-RewriteRule ^(.+)\.php$ /mr.millet.admin/$1 [R=301,L]
+RewriteRule ^(.+)\.php$ /mrs.millet.admin/$1 [R=301,L]
 
 # -----------------------------------------
 # Don't rewrite existing files or folders
@@ -18,7 +18,7 @@ RewriteCond %{REQUEST_FILENAME} !-d
 
 # -----------------------------------------
 # Automatically load .php files
-# Example: /mr.millet.admin/login
+# Example: /mrs.millet.admin/login
 # loads: login.php
 # -----------------------------------------
 RewriteRule ^(.+)$ $1.php [L,QSA]
@@ -31,6 +31,6 @@ RewriteRule ^$ index.php [L]
 # -----------------------------------------
 # Don't rewrite AJAX POST requests
 # -----------------------------------------
-RewriteCond %{REQUEST_URI} ^/mr\.millet\.admin/ajax/
+RewriteCond %{REQUEST_URI} ^/mrs\.millet\.admin/ajax/
 RewriteCond %{REQUEST_METHOD} POST
 RewriteRule ^ - [L]

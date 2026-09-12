@@ -2,6 +2,7 @@
    MRS MILL@ — ADD APARTMENT UX
    File: ./js/add-apartment.js
    Multi-division rows, each with its own delivery charge
+   Errors shown in POPUP (not top alert)
    ========================================================= */
 
 (function () {
@@ -13,7 +14,6 @@
             : "./";
 
     const form         = document.getElementById("apartmentForm");
-    const alertBox     = document.getElementById("formAlert");
     const saveBtn      = document.getElementById("saveBtn");
     const saveText     = document.getElementById("saveBtnText");
 
@@ -28,18 +28,119 @@
     if (!form) return;
 
     /* =========================================
-       ERROR ALERT
+       BUILD ERROR POPUP (injected once)
+    ========================================= */
+
+    let errorOverlay = null;
+    let errorText    = null;
+
+    function buildErrorPopup() {
+
+        if (errorOverlay) return;
+
+        errorOverlay = document.createElement("div");
+        errorOverlay.className = "mm-modal-overlay";
+        errorOverlay.setAttribute("aria-hidden", "true");
+        errorOverlay.id = "errorOverlay";
+
+        errorOverlay.innerHTML = `
+            <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="errorTitle">
+
+                <div class="mm-modal-icon mm-modal-icon-error">
+                    <i class="bi bi-exclamation-lg"></i>
+                </div>
+
+                <h3 class="mm-modal-title" id="errorTitle">
+                    Oops! Something's missing
+                </h3>
+
+                <p class="mm-modal-text" id="errorText">
+                    Please check the form and try again.
+                </p>
+
+                <div class="mm-modal-actions">
+                    <button type="button"
+                            class="mm-btn mm-btn-danger"
+                            id="errorOkBtn">
+                        <i class="bi bi-check2"></i>
+                        Got it
+                    </button>
+                </div>
+
+            </div>
+        `;
+
+        document.body.appendChild(errorOverlay);
+
+        errorText = errorOverlay.querySelector("#errorText");
+
+        /* Close on backdrop click */
+        errorOverlay.addEventListener("click", function (e) {
+            if (e.target === errorOverlay) closeErrorPopup();
+        });
+
+        /* Close on ESC */
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape" &&
+                errorOverlay.classList.contains("show")) {
+                closeErrorPopup();
+            }
+        });
+
+        /* Close on OK button */
+        errorOverlay.querySelector("#errorOkBtn")
+            .addEventListener("click", closeErrorPopup);
+
+        /* Inject error-specific styles once */
+        if (!document.getElementById("mmErrorStyles")) {
+
+            const style = document.createElement("style");
+            style.id = "mmErrorStyles";
+            style.textContent = `
+                .mm-modal-icon-error {
+                    background: #fdecec;
+                    color: #b51f2c;
+                }
+
+                .mm-btn-danger {
+                    background: #b51f2c;
+                    color: #fff;
+                    box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
+                }
+
+                .mm-btn-danger:hover {
+                    background: #8e1722;
+                    color: #fff;
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    }
+
+    /* =========================================
+       ERROR POPUP — SHOW / HIDE
     ========================================= */
 
     function showError(message) {
-        alertBox.className = "alert-box show error";
-        alertBox.textContent = message;
-        alertBox.scrollIntoView({ behavior: "smooth", block: "center" });
+
+        buildErrorPopup();
+
+        if (errorText) {
+            errorText.textContent = message || "Please check the form and try again.";
+        }
+
+        errorOverlay.classList.add("show");
+        errorOverlay.setAttribute("aria-hidden", "false");
+
+        /* focus the OK button for keyboard users */
+        const ok = errorOverlay.querySelector("#errorOkBtn");
+        if (ok) setTimeout(() => ok.focus(), 60);
     }
 
-    function clearError() {
-        alertBox.className = "alert-box";
-        alertBox.textContent = "";
+    function closeErrorPopup() {
+        if (!errorOverlay) return;
+        errorOverlay.classList.remove("show");
+        errorOverlay.setAttribute("aria-hidden", "true");
     }
 
     /* =========================================
@@ -99,6 +200,30 @@
     }
 
     /* =========================================
+       HELPERS
+    ========================================= */
+
+    function escapeAttr(str) {
+        return String(str)
+            .replace(/&/g, "&amp;")
+            .replace(/"/g, "&quot;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;");
+    }
+
+    /* =========================================
+       GET FIRST DIVISION CHARGE (for auto-fill)
+    ========================================= */
+
+    function getFirstDivisionCharge() {
+        const firstCharge = divisionRows.querySelector(".division-charge");
+        if (!firstCharge) return "";
+
+        const val = firstCharge.value.trim();
+        return val === "" ? "" : val;
+    }
+
+    /* =========================================
        DIVISION ROW
     ========================================= */
 
@@ -143,18 +268,24 @@
         return row;
     }
 
-    function escapeAttr(str) {
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/"/g, "&quot;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
-    }
+    /* =========================================
+       ADD DIVISION ROW (with auto-fill charge)
+       - If charge passed → use it
+       - Else → copy from FIRST division row
+    ========================================= */
 
     function addDivisionRow(division, charge) {
+
+        let finalCharge = charge;
+
+        if (finalCharge === undefined || finalCharge === null || finalCharge === "") {
+            finalCharge = getFirstDivisionCharge();
+        }
+
         divisionRows.appendChild(
-            createDivisionRow(division || "", charge || "")
+            createDivisionRow(division || "", finalCharge || "")
         );
+
         refreshEmptyState();
     }
 
@@ -165,9 +296,14 @@
         }
     }
 
+    /* =========================================
+       ADD DIVISION BUTTON
+    ========================================= */
+
     if (addDivBtn) {
         addDivBtn.addEventListener("click", function () {
             addDivisionRow();
+
             const inputs = divisionRows.querySelectorAll(".division-name");
             if (inputs.length) {
                 inputs[inputs.length - 1].focus();
@@ -221,7 +357,6 @@
     form.addEventListener("submit", function (e) {
 
         e.preventDefault();
-        clearError();
 
         const name    = document.getElementById("apartment_name").value.trim();
         const address = document.getElementById("apartment_address").value.trim();

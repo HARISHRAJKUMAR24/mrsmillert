@@ -38,7 +38,7 @@
         <nav class="sidebar-menu">
 
 
-            <a href="#" class="active">
+            <a href="index.php" class="active">
 
                 <i class="bi bi-grid-1x2-fill"></i>
 
