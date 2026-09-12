@@ -804,7 +804,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
                                 Apartment Address <span class="required">*</span>
                             </label>
                             <div class="input-icon-wrap">
-                                <i class="bi bi-geo-alt"></i>
                                 <textarea name="apartment_address"
                                     id="apartment_address"
                                     class="apartment-textarea"

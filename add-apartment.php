@@ -755,7 +755,6 @@ require_once './config/function.php';
                                 Apartment Address <span class="required">*</span>
                             </label>
                             <div class="input-icon-wrap">
-                                <i class="bi bi-geo-alt"></i>
                                 <textarea name="apartment_address"
                                     id="apartment_address"
                                     class="apartment-textarea"
