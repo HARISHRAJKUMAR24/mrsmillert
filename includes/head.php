@@ -5,11 +5,17 @@
 
     <title>Mrs Mill@ - Admin Dashboard</title>
     <!-- Favicon -->
-    <link
-        rel="icon"
-        type="image/png"
-        href="<?= ADMIN_URL ?>uploads/mrsmilletfavicon.png">
+<?php
+$faviconImage = getData('favicon_image', 'settings', 'id = 1');
 
+$faviconUrl = $faviconImage
+    ? ADMIN_URL . $faviconImage
+    : '';
+?>
+<link
+    rel="icon"
+    type="image/png"
+    href="<?= htmlspecialchars($faviconUrl) ?>">
     <!-- Bootstrap -->
     <link
         href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"

@@ -7,7 +7,7 @@ $apartmentId   = isset($_GET['id'])   ? (int) $_GET['id'] : 0;
 $apartmentCode = isset($_GET['code']) ? trim($_GET['code']) : '';
 
 if ($apartmentId <= 0 && $apartmentCode === '') {
-    header('Location: list.php');
+    header('Location: apartment.php');
     exit;
 }
 ?>
@@ -735,11 +735,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
                     <p>Update apartment info, divisions and delivery charges.</p>
                 </div>
 
-                <a href="list.php" class="back-btn">
-                    <i class="bi bi-arrow-left"></i>
-                    Back to List
-                </a>
-
             </div>
 
 
@@ -893,7 +888,7 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
 
             <div class="mm-modal-actions">
 
-                <a href="list.php" class="mm-btn mm-btn-ghost">
+                <a href="apartment.php" class="mm-btn mm-btn-ghost">
                     <i class="bi bi-list-ul"></i>
                     Back to List
                 </a>
