@@ -275,7 +275,7 @@ require_once './config/function.php';
                     <p>Create a new category with a name and image.</p>
                 </div>
 
-                <a href="list.php" class="back-btn">
+                <a href="category.php" class="back-btn">
                     <i class="bi bi-arrow-left"></i>
                     Back to List
                 </a>
@@ -340,7 +340,7 @@ require_once './config/function.php';
                     </div>
 
                     <div class="form-actions">
-                        <a href="list.php" class="btn-cancel">Cancel</a>
+                        <a href="category.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Save Category</span>
@@ -382,7 +382,7 @@ require_once './config/function.php';
                 Your category has been saved successfully.
             </p>
             <div class="mm-modal-actions">
-                <a href="add.php" class="mm-btn mm-btn-ghost">
+                <a href="add-category.php" class="mm-btn mm-btn-ghost">
                     <i class="bi bi-plus-lg"></i> Add Another
                 </a>
                 <a href="category.php" class="mm-btn mm-btn-primary">

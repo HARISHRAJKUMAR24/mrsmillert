@@ -691,10 +691,7 @@ require_once './config/function.php';
                     <p>Create an apartment and add its divisions with delivery charges.</p>
                 </div>
 
-                <a href="list.php" class="back-btn">
-                    <i class="bi bi-arrow-left"></i>
-                    Back to List
-                </a>
+
 
             </div>
 
@@ -807,7 +804,7 @@ require_once './config/function.php';
 
                     <div class="form-actions">
 
-                        <a href="list.php" class="btn-cancel">Cancel</a>
+                        <a href="apartment.php" class="btn-cancel">Cancel</a>
 
                         <button type="submit"
                             class="btn-save"

@@ -5,7 +5,7 @@ require_once './config/function.php';
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($id <= 0) {
-    header('Location: list.php');
+    header('Location: category.php');
     exit;
 }
 ?>
@@ -406,7 +406,7 @@ if ($id <= 0) {
                     </div>
 
                     <div class="form-actions">
-                        <a href="list.php" class="btn-cancel">Cancel</a>
+                        <a href="category.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Update Category</span>

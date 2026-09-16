@@ -2,7 +2,11 @@
 /* =========================================================
    MRS MILL@ — AJAX: DELETE PRODUCT
    File: ./ajax/product-delete.php
-   Deletes row + image file + linked apartment links
+   Deletes:
+     - product_variants (by product_code)
+     - product_apartments (by product_code)
+     - products row
+     - product image file + empty folder
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -33,22 +37,30 @@ try {
         jsonResponse(false, 'Product not found.');
     }
 
+    $productCode = $row['product_code'];
+
     $pdo->beginTransaction();
 
-    /* delete apartment links */
-    $del = $pdo->prepare(
+    /* 1) delete all variants */
+    $delVar = $pdo->prepare(
+        "DELETE FROM product_variants WHERE product_code = ?"
+    );
+    $delVar->execute([$productCode]);
+
+    /* 2) delete apartment links */
+    $delApt = $pdo->prepare(
         "DELETE FROM product_apartments WHERE product_code = ?"
     );
-    $del->execute([$row['product_code']]);
+    $delApt->execute([$productCode]);
 
-    /* delete product row */
-    $del2 = $pdo->prepare("DELETE FROM products WHERE id = ?");
-    $del2->execute([$id]);
+    /* 3) delete product row */
+    $delProd = $pdo->prepare("DELETE FROM products WHERE id = ?");
+    $delProd->execute([$id]);
 
     $pdo->commit();
 
-    /* delete image file + empty folder */
-    if (!empty($row['product_image'])) {
+    /* 4) delete image file + empty folder */
+    if (!empty($row['product_image']) && function_exists('deleteCategoryImage')) {
         deleteCategoryImage($row['product_image'], dirname(__DIR__));
     }
 
@@ -60,5 +72,5 @@ try {
         $pdo->rollBack();
     }
 
-    jsonResponse(false, 'Failed to delete product.');
+    jsonResponse(false, 'Failed to delete product: ' . $e->getMessage());
 }

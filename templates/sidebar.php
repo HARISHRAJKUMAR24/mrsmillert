@@ -36,7 +36,7 @@ $sidebarLogoUrl = $sidebarLogo
     <!-- MAIN MENU -->
 
     <div class="menu-title">
-        Main Menu
+        Main Options
     </div>
 
 
@@ -45,6 +45,11 @@ $sidebarLogoUrl = $sidebarLogo
         <a href="index.php" class="active">
             <i class="bi bi-grid-1x2-fill"></i>
             Dashboard
+        </a>
+
+        <a href="menu.php">
+            <i class="bi bi-list-ul"></i>
+            Menu
         </a>
 
         <a href="#">

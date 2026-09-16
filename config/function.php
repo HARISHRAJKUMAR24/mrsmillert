@@ -473,3 +473,24 @@ if (!function_exists('getSettings')) {
         }
     }
 }
+
+
+if (!function_exists('generateMenuCode')) {
+    function generateMenuCode(PDO $pdo): string
+    {
+        try {
+            $stmt = $pdo->query(
+                "SELECT menu_code FROM menus ORDER BY id DESC LIMIT 1"
+            );
+            $last = $stmt->fetchColumn();
+            if (!$last) return 'MEN001';
+
+            $num = (int) preg_replace('/[^0-9]/', '', $last);
+            $num++;
+
+            return 'MEN' . str_pad((string)$num, 3, '0', STR_PAD_LEFT);
+        } catch (PDOException $e) {
+            return 'MEN001';
+        }
+    }
+}

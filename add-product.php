@@ -898,7 +898,7 @@ try {
 
 
                     <div class="form-actions">
-                        <a href="list.php" class="btn-cancel">Cancel</a>
+                        <a href="product.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Save Product</span>

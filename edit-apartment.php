@@ -845,7 +845,7 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
 
                     <div class="form-actions">
 
-                        <a href="list.php" class="btn-cancel">Cancel</a>
+                        <a href="apartment.php" class="btn-cancel">Cancel</a>
 
                         <button type="submit"
                             class="btn-save"
