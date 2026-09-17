@@ -2,8 +2,52 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
-$today = date('Y-m-d');
-$in3   = date('Y-m-d', strtotime('+3 days'));
+$id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+if ($id <= 0) {
+    header('Location: discounts.php');
+    exit;
+}
+
+/* Load discount */
+$discount = null;
+$slots = [];
+
+try {
+
+    $stmt = $pdo->prepare("SELECT * FROM discounts WHERE id = ? LIMIT 1");
+    $stmt->execute([$id]);
+    $discount = $stmt->fetch();
+
+    if (!$discount) {
+        header('Location: discounts.php');
+        exit;
+    }
+
+    $sStmt = $pdo->prepare(
+        "SELECT * FROM discount_times WHERE discount_code = ? ORDER BY id ASC"
+    );
+    $sStmt->execute([$discount['discount_code']]);
+    $slots = $sStmt->fetchAll();
+
+} catch (PDOException $e) {
+    header('Location: discounts.php');
+    exit;
+}
+
+/* Convert HH:MM:SS to 12h + AM/PM */
+function to12h(string $t): array
+{
+    $ts = strtotime($t);
+    if (!$ts) return ['09:00', 'AM'];
+    $h = (int)date('H', $ts);
+    $m = (int)date('i', $ts);
+    $ampm = $h >= 12 ? 'PM' : 'AM';
+    $h12  = $h % 12; if ($h12 === 0) $h12 = 12;
+    return [sprintf('%02d:%02d', $h12, $m), $ampm];
+}
+
+$isCoupon = $discount['discount_type'] === 'coupon';
+$couponSlot = $isCoupon ? ($slots[0] ?? null) : null;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -26,6 +70,13 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         .disc-title p { margin: 0; color: #817a71; font-size: 13px; }
 
+        .back-btn {
+            display: inline-flex; align-items: center; gap: 8px;
+            border: 1px solid #e4ddd3; background: #fff; color: #6f675f;
+            padding: 10px 16px; border-radius: 10px;
+            font-size: 11px; font-weight: 700; text-decoration: none;
+        }
+
         .disc-card {
             background: #fff; border: 1px solid #eee7dc;
             border-radius: 20px; padding: 25px; max-width: 1100px;
@@ -42,6 +93,14 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         .form-card-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
         .form-card-header span { display: block; margin-top: 3px; color: #817a71; font-size: 10px; }
+
+        .disc-code-tag {
+            margin-left: auto;
+            display: inline-block;
+            background: #faf7f0; border: 1px dashed #d8c9b8;
+            color: #6f5a3f; font-size: 10px; font-weight: 800;
+            padding: 4px 10px; border-radius: 7px; letter-spacing: 1px;
+        }
 
         .disc-form label {
             display: block; font-size: 11px; font-weight: 700;
@@ -70,9 +129,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         .input-icon-wrap .disc-input { padding-left: 40px; }
 
         /* TYPE */
-        .disc-type-row {
-            display: flex; gap: 12px; margin-bottom: 22px;
-        }
+        .disc-type-row { display: flex; gap: 12px; margin-bottom: 22px; }
         .disc-type-option { flex: 1; position: relative; cursor: pointer; }
         .disc-type-option input { position: absolute; opacity: 0; pointer-events: none; }
         .disc-type-box {
@@ -94,8 +151,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
 
         /* SECTIONS */
         .section {
-            margin-top: 22px;
-            padding-top: 20px;
+            margin-top: 22px; padding-top: 20px;
             border-top: 1px solid #f0ebe4;
         }
         .section-head {
@@ -112,16 +168,13 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             display: flex; align-items: center; justify-content: center;
             font-size: 14px;
         }
-        .section-head h4 .required { margin-left: 2px; }
         .section-head p {
             margin: 4px 0 0 38px;
             font-size: 10px; color: #817a71;
         }
 
         /* TIME ROWS */
-        .time-rows {
-            display: flex; flex-direction: column; gap: 12px;
-        }
+        .time-rows { display: flex; flex-direction: column; gap: 12px; }
         .time-row {
             border: 1px solid #f0ebe4;
             background: #fffdf9;
@@ -184,7 +237,6 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
-        /* slot extra: amount type + amount + delivery */
         .slot-extra-grid {
             display: grid;
             grid-template-columns: 160px 1fr 1fr;
@@ -203,17 +255,12 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             height: 42px;
             box-sizing: border-box;
         }
-        .delivery-inline.is-on {
-            background: #f0f9f1;
-            border-color: #b6e0bd;
-        }
+        .delivery-inline.is-on { background: #f0f9f1; border-color: #b6e0bd; }
         .delivery-inline .lbl {
             font-size: 11px; font-weight: 700; color: #302923;
             display: inline-flex; align-items: center; gap: 6px;
         }
-        .delivery-inline .lbl i {
-            color: #c62828; font-size: 13px;
-        }
+        .delivery-inline .lbl i { color: #c62828; font-size: 13px; }
         .delivery-inline.is-on .lbl i { color: #2e7d32; }
 
         .mm-switch {
@@ -237,9 +284,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         .add-time-btn {
             display: flex; align-items: center; justify-content: center;
             gap: 8px;
-            margin-top: 12px;
-            padding: 12px;
-            width: 100%;
+            margin-top: 12px; padding: 12px; width: 100%;
             background: #fffaf9;
             border: 2px dashed #e4ddd3;
             border-radius: 12px;
@@ -247,19 +292,12 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             font-size: 11px; font-weight: 800;
             cursor: pointer; transition: .2s;
         }
-        .add-time-btn:hover {
-            background: #fff5f5;
-            border-color: #d98a91;
-        }
+        .add-time-btn:hover { background: #fff5f5; border-color: #d98a91; }
 
         /* COUPON */
         .coupon-fields { display: none; }
         .coupon-fields.show { display: block; }
-        .coupon-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
+        .coupon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
         /* STATUS */
         .status-toggle-row {
@@ -354,9 +392,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         .mm-btn-primary { background: #b51f2c; color: #fff; }
         .mm-btn-primary:hover { background: #8e1722; color: #fff; }
-        .mm-btn-ghost {
-            background: #fff; border: 1px solid #e4ddd3; color: #6f675f;
-        }
+        .mm-btn-ghost { background: #fff; border: 1px solid #e4ddd3; color: #6f675f; }
         .mm-btn-ghost:hover { background: #faf7f0; }
 
         @media (max-width: 900px) {
@@ -412,9 +448,14 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
 
             <div class="disc-header">
                 <div class="disc-title">
-                    <h1>Add Discount</h1>
-                    <p>Create a time-based or coupon-based discount with fixed or percentage amount.</p>
+                    <h1>Edit Discount</h1>
+                    <p>Update name, type, time slots and amount.</p>
                 </div>
+
+                <a href="discounts.php" class="back-btn">
+                    <i class="bi bi-arrow-left"></i>
+                    Back to List
+                </a>
             </div>
 
 
@@ -422,15 +463,20 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
 
                 <div class="form-card-header">
                     <div class="form-card-icon">
-                        <i class="bi bi-ticket-perforated"></i>
+                        <i class="bi bi-pencil-square"></i>
                     </div>
                     <div>
                         <h3>Discount Details</h3>
-                        <span>All fields marked with * are required.</span>
+                        <span>Changes save on Update.</span>
                     </div>
+                    <span class="disc-code-tag">
+                        #<?= htmlspecialchars($discount['discount_code']) ?>
+                    </span>
                 </div>
 
                 <form id="discountForm" class="disc-form" method="POST" novalidate>
+
+                    <input type="hidden" id="discount_id" value="<?= (int)$discount['id'] ?>">
 
                     <div class="row g-3">
                         <div class="col-12">
@@ -440,43 +486,44 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                                 <input type="text"
                                     id="discount_name"
                                     class="disc-input"
-                                    placeholder="Eg: Happy Hour"
                                     maxlength="150"
+                                    value="<?= htmlspecialchars($discount['discount_name']) ?>"
                                     required>
                             </div>
                         </div>
                     </div>
 
 
-                    <!-- ==================== DISCOUNT TYPE ==================== -->
-
+                    <!-- TYPE -->
                     <div class="section">
                         <div class="section-head">
                             <div>
                                 <h4><i class="bi bi-sliders"></i> Discount Type <span class="required">*</span></h4>
-                                <p>Choose whether this discount runs on time slots or requires a coupon code.</p>
+                                <p>Type cannot be changed after creation. Change by creating a new one.</p>
                             </div>
                         </div>
 
                         <div class="disc-type-row">
 
                             <label class="disc-type-option" for="disc_type_time">
-                                <input type="radio" id="disc_type_time" name="discount_type" value="time" checked>
-                                <div class="disc-type-box">
+                                <input type="radio" id="disc_type_time" name="discount_type" value="time"
+                                    <?= !$isCoupon ? 'checked disabled' : 'disabled' ?>>
+                                <div class="disc-type-box" style="opacity:<?= $isCoupon ? '0.5' : '1' ?>;">
                                     <div class="mode-head">
                                         <i class="bi bi-clock-history"></i> Time Based
                                     </div>
-                                    <p>Runs automatically in one or more time slots. Each slot has its own amount type + amount + delivery.</p>
+                                    <p>Runs automatically in one or more time slots.</p>
                                 </div>
                             </label>
 
                             <label class="disc-type-option" for="disc_type_coupon">
-                                <input type="radio" id="disc_type_coupon" name="discount_type" value="coupon">
-                                <div class="disc-type-box">
+                                <input type="radio" id="disc_type_coupon" name="discount_type" value="coupon"
+                                    <?= $isCoupon ? 'checked disabled' : 'disabled' ?>>
+                                <div class="disc-type-box" style="opacity:<?= $isCoupon ? '1' : '0.5' ?>;">
                                     <div class="mode-head">
                                         <i class="bi bi-ticket-detailed"></i> Coupon Code
                                     </div>
-                                    <p>Customer enters a coupon code. Valid within a date range and one time window.</p>
+                                    <p>Customer enters a coupon code with date range.</p>
                                 </div>
                             </label>
 
@@ -484,13 +531,12 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                     </div>
 
 
-                    <!-- ==================== TIME SLOTS ==================== -->
-
-                    <div class="section" id="timeSection">
+                    <!-- TIME SLOTS -->
+                    <div class="section" id="timeSection" style="<?= $isCoupon ? 'display:none;' : '' ?>">
                         <div class="section-head">
                             <div>
                                 <h4><i class="bi bi-clock"></i> Time Slots <span class="required">*</span></h4>
-                                <p>Each slot has its own <strong>amount type</strong> (Fixed / Percent), <strong>amount</strong> and <strong>delivery</strong> toggle.</p>
+                                <p>Each slot has its own <strong>amount type</strong>, <strong>amount</strong> and <strong>delivery</strong>.</p>
                             </div>
                         </div>
 
@@ -503,9 +549,8 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                     </div>
 
 
-                    <!-- ==================== COUPON ==================== -->
-
-                    <div class="section coupon-fields" id="couponSection">
+                    <!-- COUPON -->
+                    <div class="section coupon-fields <?= $isCoupon ? 'show' : '' ?>" id="couponSection">
                         <div class="section-head">
                             <div>
                                 <h4><i class="bi bi-ticket-perforated"></i> Coupon Details <span class="required">*</span></h4>
@@ -521,8 +566,8 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                                     <input type="text"
                                         id="coupon_code"
                                         class="disc-input"
-                                        placeholder="Eg: SAVE50"
                                         maxlength="50"
+                                        value="<?= htmlspecialchars($discount['coupon_code'] ?? '') ?>"
                                         autocomplete="off"
                                         spellcheck="false">
                                 </div>
@@ -535,7 +580,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                                     <input type="date"
                                         id="valid_from_date"
                                         class="disc-input"
-                                        value="<?= htmlspecialchars($today) ?>">
+                                        value="<?= htmlspecialchars($discount['valid_from_date'] ?? '') ?>">
                                 </div>
                             </div>
                             <div>
@@ -545,34 +590,42 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                                     <input type="date"
                                         id="valid_to_date"
                                         class="disc-input"
-                                        value="<?= htmlspecialchars($in3) ?>">
+                                        value="<?= htmlspecialchars($discount['valid_to_date'] ?? '') ?>">
                                 </div>
                             </div>
                         </div>
+
+                        <?php
+                        $cStart = $couponSlot ? to12h($couponSlot['start_time']) : ['09:00', 'AM'];
+                        $cEnd   = $couponSlot ? to12h($couponSlot['end_time'])   : ['09:00', 'PM'];
+                        $cType  = $couponSlot ? $couponSlot['amount_type']        : 'fixed';
+                        $cAmt   = $couponSlot ? $couponSlot['discount_amount']    : '';
+                        $cDel   = $couponSlot ? (int)$couponSlot['delivery_enabled'] : 1;
+                        ?>
 
                         <label>Coupon Time Window <span class="required">*</span></label>
                         <div class="time-row-grid" style="margin-bottom:12px;">
                             <div>
                                 <label class="field-label">Start Time</label>
-                                <input type="time" id="coupon_start_time" class="time-input" value="09:00">
+                                <input type="time" id="coupon_start_time" class="time-input" value="<?= htmlspecialchars($cStart[0]) ?>">
                             </div>
                             <div>
                                 <label class="field-label">AM/PM</label>
                                 <select id="coupon_start_ampm" class="time-input">
-                                    <option value="AM" selected>AM</option>
-                                    <option value="PM">PM</option>
+                                    <option value="AM" <?= $cStart[1] === 'AM' ? 'selected' : '' ?>>AM</option>
+                                    <option value="PM" <?= $cStart[1] === 'PM' ? 'selected' : '' ?>>PM</option>
                                 </select>
                             </div>
                             <div></div>
                             <div>
                                 <label class="field-label">End Time</label>
-                                <input type="time" id="coupon_end_time" class="time-input" value="09:00">
+                                <input type="time" id="coupon_end_time" class="time-input" value="<?= htmlspecialchars($cEnd[0]) ?>">
                             </div>
                             <div>
                                 <label class="field-label">AM/PM</label>
                                 <select id="coupon_end_ampm" class="time-input">
-                                    <option value="AM">AM</option>
-                                    <option value="PM" selected>PM</option>
+                                    <option value="AM" <?= $cEnd[1] === 'AM' ? 'selected' : '' ?>>AM</option>
+                                    <option value="PM" <?= $cEnd[1] === 'PM' ? 'selected' : '' ?>>PM</option>
                                 </select>
                             </div>
                             <div></div>
@@ -582,33 +635,34 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                             <div>
                                 <label>Amount Type <span class="required">*</span></label>
                                 <select id="coupon_amount_type" class="time-input">
-                                    <option value="fixed" selected>Fixed (₹)</option>
-                                    <option value="percent">Percentage (%)</option>
+                                    <option value="fixed" <?= $cType === 'fixed' ? 'selected' : '' ?>>Fixed (₹)</option>
+                                    <option value="percent" <?= $cType === 'percent' ? 'selected' : '' ?>>Percentage (%)</option>
                                 </select>
                             </div>
 
                             <div>
                                 <label>Amount <span class="required">*</span></label>
                                 <div class="input-icon-wrap">
-                                    <i class="bi bi-currency-rupee" id="couponAmountIcon"></i>
+                                    <i class="bi <?= $cType === 'percent' ? 'bi-percent' : 'bi-currency-rupee' ?>" id="couponAmountIcon"></i>
                                     <input type="number"
                                         id="coupon_amount"
                                         class="disc-input"
-                                        placeholder="Eg: 50"
+                                        value="<?= htmlspecialchars((string)$cAmt) ?>"
                                         min="0"
-                                        step="0.01">
+                                        step="0.01"
+                                        <?= $cType === 'percent' ? 'max="100"' : '' ?>>
                                 </div>
                             </div>
 
                             <div>
                                 <label>Delivery</label>
-                                <div class="delivery-inline is-on" id="couponDeliveryWrap">
+                                <div class="delivery-inline <?= $cDel ? 'is-on' : '' ?>" id="couponDeliveryWrap">
                                     <span class="lbl">
-                                        <i class="bi bi-truck" id="couponDeliveryIcon"></i>
-                                        <span id="couponDeliveryText">Delivery Enabled</span>
+                                        <i class="bi bi-truck"></i>
+                                        <span id="couponDeliveryText"><?= $cDel ? 'Delivery Enabled' : 'Delivery Disabled' ?></span>
                                     </span>
                                     <label class="mm-switch" for="coupon_delivery_enabled">
-                                        <input type="checkbox" id="coupon_delivery_enabled" checked>
+                                        <input type="checkbox" id="coupon_delivery_enabled" <?= $cDel ? 'checked' : '' ?>>
                                         <span class="mm-switch-slider"></span>
                                     </label>
                                 </div>
@@ -617,20 +671,21 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                     </div>
 
 
-                    <!-- ==================== STATUS TOGGLE ==================== -->
-
-                    <div class="status-toggle-row is-active" id="statusToggleRow">
+                    <!-- STATUS -->
+                    <div class="status-toggle-row <?= (int)$discount['status'] === 1 ? 'is-active' : '' ?>" id="statusToggleRow">
                         <div class="status-toggle-info">
                             <div class="status-toggle-icon" id="statusToggleIcon">
-                                <i class="bi bi-check-circle-fill"></i>
+                                <i class="bi <?= (int)$discount['status'] === 1 ? 'bi-check-circle-fill' : 'bi-x-circle-fill' ?>"></i>
                             </div>
                             <div>
-                                <h4 id="statusToggleTitle">Active</h4>
-                                <p id="statusToggleDesc">Discount will be applied.</p>
+                                <h4 id="statusToggleTitle"><?= (int)$discount['status'] === 1 ? 'Active' : 'Inactive' ?></h4>
+                                <p id="statusToggleDesc"><?= (int)$discount['status'] === 1
+                                    ? 'Discount will be applied.'
+                                    : 'Discount will not be applied.' ?></p>
                             </div>
                         </div>
                         <label class="mm-switch" for="discount_status">
-                            <input type="checkbox" id="discount_status" name="discount_status" checked>
+                            <input type="checkbox" id="discount_status" <?= (int)$discount['status'] === 1 ? 'checked' : '' ?>>
                             <span class="mm-switch-slider"></span>
                         </label>
                     </div>
@@ -640,7 +695,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                         <a href="discounts.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
-                            <span id="saveBtnText">Save Discount</span>
+                            <span id="saveBtnText">Update Discount</span>
                         </button>
                     </div>
 
@@ -656,15 +711,11 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
     <!-- ERROR -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon error">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
+            <div class="mm-modal-icon error"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <h3 class="mm-modal-title" id="errorTitle">Oops!</h3>
             <p class="mm-modal-text" id="errorText">Something went wrong.</p>
             <div class="mm-modal-actions">
-                <button type="button" class="mm-btn mm-btn-primary" id="errorOkBtn">
-                    <i class="bi bi-check2"></i> Got it
-                </button>
+                <button type="button" class="mm-btn mm-btn-primary" id="errorOkBtn">Got it</button>
             </div>
         </div>
     </div>
@@ -674,23 +725,42 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon success"><i class="bi bi-check-lg"></i></div>
-            <h3 class="mm-modal-title">Discount Added!</h3>
-            <p class="mm-modal-text" id="successText">Your discount has been saved successfully.</p>
+            <h3 class="mm-modal-title">Discount Updated!</h3>
+            <p class="mm-modal-text" id="successText">Discount updated successfully.</p>
             <div class="mm-modal-actions">
-                <a href="add-discount.php" class="mm-btn mm-btn-ghost">
-                    <i class="bi bi-plus-lg"></i> Add Another
+                <a href="discounts.php" class="mm-btn mm-btn-ghost">
+                    <i class="bi bi-list-ul"></i> Back to List
                 </a>
-                <a href="discounts.php" class="mm-btn mm-btn-primary">
-                    <i class="bi bi-list-ul"></i> View Discounts
-                </a>
+                <button type="button" class="mm-btn mm-btn-primary" id="stayBtn">
+                    <i class="bi bi-pencil"></i> Stay Here
+                </button>
             </div>
         </div>
     </div>
 
 
+    <script>
+        window.ADMIN_URL = "<?= ADMIN_URL; ?>";
+        window.DISCOUNT_ID = <?= (int)$discount['id'] ?>;
+        window.DISCOUNT_TYPE = "<?= htmlspecialchars($discount['discount_type']) ?>";
+        window.DISCOUNT_SLOTS = <?= json_encode(array_map(function ($s) {
+            $st = to12h($s['start_time']);
+            $et = to12h($s['end_time']);
+            return [
+                'start_time'       => $st[0],
+                'start_ampm'       => $st[1],
+                'end_time'         => $et[0],
+                'end_ampm'         => $et[1],
+                'amount_type'      => $s['amount_type'],
+                'discount_amount'  => (float)$s['discount_amount'],
+                'delivery_enabled' => (int)$s['delivery_enabled']
+            ];
+        }, $slots), JSON_UNESCAPED_UNICODE) ?>;
+    </script>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>
-    <script src="<?= ADMIN_URL; ?>js/add-discount.js"></script>
+    <script src="<?= ADMIN_URL; ?>js/edit-discount.js"></script>
 
 </body>
 
