@@ -3,6 +3,7 @@
    File: ./js/edit-menu.js
    - Same dropdown + multi-variant + stock UI as Add page
    - Bottom "Add Another Product" button (auto-scroll)
+   - Active / Inactive status toggle
    ========================================================= */
 
 (function () {
@@ -26,6 +27,12 @@
     const addProductBtnBottom = document.getElementById("addProductBtnBottom");
     const prodRows            = document.getElementById("prodRows");
     const prodEmpty           = document.getElementById("prodEmpty");
+
+    /* STATUS */
+    const statusInput = document.getElementById("menu_status");
+    const statusRow   = document.getElementById("statusToggleRow");
+    const statusTitle = document.getElementById("statusToggleTitle");
+    const statusDesc  = document.getElementById("statusToggleDesc");
 
     const startDate = document.getElementById("start_date");
     const startTime = document.getElementById("start_time");
@@ -80,6 +87,22 @@
     errorOverlay.addEventListener("click", e => {
         if (e.target === errorOverlay) closeError();
     });
+
+    /* ---------------- STATUS TOGGLE ---------------- */
+
+    function applyStatusUI() {
+        if (!statusInput) return;
+        const active = statusInput.checked;
+        if (statusRow)   statusRow.classList.toggle("is-active", active);
+        if (statusTitle) statusTitle.textContent = active ? "Active" : "Inactive";
+        if (statusDesc)  statusDesc.textContent  = active
+            ? "Menu will be visible to customers."
+            : "Menu will be hidden from customers.";
+    }
+
+    if (statusInput) {
+        statusInput.addEventListener("change", applyStatusUI);
+    }
 
     /* ---------------- DATE / TIME ---------------- */
 
@@ -602,9 +625,13 @@
 
         setLoading(true);
 
+        /* STATUS */
+        const status = (statusInput && statusInput.checked) ? "1" : "0";
+
         const formData = new FormData();
         formData.append("id", id);
         formData.append("menu_name", name);
+        formData.append("menu_status", status);
         formData.append("start_at", fmt(s));
         formData.append("end_at", fmt(en));
         formData.append("rows", JSON.stringify(rows));
@@ -649,6 +676,8 @@
     }
 
     /* ---------------- INIT ---------------- */
+
+    applyStatusUI();
 
     if (MENU_ROWS.length > 0) {
         MENU_ROWS.forEach(prefill => addProductRow(prefill));

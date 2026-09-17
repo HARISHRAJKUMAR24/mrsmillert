@@ -3,6 +3,7 @@
    MRS MILL@ — AJAX: ADD MENU
    File: ./ajax/add-menu.php
    - Generates menu_code (MEN001, MEN002 ...)
+   - Saves status (1 = Active, 0 = Inactive)
    - Saves common start/end datetime
    - Saves per product row, expanding each selected variant into a row
    ========================================================= */
@@ -17,11 +18,15 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 }
 
 $name    = trim($_POST['menu_name'] ?? '');
+$statusRaw = $_POST['menu_status'] ?? '1';
 $startAt = trim($_POST['start_at'] ?? '');
 $endAt   = trim($_POST['end_at'] ?? '');
 $rowsRaw = $_POST['rows'] ?? '[]';
 
 $rows = json_decode($rowsRaw, true);
+
+/* Status */
+$status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
 if ($name === '') jsonResponse(false, 'Menu name is required.');
 
@@ -125,14 +130,15 @@ try {
     $pdo->beginTransaction();
 
     $stmt = $pdo->prepare(
-        "INSERT INTO menus (menu_code, menu_name, start_at, end_at)
-         VALUES (?, ?, ?, ?)"
+        "INSERT INTO menus (menu_code, menu_name, start_at, end_at, status)
+         VALUES (?, ?, ?, ?, ?)"
     );
     $stmt->execute([
         $menuCode,
         $name,
         $startObj->format('Y-m-d H:i:s'),
-        $endObj->format('Y-m-d H:i:s')
+        $endObj->format('Y-m-d H:i:s'),
+        $status
     ]);
 
     $menuId = (int) $pdo->lastInsertId();
@@ -157,9 +163,10 @@ try {
     $pdo->commit();
 
     jsonResponse(true, 'Menu added successfully.', [
-        'id'   => $menuId,
-        'code' => $menuCode,
-        'rows' => $flat
+        'id'     => $menuId,
+        'code'   => $menuCode,
+        'status' => $status,
+        'rows'   => $flat
     ]);
 
 } catch (PDOException $e) {

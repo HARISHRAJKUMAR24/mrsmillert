@@ -494,3 +494,23 @@ if (!function_exists('generateMenuCode')) {
         }
     }
 }
+
+if (!function_exists('generateDiscountCode')) {
+    function generateDiscountCode(PDO $pdo): string
+    {
+        try {
+            $stmt = $pdo->query(
+                "SELECT discount_code FROM discounts ORDER BY id DESC LIMIT 1"
+            );
+            $last = $stmt->fetchColumn();
+            if (!$last) return 'DSC001';
+
+            $num = (int) preg_replace('/[^0-9]/', '', $last);
+            $num++;
+
+            return 'DSC' . str_pad((string)$num, 3, '0', STR_PAD_LEFT);
+        } catch (PDOException $e) {
+            return 'DSC001';
+        }
+    }
+}

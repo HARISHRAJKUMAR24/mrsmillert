@@ -63,7 +63,6 @@ try {
     );
     $recentMenus = $stmt->fetchAll();
 
-    /* Load each menu's product rows for prefilling */
     if (!empty($recentMenus)) {
         $codes = array_column($recentMenus, 'menu_code');
         $placeholders = implode(',', array_fill(0, count($codes), '?'));
@@ -104,10 +103,6 @@ try {
     $recentMenus = [];
 }
 
-/* =========================================================
-   BUILD LABEL: Menu Name (Today) / (Yesterday) / (15/09/2026)
-   ========================================================= */
-
 function menuRecencyLabel(string $createdAt): string
 {
     $ts = strtotime($createdAt);
@@ -124,9 +119,7 @@ function menuRecencyLabel(string $createdAt): string
     return date('d/m/Y', $ts);
 }
 
-/* Attach labels */
 foreach ($recentMenus as &$m) {
-    /* Use start_at if created_at not selected */
     $m['label'] = menuRecencyLabel($m['start_at'] ?? date('Y-m-d'));
 }
 unset($m);
@@ -156,7 +149,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
         }
         .menu-title p { margin: 0; color: #817a71; font-size: 13px; }
 
-        /* duplicate dropdown */
         .duplicate-wrap {
             position: relative;
             display: inline-flex; align-items: center; gap: 8px;
@@ -248,7 +240,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
             font-size: 11px; color: #948c82;
         }
 
-        /* form card */
         .menu-form-card {
             background: #fff; border: 1px solid #eee7dc;
             border-radius: 20px; padding: 25px; max-width: 1100px;
@@ -293,6 +284,51 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
         }
         .input-icon-wrap .menu-input { padding-left: 40px; }
 
+        /* =====================================================
+           STATUS TOGGLE
+        ===================================================== */
+
+        .status-toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 14px;
+            padding: 14px 16px;
+            background: #fffdf9;
+            border: 1px solid #e8e1d8;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        .status-toggle-info { display: flex; align-items: center; gap: 12px; }
+        .status-toggle-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: #fde6e6; color: #c62828;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            transition: .25s;
+        }
+        .status-toggle-row.is-active .status-toggle-icon {
+            background: #e8f6ea; color: #2e7d32;
+        }
+        .status-toggle-info h4 { margin: 0; font-size: 13px; font-weight: 700; color: #302923; }
+        .status-toggle-info p { margin: 2px 0 0; font-size: 10px; color: #948c82; }
+
+        .mm-switch {
+            position: relative; display: inline-block;
+            width: 46px; height: 26px; flex-shrink: 0;
+        }
+        .mm-switch input { opacity: 0; width: 0; height: 0; }
+        .mm-switch-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: #d8d2c9; border-radius: 30px; transition: .25s;
+        }
+        .mm-switch-slider::before {
+            content: ""; position: absolute;
+            height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%;
+            transition: .25s; box-shadow: 0 2px 4px rgba(0,0,0,.15);
+        }
+        .mm-switch input:checked + .mm-switch-slider { background: #2e7d32; }
+        .mm-switch input:checked + .mm-switch-slider::before { transform: translateX(20px); }
+
         .datetime-section { margin-top: 6px; padding-top: 20px; }
 
         .section-head {
@@ -323,7 +359,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
         .dt-grid .menu-input { height: 42px; padding: 10px 12px; }
         #durationPreview { font-size: 10px; color: #2e7d32; padding: 6px 0; }
 
-        /* products */
         .products-section {
             margin-top: 22px; padding-top: 20px;
             border-top: 1px solid #f0ebe4;
@@ -738,7 +773,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
                     <p>Create a menu with a common time window, pick products and multiple variants with stock.</p>
                 </div>
 
-                <!-- DUPLICATE DROPDOWN -->
                 <div class="duplicate-wrap" id="duplicateWrap">
                     <button type="button" class="duplicate-btn" id="duplicateBtn">
                         <i class="bi bi-files"></i>
@@ -784,6 +818,25 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
                                     required>
                             </div>
                         </div>
+                    </div>
+
+
+                    <!-- ==================== STATUS TOGGLE ==================== -->
+
+                    <div class="status-toggle-row is-active" id="statusToggleRow">
+                        <div class="status-toggle-info">
+                            <div class="status-toggle-icon" id="statusToggleIcon">
+                                <i class="bi bi-check-circle-fill"></i>
+                            </div>
+                            <div>
+                                <h4 id="statusToggleTitle">Active</h4>
+                                <p id="statusToggleDesc">Menu will be visible to customers.</p>
+                            </div>
+                        </div>
+                        <label class="mm-switch" for="menu_status">
+                            <input type="checkbox" id="menu_status" name="menu_status" checked>
+                            <span class="mm-switch-slider"></span>
+                        </label>
                     </div>
 
 
@@ -842,7 +895,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
                             No products added yet. Click <strong>Add Product</strong> to start.
                         </div>
 
-                        <!-- BOTTOM ADD BUTTON -->
                         <button type="button" class="add-product-btn-bottom" id="addProductBtnBottom">
                             <i class="bi bi-plus-circle"></i>
                             Add Another Product
@@ -907,8 +959,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";
         window.PRODUCTS = <?= json_encode($products, JSON_UNESCAPED_UNICODE); ?>;
         window.RECENT_MENUS = <?= json_encode($recentMenus, JSON_UNESCAPED_UNICODE); ?>;
-
-       
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

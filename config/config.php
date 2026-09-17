@@ -18,7 +18,7 @@ define(
     'ADMIN_URL',
     'http://localhost/mrs.millet.admin/'
 );
-
+date_default_timezone_set('Asia/Kolkata');
 
 // =========================================
 // START SESSION
@@ -239,5 +239,3 @@ function getData(
         return '';
     }
 }
-
-

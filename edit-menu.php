@@ -95,7 +95,6 @@ $endTs   = strtotime($menu['end_at']);
 $startDateVal = date('Y-m-d', $startTs);
 $endDateVal   = date('Y-m-d', $endTs);
 
-/* 24h → 12h for the initial HTML values */
 function to12h(string $dbDateTime): array
 {
     $ts = strtotime($dbDateTime);
@@ -108,6 +107,9 @@ function to12h(string $dbDateTime): array
 }
 [$startTime12, $startAmPm] = to12h($menu['start_at']);
 [$endTime12,   $endAmPm]   = to12h($menu['end_at']);
+
+/* Status */
+$menuStatus = isset($menu['status']) ? (int)$menu['status'] : 1;
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -189,6 +191,51 @@ function to12h(string $dbDateTime): array
             font-size: 15px; pointer-events: none;
         }
         .input-icon-wrap .menu-input { padding-left: 40px; }
+
+        /* =====================================================
+           STATUS TOGGLE
+        ===================================================== */
+
+        .status-toggle-row {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 14px;
+            padding: 14px 16px;
+            background: #fffdf9;
+            border: 1px solid #e8e1d8;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        .status-toggle-info { display: flex; align-items: center; gap: 12px; }
+        .status-toggle-icon {
+            width: 38px; height: 38px; border-radius: 10px;
+            background: #fde6e6; color: #c62828;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+            transition: .25s;
+        }
+        .status-toggle-row.is-active .status-toggle-icon {
+            background: #e8f6ea; color: #2e7d32;
+        }
+        .status-toggle-info h4 { margin: 0; font-size: 13px; font-weight: 700; color: #302923; }
+        .status-toggle-info p { margin: 2px 0 0; font-size: 10px; color: #948c82; }
+
+        .mm-switch {
+            position: relative; display: inline-block;
+            width: 46px; height: 26px; flex-shrink: 0;
+        }
+        .mm-switch input { opacity: 0; width: 0; height: 0; }
+        .mm-switch-slider {
+            position: absolute; cursor: pointer; inset: 0;
+            background: #d8d2c9; border-radius: 30px; transition: .25s;
+        }
+        .mm-switch-slider::before {
+            content: ""; position: absolute;
+            height: 20px; width: 20px; left: 3px; bottom: 3px;
+            background: #fff; border-radius: 50%;
+            transition: .25s; box-shadow: 0 2px 4px rgba(0,0,0,.15);
+        }
+        .mm-switch input:checked + .mm-switch-slider { background: #2e7d32; }
+        .mm-switch input:checked + .mm-switch-slider::before { transform: translateX(20px); }
 
         /* TIME WINDOW */
         .datetime-section { margin-top: 6px; padding-top: 20px; }
@@ -311,7 +358,6 @@ function to12h(string $dbDateTime): array
             margin-bottom: 5px; display: block;
         }
 
-        /* dropdown */
         .dd { position: relative; }
         .dd-trigger {
             width: 100%; min-height: 42px;
@@ -442,7 +488,6 @@ function to12h(string $dbDateTime): array
             display: block; margin-bottom: 6px;
         }
 
-        /* stock */
         .stock-mode-group {
             display: flex; gap: 12px;
             align-items: flex-end;
@@ -510,7 +555,6 @@ function to12h(string $dbDateTime): array
             display: block; margin-bottom: 8px;
         }
 
-        /* actions */
         .form-actions {
             display: flex; justify-content: flex-end; gap: 10px;
             margin-top: 22px; padding-top: 20px; border-top: 1px solid #f0ebe4;
@@ -549,7 +593,6 @@ function to12h(string $dbDateTime): array
             display: inline-block; margin-bottom: 10px;
         }
 
-        /* modal */
         .mm-modal-overlay {
             position: fixed; inset: 0;
             background: rgba(30, 25, 22, .55);
@@ -646,10 +689,13 @@ function to12h(string $dbDateTime): array
             <div class="menu-header">
                 <div class="menu-title">
                     <h1>Edit Menu</h1>
-                    <p>Update name, time window, products and stock.</p>
+                    <p>Update name, status, time window, products and stock.</p>
                 </div>
 
-
+                <a href="menu.php" class="back-btn">
+                    <i class="bi bi-arrow-left"></i>
+                    Back to List
+                </a>
             </div>
 
 
@@ -692,6 +738,27 @@ function to12h(string $dbDateTime): array
                             </div>
                         </div>
 
+                    </div>
+
+
+                    <!-- ==================== STATUS TOGGLE ==================== -->
+
+                    <div class="status-toggle-row <?= $menuStatus === 1 ? 'is-active' : '' ?>" id="statusToggleRow">
+                        <div class="status-toggle-info">
+                            <div class="status-toggle-icon" id="statusToggleIcon">
+                                <i class="bi <?= $menuStatus === 1 ? 'bi-check-circle-fill' : 'bi-x-circle-fill' ?>"></i>
+                            </div>
+                            <div>
+                                <h4 id="statusToggleTitle"><?= $menuStatus === 1 ? 'Active' : 'Inactive' ?></h4>
+                                <p id="statusToggleDesc"><?= $menuStatus === 1
+                                    ? 'Menu will be visible to customers.'
+                                    : 'Menu will be hidden from customers.' ?></p>
+                            </div>
+                        </div>
+                        <label class="mm-switch" for="menu_status">
+                            <input type="checkbox" id="menu_status" name="menu_status" <?= $menuStatus === 1 ? 'checked' : '' ?>>
+                            <span class="mm-switch-slider"></span>
+                        </label>
                     </div>
 
 
@@ -756,7 +823,6 @@ function to12h(string $dbDateTime): array
                             No products added yet. Click <strong>Add Product</strong> to start.
                         </div>
 
-                        <!-- BOTTOM ADD BUTTON -->
                         <button type="button" class="add-product-btn-bottom" id="addProductBtnBottom">
                             <i class="bi bi-plus-circle"></i>
                             Add Another Product

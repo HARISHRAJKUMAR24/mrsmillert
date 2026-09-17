@@ -43,6 +43,10 @@ function menuTimingStatus(string $startAt, string $endAt): array
     $start = strtotime($startAt);
     $end   = strtotime($endAt);
 
+    if ($start === false || $end === false) {
+        return ['key' => 'expired', 'label' => 'Unknown'];
+    }
+
     if ($now < $start) {
         return ['key' => 'upcoming', 'label' => 'Upcoming'];
     }
@@ -143,9 +147,7 @@ function fmtDateTime(string $dbDate): string
             font-family: "DM Sans", sans-serif;
         }
 
-        .menu-table thead {
-            background: #faf7f0;
-        }
+        .menu-table thead { background: #faf7f0; }
         .menu-table th {
             text-align: left;
             font-size: 10px; font-weight: 800;
@@ -181,19 +183,13 @@ function fmtDateTime(string $dbDate): string
             width: fit-content;
         }
 
-        .menu-counts {
-            display: flex; flex-direction: column; gap: 4px;
-        }
+        .menu-counts { display: flex; flex-direction: column; gap: 4px; }
         .menu-count-item {
             font-size: 11px; color: #6f675f;
             display: inline-flex; align-items: center; gap: 6px;
         }
-        .menu-count-item i {
-            color: #b51f2c; font-size: 11px;
-        }
-        .menu-count-item strong {
-            color: #302923; font-weight: 800;
-        }
+        .menu-count-item i { color: #b51f2c; font-size: 11px; }
+        .menu-count-item strong { color: #302923; font-weight: 800; }
 
         .menu-dates {
             display: flex; flex-direction: column; gap: 5px;
@@ -258,16 +254,12 @@ function fmtDateTime(string $dbDate): string
             color: #1565c0;
             border-color: #cfe0f5;
         }
-        .row-btn.edit:hover {
-            background: #eef4fd; color: #0d47a1;
-        }
+        .row-btn.edit:hover { background: #eef4fd; color: #0d47a1; }
         .row-btn.delete {
             color: #b51f2c;
             border-color: #f0d6d8;
         }
-        .row-btn.delete:hover {
-            background: #fde6e6; color: #c62828;
-        }
+        .row-btn.delete:hover { background: #fde6e6; color: #c62828; }
 
         .table-empty {
             text-align: center; padding: 50px 20px;

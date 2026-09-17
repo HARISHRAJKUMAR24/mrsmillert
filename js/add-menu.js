@@ -2,9 +2,9 @@
    MRS MILL@ — ADD MENU UX
    File: ./js/add-menu.js
    - Common time window
-   - Multiple product rows
-   - Each row: product dropdown (with search) + variant MULTI-select
+   - Multiple product rows with dropdown + multi-variant
    - Stock: unlimited OR count
+   - Active / Inactive status toggle
    - Duplicate recent menu
    - Bottom "Add Another Product" button
    ========================================================= */
@@ -31,6 +31,12 @@
     const prodEmpty           = document.getElementById("prodEmpty");
 
     const menuNameInput = document.getElementById("menu_name");
+
+    /* STATUS */
+    const statusInput = document.getElementById("menu_status");
+    const statusRow   = document.getElementById("statusToggleRow");
+    const statusTitle = document.getElementById("statusToggleTitle");
+    const statusDesc  = document.getElementById("statusToggleDesc");
 
     const startDate = document.getElementById("start_date");
     const startTime = document.getElementById("start_time");
@@ -93,6 +99,22 @@
     errorOverlay.addEventListener("click", e => {
         if (e.target === errorOverlay) closeError();
     });
+
+    /* ---------------- STATUS TOGGLE ---------------- */
+
+    function applyStatusUI() {
+        if (!statusInput) return;
+        const active = statusInput.checked;
+        if (statusRow)   statusRow.classList.toggle("is-active", active);
+        if (statusTitle) statusTitle.textContent = active ? "Active" : "Inactive";
+        if (statusDesc)  statusDesc.textContent  = active
+            ? "Menu will be visible to customers."
+            : "Menu will be hidden from customers.";
+    }
+
+    if (statusInput) {
+        statusInput.addEventListener("change", applyStatusUI);
+    }
 
     /* ---------------- DATE / TIME ---------------- */
 
@@ -162,9 +184,7 @@
         el.addEventListener("change", updateDurationPreview);
     });
 
-    /* =========================================================
-       GENERIC DROPDOWN
-       ========================================================= */
+    /* ---------------- GENERIC DROPDOWN ---------------- */
 
     function closeAllDropdowns(except) {
         document.querySelectorAll(".dd.open").forEach(dd => {
@@ -249,9 +269,7 @@
         return { render, open, close };
     }
 
-    /* =========================================================
-       PRODUCT ROW
-       ========================================================= */
+    /* ---------------- PRODUCT ROW ---------------- */
 
     function addProductRow(prefill) {
         rowCounter++;
@@ -554,12 +572,9 @@
     if (addProductBtnBottom) {
         addProductBtnBottom.addEventListener("click", () => {
             addProductRow();
-            /* Scroll to the newly added row smoothly */
             const rows = prodRows.querySelectorAll(".prod-row");
             const last = rows[rows.length - 1];
-            if (last) {
-                last.scrollIntoView({ behavior: "smooth", block: "center" });
-            }
+            if (last) last.scrollIntoView({ behavior: "smooth", block: "center" });
         });
     }
 
@@ -582,9 +597,7 @@
         });
     }
 
-    /* =========================================================
-       DUPLICATE MENU DROPDOWN
-       ========================================================= */
+    /* ---------------- DUPLICATE MENU ---------------- */
 
     function renderDuplicateList(filter) {
         filter = (filter || "").toLowerCase().trim();
@@ -642,10 +655,8 @@
             const menu = RECENT_MENUS.find(x => Number(x.id) === menuId);
             if (!menu) return;
 
-            /* Prefill name as "<name> (copy)" */
             menuNameInput.value = menu.menu_name + " (copy)";
 
-            /* Prefill time window from the source menu */
             const s = new Date(menu.start_at.replace(" ", "T"));
             const e2 = new Date(menu.end_at.replace(" ", "T"));
 
@@ -675,7 +686,6 @@
                 endAmPm.value = ea;
             }
 
-            /* Rebuild product rows */
             prodRows.innerHTML = "";
             rowCounter = 0;
 
@@ -689,17 +699,13 @@
             refreshEmpty();
             updateDurationPreview();
 
-            /* Close dropdown */
             duplicateWrap.classList.remove("open");
 
-            /* Scroll to the form top */
             document.querySelector(".menu-form-card")?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
     }
 
-    /* =========================================================
-       COLLECT / VALIDATE / SUBMIT
-       ========================================================= */
+    /* ---------------- COLLECT / VALIDATE / SUBMIT ---------------- */
 
     function collectRows() {
         const rows = prodRows.querySelectorAll(".prod-row");
@@ -780,8 +786,12 @@
 
         setLoading(true);
 
+        /* STATUS */
+        const status = (statusInput && statusInput.checked) ? "1" : "0";
+
         const formData = new FormData();
         formData.append("menu_name", name);
+        formData.append("menu_status", status);
         formData.append("start_at", fmt(s));
         formData.append("end_at", fmt(en));
         formData.append("rows", JSON.stringify(rows));
@@ -807,6 +817,10 @@
                 refreshEmpty();
                 updateDurationPreview();
                 addProductRow();
+
+                /* Reset status to Active */
+                if (statusInput) statusInput.checked = true;
+                applyStatusUI();
             } else {
                 showError(data.message || "Failed to save menu.", "Save failed");
                 setLoading(false);
@@ -829,6 +843,7 @@
 
     /* ---------------- INIT ---------------- */
 
+    applyStatusUI();
     updateDurationPreview();
     addProductRow();
 

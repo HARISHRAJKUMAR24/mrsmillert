@@ -86,6 +86,11 @@ $sidebarLogoUrl = $sidebarLogo
             Apartment
         </a>
 
+        <a href="discount.php">
+    <i class="bi bi-percent"></i>
+    Discounts
+</a>
+
         <a href="#">
             <i class="bi bi-truck"></i>
             Delivery

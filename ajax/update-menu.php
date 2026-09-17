@@ -1,8 +1,8 @@
 <?php
 /* =========================================================
    MRS MILL@ — AJAX: UPDATE MENU
-   File: ./ajax/menu-update.php
-   - Updates menu name + time
+   File: ./ajax/update-menu.php
+   - Updates menu name + status + time
    - Deletes all menu_products for this menu, re-inserts
    ========================================================= */
 
@@ -15,13 +15,17 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, 'Method not allowed.');
 }
 
-$id      = (int) ($_POST['id'] ?? 0);
-$name    = trim($_POST['menu_name'] ?? '');
-$startAt = trim($_POST['start_at'] ?? '');
-$endAt   = trim($_POST['end_at'] ?? '');
-$rowsRaw = $_POST['rows'] ?? '[]';
+$id        = (int) ($_POST['id'] ?? 0);
+$name      = trim($_POST['menu_name'] ?? '');
+$statusRaw = $_POST['menu_status'] ?? '1';
+$startAt   = trim($_POST['start_at'] ?? '');
+$endAt     = trim($_POST['end_at'] ?? '');
+$rowsRaw   = $_POST['rows'] ?? '[]';
 
 $rows = json_decode($rowsRaw, true);
+
+/* Status: 1 = Active, 0 = Inactive */
+$status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
 if ($id <= 0)     jsonResponse(false, 'Invalid menu ID.');
 if ($name === '') jsonResponse(false, 'Menu name is required.');
@@ -123,16 +127,17 @@ try {
 
     $pdo->beginTransaction();
 
-    /* 1) menus */
+    /* 1) menus — includes status */
     $stmt = $pdo->prepare(
         "UPDATE menus
-         SET menu_name = ?, start_at = ?, end_at = ?
+         SET menu_name = ?, start_at = ?, end_at = ?, status = ?
          WHERE id = ?"
     );
     $stmt->execute([
         $name,
         $startObj->format('Y-m-d H:i:s'),
         $endObj->format('Y-m-d H:i:s'),
+        $status,
         $id
     ]);
 
@@ -159,9 +164,10 @@ try {
     $pdo->commit();
 
     jsonResponse(true, 'Menu updated successfully.', [
-        'id'   => $id,
-        'code' => $existing['menu_code'],
-        'rows' => $flat
+        'id'     => $id,
+        'code'   => $existing['menu_code'],
+        'status' => $status,
+        'rows'   => $flat
     ]);
 
 } catch (PDOException $e) {
