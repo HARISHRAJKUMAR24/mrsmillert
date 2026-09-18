@@ -2,7 +2,7 @@
    MRS MILL@ — ADD DISCOUNT UX
    File: ./js/add-discount.js
    - Type: time / coupon
-   - Per-slot: start/end time + amount type + amount + delivery
+   - Per-slot: NAME (Set 1, Set 2...) + start/end time + amount type + amount + delivery
    - Amount type: fixed (₹) OR percent (%)
    ========================================================= */
 
@@ -96,7 +96,7 @@
     if (typeTime)   typeTime.addEventListener("change", applyTypeUI);
     if (typeCoupon) typeCoupon.addEventListener("change", applyTypeUI);
 
-    /* ---------------- COUPON AMOUNT TYPE ICON ---------------- */
+    /* ---------------- COUPON ICON ---------------- */
 
     function updateCouponAmountIcon() {
         if (!couponAmountIcon) return;
@@ -104,11 +104,8 @@
         couponAmountIcon.className = t === "percent" ? "bi bi-percent" : "bi bi-currency-rupee";
         if (couponAmount) {
             couponAmount.placeholder = t === "percent" ? "Eg: 10" : "Eg: 50";
-            if (t === "percent") {
-                couponAmount.setAttribute("max", "100");
-            } else {
-                couponAmount.removeAttribute("max");
-            }
+            if (t === "percent") couponAmount.setAttribute("max", "100");
+            else couponAmount.removeAttribute("max");
         }
     }
     if (couponAmountType) couponAmountType.addEventListener("change", updateCouponAmountIcon);
@@ -164,6 +161,15 @@
                 <button type="button" class="time-row-remove" title="Remove slot">
                     <i class="bi bi-trash3"></i>
                 </button>
+            </div>
+
+            <div class="slot-name-grid">
+                <label class="field-label">Slot Name <span class="required">*</span></label>
+                <input type="text"
+                       class="time-input js-slot-name"
+                       value="Set ${timeCounter}"
+                       maxlength="50"
+                       placeholder="Eg: Set 1">
             </div>
 
             <div class="time-row-grid">
@@ -244,7 +250,7 @@
             txt.textContent = on ? "Delivery Enabled" : "Delivery Disabled";
         });
 
-        /* per-row amount type icon + max */
+        /* per-row amount type */
         const typeSel = row.querySelector(".js-slot-amount-type");
         const amountInput = row.querySelector(".js-slot-amount");
         const amountIcon  = row.querySelector(".js-slot-amount-icon");
@@ -297,6 +303,7 @@
         const out = [];
 
         rows.forEach(r => {
+            const slotName = (r.querySelector(".js-slot-name")?.value || "").trim();
             const st = r.querySelector(".js-start-time")?.value || "09:00";
             const sa = r.querySelector(".js-start-ampm")?.value || "AM";
             const et = r.querySelector(".js-end-time")?.value || "09:00";
@@ -306,6 +313,7 @@
             const delivery = r.querySelector(".js-slot-delivery")?.checked ? 1 : 0;
 
             out.push({
+                slot_name: slotName,
                 start_time: to24h(st, sa),
                 end_time:   to24h(et, ea),
                 amount_type: amountType,
@@ -334,6 +342,10 @@
             for (let i = 0; i < slots.length; i++) {
                 const s = slots[i];
                 const label = `Slot #${i + 1}`;
+                if (!s.slot_name) {
+                    showError(`${label}: please enter a slot name.`, "Missing slot name");
+                    return null;
+                }
                 if (s.start_time === s.end_time) {
                     showError(`${label}: start and end time cannot be same.`, "Invalid slot");
                     return null;
@@ -354,6 +366,7 @@
                 valid_from_date: "",
                 valid_to_date: "",
                 slots: slots.map(s => ({
+                    slot_name: s.slot_name,
                     start_time: s.start_time,
                     end_time: s.end_time,
                     amount_type: s.amount_type,
@@ -405,6 +418,7 @@
             valid_from_date: from,
             valid_to_date: to,
             slots: [{
+                slot_name: "Coupon",
                 start_time: cStart,
                 end_time: cEnd,
                 amount_type: couponType,

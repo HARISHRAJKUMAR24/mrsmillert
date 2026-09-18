@@ -9,92 +9,357 @@ require_once './config/function.php';
     <?php include './includes/head.php'; ?>
 
     <style>
-        .settings-page { padding: 30px 32px 40px; }
+        .settings-page {
+            padding: 30px 32px 40px;
+        }
 
         .settings-header {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 20px; margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 25px;
         }
 
         .settings-title h1 {
             font-family: "Playfair Display", serif;
-            font-size: 29px; font-weight: 700;
-            color: #302923; margin: 0 0 5px;
+            font-size: 29px;
+            font-weight: 700;
+            color: #302923;
+            margin: 0 0 5px;
         }
 
-        .settings-title p { margin: 0; color: #817a71; font-size: 13px; }
+        .settings-title p {
+            margin: 0;
+            color: #817a71;
+            font-size: 13px;
+        }
 
         .settings-form-card {
-            background: #fff; border: 1px solid #eee7dc;
-            border-radius: 20px; padding: 25px; max-width: 900px;
+            background: #fff;
+            border: 1px solid #eee7dc;
+            border-radius: 20px;
+            padding: 25px;
+            max-width: 900px;
         }
 
         .form-card-header {
-            display: flex; align-items: center; gap: 12px; margin-bottom: 22px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 22px;
         }
 
         .form-card-icon {
-            width: 42px; height: 42px; border-radius: 12px;
-            background: #fbe8e9; color: #b51f2c;
-            display: flex; align-items: center; justify-content: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #fbe8e9;
+            color: #b51f2c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 18px;
         }
 
-        .form-card-header h3 { margin: 0; font-size: 16px; font-weight: 700; }
-        .form-card-header span { display: block; margin-top: 3px; color: #817a71; font-size: 10px; }
-
-        .settings-form label {
-            display: block; font-size: 11px; font-weight: 700;
-            color: #4e4841; margin-bottom: 7px;
+        .form-card-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 700;
         }
 
-        .required { color: #b51f2c; }
+        .form-card-header span {
+            display: block;
+            margin-top: 3px;
+            color: #817a71;
+            font-size: 10px;
+        }
+
+        .settings-form label {
+            display: block;
+            font-size: 11px;
+            font-weight: 700;
+            color: #4e4841;
+            margin-bottom: 7px;
+        }
+
+        .required {
+            color: #b51f2c;
+        }
 
         .settings-input {
-            width: 100%; height: 45px;
-            border: 1px solid #e8e1d8; background: #fffdf9;
-            border-radius: 11px; padding: 11px 13px;
-            font-family: "DM Sans", sans-serif; font-size: 12px;
-            color: #292521; outline: none; transition: .2s ease;
+            width: 100%;
+            height: 45px;
+            border: 1px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 11px;
+            padding: 11px 13px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            transition: .2s ease;
         }
 
         .settings-input:focus {
-            border-color: #d98a91; background: #fff;
+            border-color: #d98a91;
+            background: #fff;
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
-        .input-icon-wrap { position: relative; }
-        .input-icon-wrap > i {
-            position: absolute; left: 13px; top: 50%;
-            transform: translateY(-50%); color: #aaa198;
-            font-size: 15px; pointer-events: none;
+        .input-icon-wrap {
+            position: relative;
         }
-        .input-icon-wrap .settings-input { padding-left: 40px; }
+
+        .input-icon-wrap>i {
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa198;
+            font-size: 15px;
+            pointer-events: none;
+        }
+
+        .input-icon-wrap .settings-input {
+            padding-left: 40px;
+        }
 
         .section-divider {
-            margin: 26px 0 20px; padding-top: 22px;
+            margin: 26px 0 20px;
+            padding-top: 22px;
             border-top: 1px solid #f0ebe4;
-            display: flex; align-items: center; gap: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
         .section-divider i {
-            width: 32px; height: 32px; border-radius: 10px;
-            background: #fbe8e9; color: #b51f2c;
-            display: flex; align-items: center; justify-content: center;
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: #fbe8e9;
+            color: #b51f2c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             font-size: 14px;
         }
 
         .section-divider h4 {
-            margin: 0; font-size: 13px; font-weight: 800; color: #302923;
+            margin: 0;
+            font-size: 13px;
+            font-weight: 800;
+            color: #302923;
         }
 
         .section-divider span {
-            display: block; font-size: 10px; color: #817a71;
+            display: block;
+            font-size: 10px;
+            color: #817a71;
             margin-top: 2px;
         }
 
-        /* IMAGE BLOCKS */
+        .section-head-actions {
+            margin-left: auto;
+        }
 
+        .add-branch-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #b51f2c;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            padding: 8px 14px;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        .add-branch-btn:hover {
+            background: #8e1722;
+        }
+
+        .add-branch-btn-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 14px;
+            padding: 14px;
+            width: 100%;
+            background: #fffaf9;
+            border: 2px dashed #e4ddd3;
+            border-radius: 12px;
+            color: #b51f2c;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .2s;
+        }
+
+        .add-branch-btn-bottom:hover {
+            background: #fff5f5;
+            border-color: #d98a91;
+        }
+
+        .add-branch-btn-bottom i {
+            font-size: 16px;
+        }
+
+        /* BRANCHES */
+        .branch-rows {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .branch-row {
+            border: 1px solid #f0ebe4;
+            background: #fffdf9;
+            border-radius: 14px;
+            padding: 14px;
+            animation: inFade .25s ease;
+        }
+
+        @keyframes inFade {
+            0% {
+                transform: translateY(-6px);
+                opacity: 0;
+            }
+
+            100% {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .branch-row-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .branch-row-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 800;
+            background: #f1e8df;
+            color: #755d48;
+            padding: 4px 9px;
+            border-radius: 6px;
+        }
+
+        .branch-row-badge i {
+            color: #b51f2c;
+            font-size: 11px;
+        }
+
+        .branch-row-remove {
+            background: #fff;
+            border: 1px solid #f0d6d8;
+            color: #b51f2c;
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: .2s;
+            font-size: 13px;
+        }
+
+        .branch-row-remove:hover {
+            background: #fde6e6;
+            border-color: #f5c0c0;
+            color: #c62828;
+        }
+
+        .branch-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .branch-grid .field-label {
+            font-size: 10px;
+            font-weight: 700;
+            color: #6f675f;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .branch-full {
+            grid-column: 1 / -1;
+        }
+
+        .branch-input {
+            width: 100%;
+            height: 42px;
+            border: 1px solid #e8e1d8;
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            transition: .2s ease;
+        }
+
+        .branch-input:focus {
+            border-color: #d98a91;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .branch-textarea {
+            width: 100%;
+            min-height: 66px;
+            border: 1px solid #e8e1d8;
+            background: #fff;
+            border-radius: 10px;
+            padding: 10px 12px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            transition: .2s ease;
+            resize: vertical;
+        }
+
+        .branch-textarea:focus {
+            border-color: #d98a91;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .branches-empty {
+            text-align: center;
+            padding: 30px 20px;
+            border: 2px dashed #e4ddd3;
+            border-radius: 14px;
+            color: #948c82;
+            font-size: 11px;
+            background: #fffdf9;
+        }
+
+        .branches-empty i {
+            font-size: 30px;
+            color: #d5cbbd;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        /* IMAGE BLOCKS */
         .img-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -148,7 +413,10 @@ require_once './config/function.php';
         }
 
         .img-upload-zone input[type="file"] {
-            position: absolute; inset: 0; opacity: 0; cursor: pointer;
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
         }
 
         .img-placeholder i {
@@ -202,10 +470,15 @@ require_once './config/function.php';
         }
 
         .img-action-btn {
-            display: inline-flex; align-items: center; gap: 5px;
-            border-radius: 8px; padding: 6px 11px;
-            font-size: 10px; font-weight: 700;
-            cursor: pointer; transition: .2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            border-radius: 8px;
+            padding: 6px 11px;
+            font-size: 10px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: .2s ease;
             border: 1px solid transparent;
         }
 
@@ -215,7 +488,9 @@ require_once './config/function.php';
             color: #b51f2c;
         }
 
-        .img-action-btn.replace:hover { background: #fbe8e9; }
+        .img-action-btn.replace:hover {
+            background: #fbe8e9;
+        }
 
         .img-action-btn.remove {
             background: #fff;
@@ -243,7 +518,10 @@ require_once './config/function.php';
             background: #fdf5e8;
             border: 1px dashed #e8d2a8;
         }
-        .new-image-note.show { display: block; }
+
+        .new-image-note.show {
+            display: block;
+        }
 
         .removed-image-note {
             color: #a02a2a;
@@ -252,111 +530,245 @@ require_once './config/function.php';
             align-items: center;
             gap: 6px;
         }
-        .removed-image-note.show { display: flex; }
+
+        .removed-image-note.show {
+            display: flex;
+        }
 
         /* ACTIONS */
-
         .form-actions {
-            display: flex; justify-content: flex-end; gap: 10px;
-            margin-top: 22px; padding-top: 20px; border-top: 1px solid #f0ebe4;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 22px;
+            padding-top: 20px;
+            border-top: 1px solid #f0ebe4;
         }
 
         .btn-save {
-            border: none; background: #b51f2c; color: #fff;
-            border-radius: 10px; padding: 10px 19px;
-            font-size: 11px; font-weight: 700;
-            display: inline-flex; align-items: center; gap: 7px;
-            cursor: pointer; transition: .2s;
+            border: none;
+            background: #b51f2c;
+            color: #fff;
+            border-radius: 10px;
+            padding: 10px 19px;
+            font-size: 11px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            cursor: pointer;
+            transition: .2s;
         }
 
-        .btn-save:hover { background: #8e1722; }
-        .btn-save:disabled { opacity: .7; cursor: not-allowed; }
+        .btn-save:hover {
+            background: #8e1722;
+        }
+
+        .btn-save:disabled {
+            opacity: .7;
+            cursor: not-allowed;
+        }
 
         .btn-spinner {
-            width: 14px; height: 14px;
-            border: 2px solid rgba(255,255,255,.4);
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, .4);
             border-top-color: #fff;
             border-radius: 50%;
             animation: spin .7s linear infinite;
             display: inline-block;
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
         .form-loading {
-            text-align: center; padding: 60px 20px;
-            color: #948c82; font-size: 12px;
+            text-align: center;
+            padding: 60px 20px;
+            color: #948c82;
+            font-size: 12px;
         }
 
         .form-loading .table-spinner {
-            width: 26px; height: 26px;
+            width: 26px;
+            height: 26px;
             border: 3px solid #eee7dc;
             border-top-color: #b51f2c;
             border-radius: 50%;
             animation: spin .7s linear infinite;
-            display: inline-block; margin-bottom: 10px;
+            display: inline-block;
+            margin-bottom: 10px;
         }
 
         /* MODALS */
-
         .mm-modal-overlay {
-            position: fixed; inset: 0;
+            position: fixed;
+            inset: 0;
             background: rgba(30, 25, 22, .55);
             backdrop-filter: blur(3px);
-            display: flex; align-items: center; justify-content: center;
-            padding: 20px; z-index: 9999;
-            opacity: 0; visibility: hidden; transition: .2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: .2s;
         }
-        .mm-modal-overlay.show { opacity: 1; visibility: visible; }
+
+        .mm-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
 
         .mm-modal {
-            background: #fff; border-radius: 18px;
+            background: #fff;
+            border-radius: 18px;
             padding: 30px 26px 24px;
-            max-width: 420px; width: 100%; text-align: center;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
             box-shadow: 0 30px 80px rgba(0, 0, 0, .25);
             transform: translateY(15px) scale(.96);
             transition: transform .25s cubic-bezier(.2, .9, .3, 1.2);
         }
-        .mm-modal-overlay.show .mm-modal { transform: translateY(0) scale(1); }
+
+        .mm-modal-overlay.show .mm-modal {
+            transform: translateY(0) scale(1);
+        }
 
         .mm-modal-icon {
-            width: 66px; height: 66px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px; margin: 0 auto 16px;
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin: 0 auto 16px;
             animation: popIn .35s cubic-bezier(.2, .9, .3, 1.4);
         }
-        .mm-modal-icon.success { background: #e8f6ea; color: #2e7d32; }
-        .mm-modal-icon.error   { background: #fde6e6; color: #c62828; }
-        .mm-modal-icon.danger  { background: #fde6e6; color: #c62828; }
+
+        .mm-modal-icon.success {
+            background: #e8f6ea;
+            color: #2e7d32;
+        }
+
+        .mm-modal-icon.error {
+            background: #fde6e6;
+            color: #c62828;
+        }
+
+        .mm-modal-icon.danger {
+            background: #fde6e6;
+            color: #c62828;
+        }
 
         @keyframes popIn {
-            0% { transform: scale(.5); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(.5);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
-        .mm-modal-title { margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #302923; }
-        .mm-modal-text { margin: 0 0 20px; font-size: 12px; color: #756d65; line-height: 1.6; }
-        .mm-modal-actions { display: flex; gap: 10px; }
+        .mm-modal-title {
+            margin: 0 0 8px;
+            font-size: 18px;
+            font-weight: 800;
+            color: #302923;
+        }
+
+        .mm-modal-text {
+            margin: 0 0 20px;
+            font-size: 12px;
+            color: #756d65;
+            line-height: 1.6;
+        }
+
+        .mm-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
 
         .mm-btn {
-            flex: 1; height: 44px; border-radius: 11px; border: none;
-            font-size: 12px; font-weight: 700; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center;
-            gap: 7px; text-decoration: none; transition: .2s ease;
+            flex: 1;
+            height: 44px;
+            border-radius: 11px;
+            border: none;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            text-decoration: none;
+            transition: .2s ease;
         }
-        .mm-btn-primary { background: #b51f2c; color: #fff; }
-        .mm-btn-primary:hover { background: #8e1722; color: #fff; }
-        .mm-btn-ghost { background: #fff; border: 1px solid #e4ddd3; color: #6f675f; }
-        .mm-btn-ghost:hover { background: #faf7f0; }
-        .mm-btn-danger { background: #c62828; color: #fff; }
-        .mm-btn-danger:hover { background: #a02020; }
+
+        .mm-btn-primary {
+            background: #b51f2c;
+            color: #fff;
+        }
+
+        .mm-btn-primary:hover {
+            background: #8e1722;
+            color: #fff;
+        }
+
+        .mm-btn-ghost {
+            background: #fff;
+            border: 1px solid #e4ddd3;
+            color: #6f675f;
+        }
+
+        .mm-btn-ghost:hover {
+            background: #faf7f0;
+        }
+
+        .mm-btn-danger {
+            background: #c62828;
+            color: #fff;
+        }
+
+        .mm-btn-danger:hover {
+            background: #a02020;
+        }
 
         @media (max-width: 768px) {
-            .settings-page { padding: 20px 15px 30px; }
-            .settings-form-card { padding: 17px; border-radius: 17px; }
-            .img-grid { grid-template-columns: 1fr; }
-            .form-actions { flex-direction: column-reverse; }
-            .btn-save { width: 100%; justify-content: center; }
+            .settings-page {
+                padding: 20px 15px 30px;
+            }
+
+            .settings-form-card {
+                padding: 17px;
+                border-radius: 17px;
+            }
+
+            .img-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .branch-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .form-actions {
+                flex-direction: column-reverse;
+            }
+
+            .btn-save {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -396,7 +808,7 @@ require_once './config/function.php';
             <div class="settings-header">
                 <div class="settings-title">
                     <h1>Settings</h1>
-                    <p>Manage store details, currency, favicon and logo.</p>
+                    <p>Manage store details, currency, branches, favicon and logo.</p>
                 </div>
             </div>
 
@@ -430,11 +842,11 @@ require_once './config/function.php';
                             <div class="input-icon-wrap">
                                 <i class="bi bi-person"></i>
                                 <input type="text"
-                                       id="username"
-                                       class="settings-input"
-                                       placeholder="Eg: Mrs Mill@"
-                                       maxlength="150"
-                                       required>
+                                    id="username"
+                                    class="settings-input"
+                                    placeholder="Eg: Mrs Mill@"
+                                    maxlength="150"
+                                    required>
                             </div>
                         </div>
 
@@ -443,10 +855,10 @@ require_once './config/function.php';
                             <div class="input-icon-wrap">
                                 <i class="bi bi-telephone"></i>
                                 <input type="text"
-                                       id="mobile_number"
-                                       class="settings-input"
-                                       placeholder="Eg: +91 98765 43210"
-                                       maxlength="30">
+                                    id="mobile_number"
+                                    class="settings-input"
+                                    placeholder="Eg: +91 98765 43210"
+                                    maxlength="30">
                             </div>
                         </div>
 
@@ -455,32 +867,61 @@ require_once './config/function.php';
                             <div class="input-icon-wrap">
                                 <i class="bi bi-envelope"></i>
                                 <input type="email"
-                                       id="email_address"
-                                       class="settings-input"
-                                       placeholder="Eg: hello@mrsmill.com"
-                                       maxlength="190">
+                                    id="email_address"
+                                    class="settings-input"
+                                    placeholder="Eg: hello@mrsmill.com"
+                                    maxlength="190">
                             </div>
                         </div>
 
                         <div class="col-12 col-md-3">
                             <label>Currency Symbol</label>
                             <input type="text"
-                                   id="currency"
-                                   class="settings-input"
-                                   placeholder="Eg: ₹"
-                                   maxlength="10">
+                                id="currency"
+                                class="settings-input"
+                                placeholder="Eg: ₹"
+                                maxlength="10">
                         </div>
 
                         <div class="col-12 col-md-3">
                             <label>Currency Code</label>
                             <input type="text"
-                                   id="currency_code"
-                                   class="settings-input"
-                                   placeholder="Eg: INR"
-                                   maxlength="10">
+                                id="currency_code"
+                                class="settings-input"
+                                placeholder="Eg: INR"
+                                maxlength="10">
                         </div>
 
                     </div>
+
+
+                    <!-- ==================== BRANCH ADDRESSES ==================== -->
+
+                    <div class="section-divider">
+                        <i class="bi bi-geo-alt"></i>
+                        <div>
+                            <h4>Branch Addresses</h4>
+                            <span>Add multiple branches with name, address, phone and email.</span>
+                        </div>
+                        <div class="section-head-actions">
+                            <button type="button" class="add-branch-btn" id="addBranchBtn">
+                                <i class="bi bi-plus-lg"></i> Add Branch
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="branch-rows" id="branchRows"></div>
+
+                    <div class="branches-empty" id="branchesEmpty">
+                        <i class="bi bi-geo-alt"></i>
+                        No branches added yet. Click <strong>Add Branch</strong> to start.
+                    </div>
+
+                    <!-- BOTTOM ADD BUTTON -->
+                    <button type="button" class="add-branch-btn-bottom" id="addBranchBtnBottom">
+                        <i class="bi bi-plus-circle"></i>
+                        Add Another Branch
+                    </button>
 
 
                     <!-- BRANDING -->
@@ -509,7 +950,7 @@ require_once './config/function.php';
 
                             <div class="img-upload-zone" id="faviconZone">
                                 <input type="file" id="favicon_image"
-                                       accept=".ico,.png,.svg,image/x-icon,image/png,image/svg+xml,image/jpeg,image/webp">
+                                    accept=".ico,.png,.svg,image/x-icon,image/png,image/svg+xml,image/jpeg,image/webp">
 
                                 <div class="img-preview-wrap" id="faviconWrap" style="display:none;">
                                     <img src="" alt="" class="img-preview ico" id="faviconPreview">
@@ -556,7 +997,7 @@ require_once './config/function.php';
 
                             <div class="img-upload-zone" id="logoZone">
                                 <input type="file" id="logo_image"
-                                       accept=".png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp">
+                                    accept=".png,.svg,.jpg,.jpeg,.webp,image/png,image/svg+xml,image/jpeg,image/webp">
 
                                 <div class="img-preview-wrap" id="logoWrap" style="display:none;">
                                     <img src="" alt="" class="img-preview" id="logoPreview">
@@ -687,4 +1128,5 @@ require_once './config/function.php';
     <script src="<?= ADMIN_URL; ?>js/settings.js"></script>
 
 </body>
+
 </html>

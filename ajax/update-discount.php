@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: UPDATE DISCOUNT
    File: ./ajax/update-discount.php
    - Updates discount row
-   - Replaces all discount_times for this discount
+   - Replaces all discount_times for this discount (with slot_name)
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -51,12 +51,20 @@ $cleanSlots = [];
 
 foreach ($slots as $i => $s) {
     $label = 'Slot #' . ($i + 1);
+
+    $slotName = trim((string)($s['slot_name'] ?? ''));
     $st = trim((string)($s['start_time'] ?? ''));
     $et = trim((string)($s['end_time'] ?? ''));
     $aType = strtolower(trim((string)($s['amount_type'] ?? 'fixed')));
     $amt = trim((string)($s['discount_amount'] ?? ''));
     $del = !empty($s['delivery_enabled']) ? 1 : 0;
 
+    if ($slotName === '') {
+        jsonResponse(false, $label . ': slot name is required.');
+    }
+    if (strlen($slotName) > 50) {
+        jsonResponse(false, $label . ': slot name is too long.');
+    }
     if (!preg_match('/^\d{2}:\d{2}$/', $st) || !preg_match('/^\d{2}:\d{2}$/', $et)) {
         jsonResponse(false, $label . ': invalid time format.');
     }
@@ -72,6 +80,7 @@ foreach ($slots as $i => $s) {
     }
 
     $cleanSlots[] = [
+        'slot_name'        => $slotName,
         'start_time'       => $st,
         'end_time'         => $et,
         'amount_type'      => $aType,
@@ -120,12 +129,13 @@ try {
 
     $ins = $pdo->prepare(
         "INSERT INTO discount_times
-            (discount_code, start_time, end_time, amount_type, discount_amount, delivery_enabled)
-         VALUES (?, ?, ?, ?, ?, ?)"
+            (discount_code, slot_name, start_time, end_time, amount_type, discount_amount, delivery_enabled)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
     foreach ($cleanSlots as $s) {
         $ins->execute([
             $existing['discount_code'],
+            $s['slot_name'],
             $s['start_time'],
             $s['end_time'],
             $s['amount_type'],

@@ -213,6 +213,15 @@ $couponSlot = $isCoupon ? ($slots[0] ?? null) : null;
             color: #c62828;
         }
 
+        /* SLOT NAME */
+        .slot-name-grid {
+            margin-bottom: 12px;
+        }
+        .slot-name-grid .field-label {
+            font-size: 10px; font-weight: 700; color: #6f675f;
+            margin-bottom: 5px; display: block;
+        }
+
         .time-row-grid {
             display: grid;
             grid-template-columns: 1fr 130px 100px 1fr 130px 100px;
@@ -536,7 +545,7 @@ $couponSlot = $isCoupon ? ($slots[0] ?? null) : null;
                         <div class="section-head">
                             <div>
                                 <h4><i class="bi bi-clock"></i> Time Slots <span class="required">*</span></h4>
-                                <p>Each slot has its own <strong>amount type</strong>, <strong>amount</strong> and <strong>delivery</strong>.</p>
+                                <p>Each slot has its own <strong>name</strong> (Set 1, Set 2...), <strong>amount type</strong>, <strong>amount</strong> and <strong>delivery</strong>.</p>
                             </div>
                         </div>
 
@@ -747,6 +756,7 @@ $couponSlot = $isCoupon ? ($slots[0] ?? null) : null;
             $st = to12h($s['start_time']);
             $et = to12h($s['end_time']);
             return [
+                'slot_name'        => $s['slot_name'] ?? 'Set',
                 'start_time'       => $st[0],
                 'start_ampm'       => $st[1],
                 'end_time'         => $et[0],

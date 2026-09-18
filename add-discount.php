@@ -69,10 +69,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         .input-icon-wrap .disc-input { padding-left: 40px; }
 
-        /* TYPE */
-        .disc-type-row {
-            display: flex; gap: 12px; margin-bottom: 22px;
-        }
+        .disc-type-row { display: flex; gap: 12px; margin-bottom: 22px; }
         .disc-type-option { flex: 1; position: relative; cursor: pointer; }
         .disc-type-option input { position: absolute; opacity: 0; pointer-events: none; }
         .disc-type-box {
@@ -92,7 +89,6 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         .disc-type-box .mode-head i { font-size: 15px; color: #b51f2c; }
         .disc-type-box p { margin: 0; font-size: 10px; color: #948c82; line-height: 1.5; }
 
-        /* SECTIONS */
         .section {
             margin-top: 22px;
             padding-top: 20px;
@@ -118,10 +114,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             font-size: 10px; color: #817a71;
         }
 
-        /* TIME ROWS */
-        .time-rows {
-            display: flex; flex-direction: column; gap: 12px;
-        }
+        .time-rows { display: flex; flex-direction: column; gap: 12px; }
         .time-row {
             border: 1px solid #f0ebe4;
             background: #fffdf9;
@@ -160,6 +153,14 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             color: #c62828;
         }
 
+        .slot-name-grid {
+            margin-bottom: 12px;
+        }
+        .slot-name-grid .field-label {
+            font-size: 10px; font-weight: 700; color: #6f675f;
+            margin-bottom: 5px; display: block;
+        }
+
         .time-row-grid {
             display: grid;
             grid-template-columns: 1fr 130px 100px 1fr 130px 100px;
@@ -184,7 +185,6 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
-        /* slot extra: amount type + amount + delivery */
         .slot-extra-grid {
             display: grid;
             grid-template-columns: 160px 1fr 1fr;
@@ -203,17 +203,12 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             height: 42px;
             box-sizing: border-box;
         }
-        .delivery-inline.is-on {
-            background: #f0f9f1;
-            border-color: #b6e0bd;
-        }
+        .delivery-inline.is-on { background: #f0f9f1; border-color: #b6e0bd; }
         .delivery-inline .lbl {
             font-size: 11px; font-weight: 700; color: #302923;
             display: inline-flex; align-items: center; gap: 6px;
         }
-        .delivery-inline .lbl i {
-            color: #c62828; font-size: 13px;
-        }
+        .delivery-inline .lbl i { color: #c62828; font-size: 13px; }
         .delivery-inline.is-on .lbl i { color: #2e7d32; }
 
         .mm-switch {
@@ -237,9 +232,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         .add-time-btn {
             display: flex; align-items: center; justify-content: center;
             gap: 8px;
-            margin-top: 12px;
-            padding: 12px;
-            width: 100%;
+            margin-top: 12px; padding: 12px; width: 100%;
             background: #fffaf9;
             border: 2px dashed #e4ddd3;
             border-radius: 12px;
@@ -247,21 +240,12 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
             font-size: 11px; font-weight: 800;
             cursor: pointer; transition: .2s;
         }
-        .add-time-btn:hover {
-            background: #fff5f5;
-            border-color: #d98a91;
-        }
+        .add-time-btn:hover { background: #fff5f5; border-color: #d98a91; }
 
-        /* COUPON */
         .coupon-fields { display: none; }
         .coupon-fields.show { display: block; }
-        .coupon-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-        }
+        .coupon-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 
-        /* STATUS */
         .status-toggle-row {
             display: flex; align-items: center; justify-content: space-between;
             gap: 14px;
@@ -284,7 +268,6 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         .status-toggle-info h4 { margin: 0; font-size: 13px; font-weight: 700; color: #302923; }
         .status-toggle-info p { margin: 2px 0 0; font-size: 10px; color: #948c82; }
 
-        /* ACTIONS */
         .form-actions {
             display: flex; justify-content: flex-end; gap: 10px;
             margin-top: 22px; padding-top: 20px; border-top: 1px solid #f0ebe4;
@@ -312,7 +295,6 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* MODALS */
         .mm-modal-overlay {
             position: fixed; inset: 0;
             background: rgba(30, 25, 22, .55);
@@ -354,9 +336,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
         }
         .mm-btn-primary { background: #b51f2c; color: #fff; }
         .mm-btn-primary:hover { background: #8e1722; color: #fff; }
-        .mm-btn-ghost {
-            background: #fff; border: 1px solid #e4ddd3; color: #6f675f;
-        }
+        .mm-btn-ghost { background: #fff; border: 1px solid #e4ddd3; color: #6f675f; }
         .mm-btn-ghost:hover { background: #faf7f0; }
 
         @media (max-width: 900px) {
@@ -466,7 +446,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                                     <div class="mode-head">
                                         <i class="bi bi-clock-history"></i> Time Based
                                     </div>
-                                    <p>Runs automatically in one or more time slots. Each slot has its own amount type + amount + delivery.</p>
+                                    <p>Runs automatically in one or more time slots. Each slot has its own name, amount type + amount + delivery.</p>
                                 </div>
                             </label>
 
@@ -490,7 +470,7 @@ $in3   = date('Y-m-d', strtotime('+3 days'));
                         <div class="section-head">
                             <div>
                                 <h4><i class="bi bi-clock"></i> Time Slots <span class="required">*</span></h4>
-                                <p>Each slot has its own <strong>amount type</strong> (Fixed / Percent), <strong>amount</strong> and <strong>delivery</strong> toggle.</p>
+                                <p>Each slot has its own <strong>name</strong> (Set 1, Set 2...), <strong>amount type</strong>, <strong>amount</strong> and <strong>delivery</strong>.</p>
                             </div>
                         </div>
 

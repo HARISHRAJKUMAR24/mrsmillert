@@ -2,11 +2,9 @@
 /* =========================================================
    MRS MILL@ — AJAX: UPDATE SETTINGS
    File: ./ajax/settings-update.php
-
-   Rules:
-   - Replace favicon / logo → delete old file, save new
-   - Remove favicon / logo  → delete old file, set NULL
-   - No change             → keep existing file
+   - Updates settings row
+   - Replaces all branches with the posted list
+   - Handles favicon & logo replace/remove
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -26,6 +24,9 @@ $currencyCode = trim($_POST['currency_code'] ?? '');
 
 $removeFavicon = (int) ($_POST['remove_favicon'] ?? 0);
 $removeLogo    = (int) ($_POST['remove_logo'] ?? 0);
+$branchesRaw   = $_POST['branches'] ?? '[]';
+
+$branches = json_decode($branchesRaw, true);
 
 /* ---------------- VALIDATION ---------------- */
 
@@ -41,8 +42,40 @@ if ($emailAddress !== '' && !filter_var($emailAddress, FILTER_VALIDATE_EMAIL)) {
     jsonResponse(false, 'Please enter a valid email address.');
 }
 
-if ($currency === '') {
-    $currency = '₹';
+if ($currency === '') $currency = '₹';
+
+/* Validate branches */
+$cleanBranches = [];
+
+if (is_array($branches)) {
+    foreach ($branches as $i => $b) {
+        $label = 'Branch #' . ($i + 1);
+
+        $name    = trim((string)($b['branch_name'] ?? ''));
+        $address = trim((string)($b['branch_address'] ?? ''));
+        $mobile  = trim((string)($b['branch_mobile'] ?? ''));
+        $email   = trim((string)($b['branch_email'] ?? ''));
+
+        /* Skip empty entries */
+        if ($name === '' && $address === '' && $mobile === '' && $email === '') continue;
+
+        if ($name === '')    jsonResponse(false, $label . ': branch name is required.');
+        if ($address === '') jsonResponse(false, $label . ': branch address is required.');
+
+        if ($mobile !== '' && !preg_match('/^[0-9+\-\s()]{6,20}$/', $mobile)) {
+            jsonResponse(false, $label . ': invalid mobile number.');
+        }
+        if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            jsonResponse(false, $label . ': invalid email address.');
+        }
+
+        $cleanBranches[] = [
+            'branch_name'    => $name,
+            'branch_address' => $address,
+            'branch_mobile'  => $mobile,
+            'branch_email'   => $email
+        ];
+    }
 }
 
 /* ---------------- LOAD EXISTING ---------------- */
@@ -50,18 +83,15 @@ if ($currency === '') {
 try {
 
     $settings = getSettings($pdo);
-
-    if (!$settings) {
-        jsonResponse(false, 'Settings not found.');
-    }
+    if (!$settings) jsonResponse(false, 'Settings not found.');
 
 } catch (PDOException $e) {
     jsonResponse(false, 'Server error. Please try again.');
 }
 
-$baseDir         = dirname(__DIR__);
-$currentFavicon  = $settings['favicon_image'] ?: '';
-$currentLogo     = $settings['logo_image'] ?: '';
+$baseDir        = dirname(__DIR__);
+$currentFavicon = $settings['favicon_image'] ?: '';
+$currentLogo    = $settings['logo_image'] ?: '';
 
 $newFavicon = $currentFavicon;
 $newLogo    = $currentLogo;
@@ -80,9 +110,7 @@ if (isset($_FILES['favicon_image']) &&
         jsonResponse(false, 'Favicon: ' . $upload['message']);
     }
 
-    if ($currentFavicon !== '') {
-        deleteStoredFile($currentFavicon, $baseDir);
-    }
+    if ($currentFavicon !== '') deleteStoredFile($currentFavicon, $baseDir);
 
     $newFavicon = $upload['path'];
     $uploadedFavicon = true;
@@ -101,16 +129,11 @@ if (isset($_FILES['logo_image']) &&
     $upload = uploadSettingsImage($_FILES['logo_image'], $baseDir, 'logo');
 
     if (!$upload['success']) {
-        // rollback favicon upload if we already did one
-        if ($uploadedFavicon && $newFavicon) {
-            deleteStoredFile($newFavicon, $baseDir);
-        }
+        if ($uploadedFavicon && $newFavicon) deleteStoredFile($newFavicon, $baseDir);
         jsonResponse(false, 'Logo: ' . $upload['message']);
     }
 
-    if ($currentLogo !== '') {
-        deleteStoredFile($currentLogo, $baseDir);
-    }
+    if ($currentLogo !== '') deleteStoredFile($currentLogo, $baseDir);
 
     $newLogo = $upload['path'];
     $uploadedLogo = true;
@@ -121,10 +144,13 @@ if (isset($_FILES['logo_image']) &&
     $newLogo = null;
 }
 
-/* ---------------- UPDATE ---------------- */
+/* ---------------- UPDATE DB ---------------- */
 
 try {
 
+    $pdo->beginTransaction();
+
+    /* 1) settings */
     $stmt = $pdo->prepare(
         "UPDATE settings
          SET username      = ?,
@@ -147,20 +173,43 @@ try {
         $newLogo
     ]);
 
+    /* 2) replace branches */
+    $pdo->exec("DELETE FROM settings_branches");
+
+    if (!empty($cleanBranches)) {
+        $ins = $pdo->prepare(
+            "INSERT INTO settings_branches
+                (branch_name, branch_address, branch_mobile, branch_email)
+             VALUES (?, ?, ?, ?)"
+        );
+        foreach ($cleanBranches as $b) {
+            $ins->execute([
+                $b['branch_name'],
+                $b['branch_address'],
+                $b['branch_mobile'],
+                $b['branch_email']
+            ]);
+        }
+    }
+
+    $pdo->commit();
+
     jsonResponse(
         true,
         'Settings updated successfully.',
         [
             'favicon_url' => $newFavicon ? ADMIN_URL . $newFavicon : '',
-            'logo_url'    => $newLogo    ? ADMIN_URL . $newLogo    : ''
+            'logo_url'    => $newLogo    ? ADMIN_URL . $newLogo    : '',
+            'branches'    => $cleanBranches
         ]
     );
 
 } catch (PDOException $e) {
 
-    // rollback uploads
+    if ($pdo->inTransaction()) $pdo->rollBack();
+
     if ($uploadedFavicon && $newFavicon) deleteStoredFile($newFavicon, $baseDir);
     if ($uploadedLogo    && $newLogo)    deleteStoredFile($newLogo, $baseDir);
 
-    jsonResponse(false, 'Failed to update settings.');
+    jsonResponse(false, 'Failed to update settings: ' . $e->getMessage());
 }

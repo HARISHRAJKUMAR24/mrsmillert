@@ -31,6 +31,31 @@ try {
     );
 
     $discounts = $stmt->fetchAll();
+
+    /* Load slot names for each discount (limited to first 4 per discount) */
+    $slotsByCode = [];
+
+    if (!empty($discounts)) {
+        $codes = array_column($discounts, 'discount_code');
+        $placeholders = implode(',', array_fill(0, count($codes), '?'));
+
+        $sStmt = $pdo->prepare(
+            "SELECT discount_code, slot_name, start_time, end_time, amount_type, discount_amount
+             FROM discount_times
+             WHERE discount_code IN ($placeholders)
+             ORDER BY id ASC"
+        );
+        $sStmt->execute($codes);
+
+        foreach ($sStmt->fetchAll() as $row) {
+            $slotsByCode[$row['discount_code']][] = $row;
+        }
+    }
+
+    foreach ($discounts as &$d) {
+        $d['slots'] = $slotsByCode[$d['discount_code']] ?? [];
+    }
+    unset($d);
 } catch (PDOException $e) {
     $discounts = [];
 }
@@ -55,22 +80,70 @@ function fmtDate(string $d): string
 
 function discountRuleStatus(array $d): array
 {
+    /* 1) Inactive if toggled off */
     if ((int)$d['status'] !== 1) {
         return ['key' => 'inactive', 'label' => 'Inactive'];
     }
 
+    /* 2) Coupon — check date range */
     if ($d['discount_type'] === 'coupon') {
-        $now = time();
-        $from = strtotime($d['valid_from_date']);
+
+        $now  = time();
+        $from = strtotime($d['valid_from_date'] . ' 00:00:00');
         $to   = strtotime($d['valid_to_date'] . ' 23:59:59');
 
         if ($now < $from) return ['key' => 'upcoming', 'label' => 'Upcoming'];
         if ($now > $to)   return ['key' => 'expired',  'label' => 'Expired'];
+
+        /* Also check time window of the coupon slot */
+        $slots = $d['slots'] ?? [];
+        if (!empty($slots)) {
+            $slot = $slots[0];
+            $st   = strtotime($slot['start_time']);
+            $et   = strtotime($slot['end_time']);
+            $cur  = strtotime(date('H:i:s'));
+
+            if ($cur >= $st && $cur <= $et) {
+                return ['key' => 'active', 'label' => 'Live'];
+            }
+            return ['key' => 'upcoming', 'label' => 'Off Time'];
+        }
+
         return ['key' => 'active', 'label' => 'Active'];
     }
 
-    /* Time-based: check if now matches any slot for this discount */
-    return ['key' => 'active', 'label' => 'Active'];
+    /* 3) Time-based — check if any slot is live right now */
+    $slots = $d['slots'] ?? [];
+
+    if (empty($slots)) {
+        return ['key' => 'inactive', 'label' => 'No Slots'];
+    }
+
+    $cur = strtotime(date('H:i:s'));
+    $liveNow = false;
+
+    foreach ($slots as $s) {
+        $st = strtotime($s['start_time']);
+        $et = strtotime($s['end_time']);
+
+        if ($st <= $et) {
+            /* Same day: start < end */
+            if ($cur >= $st && $cur <= $et) {
+                $liveNow = true;
+                break;
+            }
+        } else {
+            /* Cross-midnight: e.g. 22:00 → 02:00 */
+            if ($cur >= $st || $cur <= $et) {
+                $liveNow = true;
+                break;
+            }
+        }
+    }
+
+    return $liveNow
+        ? ['key' => 'active', 'label' => 'Live']
+        : ['key' => 'upcoming', 'label' => 'Off Time'];
 }
 ?>
 <!DOCTYPE html>
@@ -207,7 +280,7 @@ function discountRuleStatus(array $d): array
             width: 100%;
             border-collapse: collapse;
             font-family: "DM Sans", sans-serif;
-            min-width: 900px;
+            min-width: 1000px;
         }
 
         .disc-table thead {
@@ -323,7 +396,51 @@ function discountRuleStatus(array $d): array
         .slot-list {
             display: flex;
             flex-direction: column;
-            gap: 4px;
+            gap: 5px;
+        }
+
+        /* Slot pills with names */
+        .slot-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #f1e8df;
+            color: #755d48;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            width: fit-content;
+            max-width: 100%;
+        }
+
+        .slot-pill .nm {
+            color: #b51f2c;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            font-size: 9px;
+        }
+
+        .slot-pill .tm {
+            color: #6f5a3f;
+            font-weight: 700;
+        }
+
+        .slot-pill .am {
+            background: #fff;
+            color: #b51f2c;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-size: 9px;
+            font-weight: 800;
+        }
+
+        .slot-more {
+            font-size: 9px;
+            color: #948c82;
+            font-style: italic;
+            padding-left: 4px;
         }
 
         .slot-line {
@@ -369,9 +486,9 @@ function discountRuleStatus(array $d): array
         }
 
         .status-pill.upcoming {
-            background: #eef4fd;
-            color: #1565c0;
-            border: 1px solid #cfe0f5;
+            background: #fff8e6;
+            color: #a06a00;
+            border: 1px solid #f0dca0;
         }
 
         .status-pill.expired {
@@ -703,9 +820,9 @@ function discountRuleStatus(array $d): array
 
                     <select id="statusFilter" class="disc-filter">
                         <option value="">All Status</option>
-                        <option value="active">Active</option>
+                        <option value="active">Live</option>
                         <option value="inactive">Inactive</option>
-                        <option value="upcoming">Upcoming</option>
+                        <option value="upcoming">Off Time</option>
                         <option value="expired">Expired</option>
                     </select>
                 </div>
@@ -808,17 +925,41 @@ function discountRuleStatus(array $d): array
                                                         <?= fmtDate($d['valid_from_date']) ?>
                                                         → <?= fmtDate($d['valid_to_date']) ?>
                                                     </span>
+                                                    <?php if (!empty($d['slots']) && $d['slots'][0]['start_time']): ?>
+                                                        <span class="slot-line">
+                                                            <i class="bi bi-clock"></i>
+                                                            <?= fmtTime($d['slots'][0]['start_time']) ?>
+                                                            – <?= fmtTime($d['slots'][0]['end_time']) ?>
+                                                        </span>
+                                                    <?php endif; ?>
                                                 </div>
                                             <?php else: ?>
                                                 <div class="slot-list">
                                                     <span class="slot-count-badge">
                                                         <?= (int)$d['slot_count'] ?> slot<?= (int)$d['slot_count'] === 1 ? '' : 's' ?>
                                                     </span>
-                                                    <?php if ($d['first_start']): ?>
-                                                        <span class="slot-line">
-                                                            <i class="bi bi-clock"></i>
-                                                            <?= fmtTime($d['first_start']) ?>
-                                                            – <?= fmtTime($d['last_end']) ?>
+
+                                                    <?php
+                                                    /* Show up to 3 named slot pills */
+                                                    $shownSlots = array_slice($d['slots'], 0, 3);
+                                                    foreach ($shownSlots as $slot):
+                                                    ?>
+                                                        <span class="slot-pill">
+                                                            <span class="nm"><?= htmlspecialchars($slot['slot_name'] ?? 'Set') ?></span>
+                                                            <span class="tm">
+                                                                <?= fmtTime($slot['start_time']) ?> – <?= fmtTime($slot['end_time']) ?>
+                                                            </span>
+                                                            <span class="am">
+                                                                <?= $slot['amount_type'] === 'percent'
+                                                                    ? number_format((float)$slot['discount_amount'], 0) . '%'
+                                                                    : '₹' . number_format((float)$slot['discount_amount'], 0) ?>
+                                                            </span>
+                                                        </span>
+                                                    <?php endforeach; ?>
+
+                                                    <?php if (count($d['slots']) > 3): ?>
+                                                        <span class="slot-more">
+                                                            + <?= count($d['slots']) - 3 ?> more…
                                                         </span>
                                                     <?php endif; ?>
                                                 </div>

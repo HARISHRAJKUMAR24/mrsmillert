@@ -2,6 +2,7 @@
 /* =========================================================
    MRS MILL@ — AJAX: GET SETTINGS
    File: ./ajax/settings-get.php
+   Returns settings + list of branches
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -28,6 +29,21 @@ try {
     $settings['logo_url'] = $settings['logo_image']
         ? ADMIN_URL . $settings['logo_image']
         : '';
+
+    /* Load branches */
+    $branches = [];
+    try {
+        $stmt = $pdo->query(
+            "SELECT id, branch_name, branch_address, branch_mobile, branch_email
+             FROM settings_branches
+             ORDER BY id ASC"
+        );
+        $branches = $stmt->fetchAll();
+    } catch (PDOException $e) {
+        $branches = [];
+    }
+
+    $settings['branches'] = $branches;
 
     jsonResponse(true, 'OK', $settings);
 
