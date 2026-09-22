@@ -2,7 +2,13 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
-// require_once __DIR__ . '/../auth.php';
+/* ---------------- FETCH BRANCHES ---------------- */
+$branchStmt = $pdo->query(
+    "SELECT id, branch_name, branch_address
+     FROM settings_branches
+     ORDER BY branch_name ASC"
+);
+$branches = $branchStmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -115,7 +121,8 @@ require_once './config/function.php';
         }
 
         .apartment-input,
-        .apartment-textarea {
+        .apartment-textarea,
+        .apartment-select {
             width: 100%;
             border: 1px solid #e8e1d8;
             background: #fffdf9;
@@ -128,8 +135,21 @@ require_once './config/function.php';
             transition: .2s ease;
         }
 
-        .apartment-input {
+        .apartment-input,
+        .apartment-select {
             height: 45px;
+        }
+
+        .apartment-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 40px;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaa198' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            cursor: pointer;
         }
 
         .apartment-textarea {
@@ -138,7 +158,8 @@ require_once './config/function.php';
         }
 
         .apartment-input:focus,
-        .apartment-textarea:focus {
+        .apartment-textarea:focus,
+        .apartment-select:focus {
             border-color: #d98a91;
             background: #fff;
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
@@ -148,7 +169,7 @@ require_once './config/function.php';
             position: relative;
         }
 
-        .input-icon-wrap>i {
+        .input-icon-wrap > i {
             position: absolute;
             left: 13px;
             top: 50%;
@@ -158,7 +179,8 @@ require_once './config/function.php';
             pointer-events: none;
         }
 
-        .input-icon-wrap .apartment-input {
+        .input-icon-wrap .apartment-input,
+        .input-icon-wrap .apartment-select {
             padding-left: 40px;
         }
 
@@ -198,9 +220,7 @@ require_once './config/function.php';
         }
 
         @keyframes spin {
-            to {
-                transform: rotate(360deg);
-            }
+            to { transform: rotate(360deg); }
         }
 
 
@@ -223,14 +243,13 @@ require_once './config/function.php';
             flex-wrap: wrap;
         }
 
-        /* ---- Inline title + asterisk, subtitle below ---- */
         .divisions-header-title {
             display: flex;
             align-items: flex-start;
             gap: 10px;
         }
 
-        .divisions-header-title>i {
+        .divisions-header-title > i {
             width: 34px;
             height: 34px;
             border-radius: 10px;
@@ -315,22 +334,13 @@ require_once './config/function.php';
         }
 
         @keyframes fadeSlide {
-            from {
-                opacity: 0;
-                transform: translateY(-6px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
+            from { opacity: 0; transform: translateY(-6px); }
+            to   { opacity: 1; transform: translateY(0); }
         }
 
-        .division-field {
-            position: relative;
-        }
+        .division-field { position: relative; }
 
-        .division-field>i {
+        .division-field > i {
             position: absolute;
             left: 13px;
             top: 50%;
@@ -417,13 +427,8 @@ require_once './config/function.php';
         }
 
         @media (max-width: 620px) {
-            .division-row {
-                grid-template-columns: 1fr;
-            }
-
-            .remove-division {
-                width: 100%;
-            }
+            .division-row { grid-template-columns: 1fr; }
+            .remove-division { width: 100%; }
         }
 
 
@@ -531,15 +536,8 @@ require_once './config/function.php';
         }
 
         @keyframes popIn {
-            0% {
-                transform: scale(.5);
-                opacity: 0;
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
+            0%   { transform: scale(.5); opacity: 0; }
+            100% { transform: scale(1);  opacity: 1; }
         }
 
         .mm-modal-title {
@@ -614,29 +612,11 @@ require_once './config/function.php';
 
 
         @media (max-width: 768px) {
-            .apartment-page {
-                padding: 20px 15px 30px;
-            }
-
-            .apartment-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .apartment-form-card {
-                padding: 17px;
-                border-radius: 17px;
-            }
-
-            .form-actions {
-                flex-direction: column-reverse;
-            }
-
-            .btn-cancel,
-            .btn-save {
-                width: 100%;
-                justify-content: center;
-            }
+            .apartment-page { padding: 20px 15px 30px; }
+            .apartment-header { flex-direction: column; align-items: flex-start; }
+            .apartment-form-card { padding: 17px; border-radius: 17px; }
+            .form-actions { flex-direction: column-reverse; }
+            .btn-cancel, .btn-save { width: 100%; justify-content: center; }
         }
     </style>
 
@@ -691,8 +671,6 @@ require_once './config/function.php';
                     <p>Create an apartment and add its divisions with delivery charges.</p>
                 </div>
 
-
-
             </div>
 
 
@@ -719,6 +697,27 @@ require_once './config/function.php';
 
                     <div class="row g-3">
 
+                        <!-- BRANCH -->
+                        <div class="col-12 col-md-6">
+                            <label>
+                                Branch <span class="required">*</span>
+                            </label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-shop"></i>
+                                <select name="branch_id"
+                                    id="branch_id"
+                                    class="apartment-select"
+                                    required>
+                                    <option value="">— Select Branch —</option>
+                                    <?php foreach ($branches as $b): ?>
+                                        <option value="<?= (int)$b['id'] ?>">
+                                            <?= htmlspecialchars($b['branch_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
                         <!-- NAME -->
                         <div class="col-12 col-md-6">
                             <label>
@@ -740,7 +739,7 @@ require_once './config/function.php';
                             <label>Status</label>
                             <select name="status"
                                 id="status"
-                                class="apartment-input">
+                                class="apartment-select">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
                             </select>

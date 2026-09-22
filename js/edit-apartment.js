@@ -1,8 +1,6 @@
 /* =========================================================
    MRS MILL@ — EDIT APARTMENT UX
    File: ./js/edit-apartment.js
-   Loads apartment by id/code, edits divisions, saves via AJAX
-   Errors shown in POPUP + auto-fill charge from first row
    ========================================================= */
 
 (function () {
@@ -37,8 +35,13 @@
 
     if (!form) return;
 
+    /* Always fetch fresh at call time — never cache */
+    function getBranchSelect() {
+        return document.getElementById("branch_id");
+    }
+
     /* =========================================
-       BUILD ERROR POPUP (injected once)
+       ERROR POPUP
     ========================================= */
 
     let errorOverlay = null;
@@ -84,12 +87,10 @@
 
         errorText = errorOverlay.querySelector("#errorText");
 
-        /* Close on backdrop click */
         errorOverlay.addEventListener("click", function (e) {
             if (e.target === errorOverlay) closeErrorPopup();
         });
 
-        /* Close on ESC */
         document.addEventListener("keydown", function (e) {
             if (e.key === "Escape" &&
                 errorOverlay.classList.contains("show")) {
@@ -97,11 +98,9 @@
             }
         });
 
-        /* Close on OK button */
         errorOverlay.querySelector("#errorOkBtn")
             .addEventListener("click", closeErrorPopup);
 
-        /* Inject error-specific styles once */
         if (!document.getElementById("mmErrorStyles")) {
 
             const style = document.createElement("style");
@@ -127,21 +126,13 @@
         }
     }
 
-    /* =========================================
-       ERROR POPUP — SHOW / HIDE
-    ========================================= */
-
     function showError(message) {
-
         buildErrorPopup();
-
         if (errorText) {
             errorText.textContent = message || "Please check the form and try again.";
         }
-
         errorOverlay.classList.add("show");
         errorOverlay.setAttribute("aria-hidden", "false");
-
         const ok = errorOverlay.querySelector("#errorOkBtn");
         if (ok) setTimeout(() => ok.focus(), 60);
     }
@@ -157,7 +148,6 @@
     ========================================= */
 
     function showSuccessPopup(message, code) {
-
         if (!successOverlay) return;
 
         if (successText) {
@@ -184,7 +174,6 @@
     }
 
     if (successOverlay) {
-
         successOverlay.addEventListener("click", function (e) {
             if (e.target === successOverlay) closeSuccessPopup();
         });
@@ -207,8 +196,8 @@
     ========================================= */
 
     function setLoading(isLoading) {
-        saveBtn.disabled = isLoading;
-        saveText.innerHTML = isLoading
+        if (saveBtn) saveBtn.disabled = isLoading;
+        if (saveText) saveText.innerHTML = isLoading
             ? '<span class="btn-spinner"></span> Updating...'
             : 'Update Apartment';
     }
@@ -225,14 +214,9 @@
             .replace(/>/g, "&gt;");
     }
 
-    /* =========================================
-       GET FIRST DIVISION CHARGE (for auto-fill)
-    ========================================= */
-
     function getFirstDivisionCharge() {
         const firstCharge = divisionRows.querySelector(".division-charge");
         if (!firstCharge) return "";
-
         const val = firstCharge.value.trim();
         return val === "" ? "" : val;
     }
@@ -281,12 +265,6 @@
 
         return row;
     }
-
-    /* =========================================
-       ADD DIVISION ROW
-       - If charge passed → use it (needed for load)
-       - Else → copy from FIRST division row
-    ========================================= */
 
     function addDivisionRow(division, charge, skipAutoFill) {
 
@@ -375,7 +353,6 @@
             .then(data => {
 
                 if (!data.success || !data.data) {
-
                     if (formLoading) {
                         formLoading.innerHTML =
                             '<div style="color:#d71920;font-size:12px;">' +
@@ -386,17 +363,38 @@
                 }
 
                 const apt = data.data;
+                console.log("[edit-apartment] Loaded apartment:", apt);
 
-                document.getElementById("apartment_id").value = apt.id;
-                document.getElementById("apartment_name").value = apt.apartment_name || "";
+                document.getElementById("apartment_id").value      = apt.id;
+                document.getElementById("apartment_name").value    = apt.apartment_name || "";
                 document.getElementById("apartment_address").value = apt.apartment_address || "";
-                document.getElementById("status").value = String(apt.status ?? 1);
+                document.getElementById("status").value            = String(apt.status ?? 1);
+
+                /* ✅ Set branch dropdown — robust */
+                const sel = getBranchSelect();
+                if (sel) {
+                    const bid = (apt.branch_id === null || apt.branch_id === undefined)
+                        ? ""
+                        : String(apt.branch_id).trim();
+
+                    console.log("[edit-apartment] Setting branch to:", bid);
+
+                    if (bid !== "" && bid !== "0") {
+                        const exists = Array.from(sel.options).some(o => o.value === bid);
+                        if (exists) {
+                            sel.value = bid;
+                            console.log("[edit-apartment] Branch select value is now:", sel.value);
+                        } else {
+                            console.warn("[edit-apartment] Branch id " + bid + " not in dropdown.");
+                        }
+                    }
+                }
 
                 if (aptCodeBadge) {
                     aptCodeBadge.textContent = "#" + (apt.apartment_code || "");
                 }
 
-                /* fill divisions — skipAutoFill so DB charges are kept exactly */
+                /* Fill divisions */
                 divisionRows.innerHTML = "";
                 const divs = Array.isArray(apt.divisions) ? apt.divisions : [];
 
@@ -414,7 +412,8 @@
                 form.style.display = "";
 
             })
-            .catch(() => {
+            .catch((err) => {
+                console.error("[edit-apartment] Load error:", err);
                 if (formLoading) {
                     formLoading.innerHTML =
                         '<div style="color:#d71920;font-size:12px;">' +
@@ -432,14 +431,26 @@
 
         e.preventDefault();
 
-        const id      = Number(document.getElementById("apartment_id").value || 0);
-        const name    = document.getElementById("apartment_name").value.trim();
-        const address = document.getElementById("apartment_address").value.trim();
-        const status  = document.getElementById("status").value;
+        /* ✅ Always read branch fresh from DOM */
+        const sel = getBranchSelect();
 
-        if (id <= 0)  return showError("Invalid apartment ID.");
-        if (!name)    return showError("Apartment name is required.");
-        if (!address) return showError("Apartment address is required.");
+        const id       = Number(document.getElementById("apartment_id").value || 0);
+        const branchId = sel ? String(sel.value || "").trim() : "";
+        const name     = document.getElementById("apartment_name").value.trim();
+        const address  = document.getElementById("apartment_address").value.trim();
+        const status   = document.getElementById("status").value;
+
+        console.log("[edit-apartment] Submit:", {
+            id, branchId, name, address, status,
+            selectElement: sel,
+            selectValue: sel ? sel.value : null,
+            selectSelectedIndex: sel ? sel.selectedIndex : null
+        });
+
+        if (id <= 0)       return showError("Invalid apartment ID.");
+        if (!branchId)     return showError("Please select a branch.");
+        if (!name)         return showError("Apartment name is required.");
+        if (!address)      return showError("Apartment address is required.");
 
         const collected = collectDivisions();
 
@@ -455,6 +466,7 @@
 
         const formData = new FormData();
         formData.append("id", id);
+        formData.append("branch_id", branchId);
         formData.append("apartment_name", name);
         formData.append("apartment_address", address);
         formData.append("status", status);
@@ -471,26 +483,22 @@
             })))
             .then(data => {
 
+                console.log("[edit-apartment] Update response:", data);
+
                 if (data.success) {
-
-                    const code = data.data && data.data.code
-                        ? data.data.code
-                        : "";
-
+                    const code = data.data && data.data.code ? data.data.code : "";
                     showSuccessPopup(
                         data.message || "Apartment updated successfully.",
                         code
                     );
-
                     setLoading(false);
-
                 } else {
-
                     showError(data.message || "Failed to update.");
                     setLoading(false);
                 }
             })
-            .catch(() => {
+            .catch((err) => {
+                console.error("[edit-apartment] Submit error:", err);
                 showError("Unable to connect to server.");
                 setLoading(false);
             });

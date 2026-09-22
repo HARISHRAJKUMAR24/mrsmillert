@@ -2,7 +2,7 @@
 /* =========================================================
    MRS MILL@ — AJAX: UPDATE APARTMENT
    File: ./ajax/update-apartment.php
-   Updates name, address, status, divisions (JSON)
+   Updates name, address, branch_id, status, divisions (JSON)
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -22,10 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
    READ INPUT
 ----------------------------------------- */
 
-$id        = (int) ($_POST['id'] ?? 0);
-$name      = trim($_POST['apartment_name'] ?? '');
-$address   = trim($_POST['apartment_address'] ?? '');
-$status    = isset($_POST['status']) ? (int) $_POST['status'] : 1;
+$id           = (int) ($_POST['id'] ?? 0);
+$branchId     = isset($_POST['branch_id']) ? (int) $_POST['branch_id'] : 0;
+$name         = trim($_POST['apartment_name'] ?? '');
+$address      = trim($_POST['apartment_address'] ?? '');
+$status       = isset($_POST['status']) ? (int) $_POST['status'] : 1;
 $divisionsRaw = $_POST['divisions'] ?? '[]';
 
 $divisions = json_decode($divisionsRaw, true);
@@ -36,6 +37,10 @@ $divisions = json_decode($divisionsRaw, true);
 
 if ($id <= 0) {
     jsonResponse(false, 'Invalid apartment ID.');
+}
+
+if ($branchId <= 0) {
+    jsonResponse(false, 'Please select a branch.');
 }
 
 if ($name === '') {
@@ -81,7 +86,7 @@ foreach ($divisions as $d) {
 $divisionsJson = json_encode($cleanDivisions, JSON_UNESCAPED_UNICODE);
 
 /* -----------------------------------------
-   CHECK EXISTS
+   CHECK EXISTS + BRANCH VALID
 ----------------------------------------- */
 
 try {
@@ -97,16 +102,26 @@ try {
         jsonResponse(false, 'Apartment not found.');
     }
 
-    // duplicate name check (excluding current)
+    /* Verify branch exists */
+    $branchCheck = $pdo->prepare(
+        "SELECT id FROM settings_branches WHERE id = ? LIMIT 1"
+    );
+    $branchCheck->execute([$branchId]);
+
+    if (!$branchCheck->fetch()) {
+        jsonResponse(false, 'Selected branch does not exist.');
+    }
+
+    /* Duplicate name check (excluding current) */
     $dup = $pdo->prepare(
         "SELECT id FROM apartments
-         WHERE apartment_name = ? AND id <> ?
+         WHERE apartment_name = ? AND branch_id = ? AND id <> ?
          LIMIT 1"
     );
-    $dup->execute([$name, $id]);
+    $dup->execute([$name, $branchId, $id]);
 
     if ($dup->fetch()) {
-        jsonResponse(false, 'Another apartment already uses this name.');
+        jsonResponse(false, 'Another apartment already uses this name in this branch.');
     }
 
 } catch (PDOException $e) {
@@ -124,6 +139,7 @@ try {
         "UPDATE apartments
          SET apartment_name    = ?,
              apartment_address = ?,
+             branch_id         = ?,
              divisions         = ?,
              status            = ?
          WHERE id = ?"
@@ -132,6 +148,7 @@ try {
     $stmt->execute([
         $name,
         $address,
+        $branchId,
         $divisionsJson,
         $status,
         $id
@@ -143,6 +160,7 @@ try {
         [
             'id'        => $id,
             'code'      => $existing['apartment_code'],
+            'branch_id' => $branchId,
             'divisions' => $cleanDivisions
         ]
     );

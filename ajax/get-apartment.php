@@ -25,16 +25,21 @@ if ($id <= 0 && $code === '') {
 try {
 
     if ($id > 0) {
-
         $stmt = $pdo->prepare(
-            "SELECT * FROM apartments WHERE id = ? LIMIT 1"
+            "SELECT id, apartment_code, apartment_name, apartment_address,
+                    branch_id, divisions, status
+             FROM apartments
+             WHERE id = ?
+             LIMIT 1"
         );
         $stmt->execute([$id]);
-
     } else {
-
         $stmt = $pdo->prepare(
-            "SELECT * FROM apartments WHERE apartment_code = ? LIMIT 1"
+            "SELECT id, apartment_code, apartment_name, apartment_address,
+                    branch_id, divisions, status
+             FROM apartments
+             WHERE apartment_code = ?
+             LIMIT 1"
         );
         $stmt->execute([$code]);
     }
@@ -45,11 +50,34 @@ try {
         jsonResponse(false, 'Apartment not found.');
     }
 
-    $row['divisions'] = decodeDivisions($row['divisions'] ?? '');
+    /* Decode divisions */
+    $divisions = [];
+    if (!empty($row['divisions'])) {
+        if (function_exists('decodeDivisions')) {
+            $decoded = decodeDivisions($row['divisions']);
+            if (is_array($decoded)) $divisions = $decoded;
+        } else {
+            $decoded = json_decode($row['divisions'], true);
+            if (is_array($decoded)) $divisions = $decoded;
+        }
+    }
 
-    jsonResponse(true, 'OK', $row);
+    /* Build clean response */
+    $payload = [
+        'id'                => (int) $row['id'],
+        'apartment_code'    => (string) $row['apartment_code'],
+        'apartment_name'    => (string) $row['apartment_name'],
+        'apartment_address' => (string) $row['apartment_address'],
+        'branch_id'         => ($row['branch_id'] !== null && $row['branch_id'] !== '')
+                                ? (int) $row['branch_id']
+                                : null,
+        'divisions'         => $divisions,
+        'status'            => (int) $row['status'],
+    ];
+
+    jsonResponse(true, 'OK', $payload);
 
 } catch (PDOException $e) {
 
-    jsonResponse(false, 'Failed to load apartment.');
+    jsonResponse(false, 'Failed to load apartment: ' . $e->getMessage());
 }

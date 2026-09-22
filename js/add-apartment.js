@@ -13,17 +13,17 @@
             ? window.ADMIN_URL
             : "./";
 
-    const form         = document.getElementById("apartmentForm");
-    const saveBtn      = document.getElementById("saveBtn");
-    const saveText     = document.getElementById("saveBtnText");
+    const form = document.getElementById("apartmentForm");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveText = document.getElementById("saveBtnText");
 
     const divisionRows = document.getElementById("divisionRows");
-    const addDivBtn    = document.getElementById("addDivisionBtn");
-    const emptyState   = document.getElementById("divisionsEmpty");
+    const addDivBtn = document.getElementById("addDivisionBtn");
+    const emptyState = document.getElementById("divisionsEmpty");
 
     const successOverlay = document.getElementById("successOverlay");
-    const successText    = document.getElementById("successText");
-    const successCode    = document.getElementById("successCode");
+    const successText = document.getElementById("successText");
+    const successCode = document.getElementById("successCode");
 
     if (!form) return;
 
@@ -32,7 +32,7 @@
     ========================================= */
 
     let errorOverlay = null;
-    let errorText    = null;
+    let errorText = null;
 
     function buildErrorPopup() {
 
@@ -318,14 +318,14 @@
     function collectDivisions() {
 
         const rows = divisionRows.querySelectorAll(".division-row");
-        const out  = [];
+        const out = [];
         const seen = {};
 
         for (let i = 0; i < rows.length; i++) {
 
-            const row      = rows[i];
+            const row = rows[i];
             const division = row.querySelector(".division-name").value.trim();
-            const charge   = row.querySelector(".division-charge").value.trim();
+            const charge = row.querySelector(".division-charge").value.trim();
 
             if (!division) {
                 return { ok: false, message: "Division name is required for row " + (i + 1) + "." };
@@ -358,11 +358,13 @@
 
         e.preventDefault();
 
-        const name    = document.getElementById("apartment_name").value.trim();
+        const branchId = document.getElementById("branch_id").value.trim();
+        const name = document.getElementById("apartment_name").value.trim();
         const address = document.getElementById("apartment_address").value.trim();
-        const status  = document.getElementById("status").value;
+        const status = document.getElementById("status").value;
 
-        if (!name)    return showError("Apartment name is required.");
+        if (!branchId) return showError("Please select a branch.");
+        if (!name) return showError("Apartment name is required.");
         if (!address) return showError("Apartment address is required.");
 
         const collected = collectDivisions();
@@ -378,6 +380,7 @@
         setLoading(true);
 
         const formData = new FormData();
+        formData.append("branch_id", branchId);
         formData.append("apartment_name", name);
         formData.append("apartment_address", address);
         formData.append("status", status);
@@ -388,39 +391,39 @@
             body: formData,
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({
-            success: false,
-            message: "Unexpected server response."
-        })))
-        .then(data => {
+            .then(r => r.json().catch(() => ({
+                success: false,
+                message: "Unexpected server response."
+            })))
+            .then(data => {
 
-            if (data.success) {
+                if (data.success) {
 
-                const code = data.data && data.data.code
-                    ? data.data.code
-                    : "";
+                    const code = data.data && data.data.code
+                        ? data.data.code
+                        : "";
 
-                showSuccessPopup(
-                    data.message || "Apartment added successfully.",
-                    code
-                );
+                    showSuccessPopup(
+                        data.message || "Apartment added successfully.",
+                        code
+                    );
 
+                    setLoading(false);
+                    form.reset();
+
+                    divisionRows.innerHTML = "";
+                    refreshEmptyState();
+
+                } else {
+
+                    showError(data.message || "Failed to save.");
+                    setLoading(false);
+                }
+            })
+            .catch(() => {
+                showError("Unable to connect to server.");
                 setLoading(false);
-                form.reset();
-
-                divisionRows.innerHTML = "";
-                refreshEmptyState();
-
-            } else {
-
-                showError(data.message || "Failed to save.");
-                setLoading(false);
-            }
-        })
-        .catch(() => {
-            showError("Unable to connect to server.");
-            setLoading(false);
-        });
+            });
     });
 
     /* =========================================

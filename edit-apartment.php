@@ -10,6 +10,14 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
     header('Location: apartment.php');
     exit;
 }
+
+/* ---------------- FETCH BRANCHES ---------------- */
+$branchStmt = $pdo->query(
+    "SELECT id, branch_name
+     FROM settings_branches
+     ORDER BY branch_name ASC"
+);
+$branches = $branchStmt->fetchAll();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -47,26 +55,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             margin: 0;
             color: #817a71;
             font-size: 13px;
-        }
-
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #e4ddd3;
-            background: #fff;
-            color: #6f675f;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 700;
-            text-decoration: none;
-            transition: .2s;
-        }
-
-        .back-btn:hover {
-            background: #faf7f0;
-            color: #302923;
         }
 
         .apartment-form-card {
@@ -135,7 +123,8 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
         }
 
         .apartment-input,
-        .apartment-textarea {
+        .apartment-textarea,
+        .apartment-select {
             width: 100%;
             border: 1px solid #e8e1d8;
             background: #fffdf9;
@@ -148,8 +137,21 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             transition: .2s ease;
         }
 
-        .apartment-input {
+        .apartment-input,
+        .apartment-select {
             height: 45px;
+        }
+
+        .apartment-select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 40px;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23aaa198' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            background-size: 16px;
+            cursor: pointer;
         }
 
         .apartment-textarea {
@@ -158,7 +160,8 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
         }
 
         .apartment-input:focus,
-        .apartment-textarea:focus {
+        .apartment-textarea:focus,
+        .apartment-select:focus {
             border-color: #d98a91;
             background: #fff;
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
@@ -178,7 +181,8 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             pointer-events: none;
         }
 
-        .input-icon-wrap .apartment-input {
+        .input-icon-wrap .apartment-input,
+        .input-icon-wrap .apartment-select {
             padding-left: 40px;
         }
 
@@ -249,7 +253,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             gap: 10px;
         }
 
-
         .divisions-header-title>i {
             width: 34px;
             height: 34px;
@@ -294,13 +297,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             color: #817a71;
             margin: 0;
             line-height: 1.4;
-        }
-
-        .divisions-header-title span {
-            display: block;
-            font-size: 10px;
-            color: #817a71;
-            margin-top: 2px;
         }
 
         .add-division-btn {
@@ -443,7 +439,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
             margin-bottom: 8px;
         }
 
-        /* loading overlay for fetch */
         .form-loading {
             text-align: center;
             padding: 60px 20px;
@@ -769,6 +764,28 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
 
                     <div class="row g-3">
 
+                        <!-- BRANCH -->
+                        <div class="col-12 col-md-6">
+                            <label>
+                                Branch <span class="required">*</span>
+                            </label>
+                            <div class="input-icon-wrap">
+                                <i class="bi bi-shop"></i>
+                                <select name="branch_id"
+                                    id="branch_id"
+                                    class="apartment-select"
+                                    required>
+                                    <option value="">— Select Branch —</option>
+                                    <?php foreach ($branches as $b): ?>
+                                        <option value="<?= (int)$b['id'] ?>">
+                                            <?= htmlspecialchars($b['branch_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- NAME -->
                         <div class="col-12 col-md-6">
                             <label>
                                 Apartment Name <span class="required">*</span>
@@ -784,16 +801,18 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
                             </div>
                         </div>
 
+                        <!-- STATUS -->
                         <div class="col-12 col-md-6">
                             <label>Status</label>
                             <select name="status"
                                 id="status"
-                                class="apartment-input">
+                                class="apartment-select">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
                             </select>
                         </div>
 
+                        <!-- ADDRESS -->
                         <div class="col-12">
                             <label>
                                 Apartment Address <span class="required">*</span>
@@ -865,9 +884,7 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
     </main>
 
 
-    <!-- =========================================================
-         SUCCESS POPUP
-    ========================================================== -->
+    <!-- SUCCESS POPUP -->
 
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="successTitle">
@@ -904,7 +921,6 @@ if ($apartmentId <= 0 && $apartmentCode === '') {
     </div>
 
 
-    <!-- Pass apartment identifier to JS -->
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";
         window.APARTMENT_ID = <?= (int) $apartmentId; ?>;
