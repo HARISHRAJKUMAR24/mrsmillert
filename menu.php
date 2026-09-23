@@ -28,7 +28,6 @@ try {
     );
 
     $menus = $stmt->fetchAll();
-
 } catch (PDOException $e) {
     $menus = [];
 }
@@ -71,86 +70,143 @@ function fmtDateTime(string $dbDate): string
     <?php include './includes/head.php'; ?>
 
     <style>
-        .menu-page { padding: 30px 32px 40px; }
+        .menu-page {
+            padding: 30px 32px 40px;
+        }
 
         .menu-header {
-            display: flex; align-items: center; justify-content: space-between;
-            gap: 20px; margin-bottom: 25px; flex-wrap: wrap;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 20px;
+            margin-bottom: 25px;
+            flex-wrap: wrap;
         }
 
         .menu-title h1 {
             font-family: "Playfair Display", serif;
-            font-size: 29px; font-weight: 700;
-            color: #302923; margin: 0 0 5px;
+            font-size: 29px;
+            font-weight: 700;
+            color: #302923;
+            margin: 0 0 5px;
         }
-        .menu-title p { margin: 0; color: #817a71; font-size: 13px; }
+
+        .menu-title p {
+            margin: 0;
+            color: #817a71;
+            font-size: 13px;
+        }
 
         .btn-add {
-            display: inline-flex; align-items: center; gap: 8px;
-            background: #b51f2c; color: #fff;
-            border: none; border-radius: 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #b51f2c;
+            color: #fff;
+            border: none;
+            border-radius: 10px;
             padding: 11px 18px;
-            font-size: 12px; font-weight: 700;
+            font-size: 12px;
+            font-weight: 700;
             text-decoration: none;
             transition: .2s;
         }
-        .btn-add:hover { background: #8e1722; color: #fff; }
+
+        .btn-add:hover {
+            background: #8e1722;
+            color: #fff;
+        }
 
         .menu-card {
-            background: #fff; border: 1px solid #eee7dc;
-            border-radius: 20px; padding: 22px;
+            background: #fff;
+            border: 1px solid #eee7dc;
+            border-radius: 20px;
+            padding: 22px;
         }
 
         .menu-toolbar {
-            display: flex; align-items: center; gap: 12px;
-            margin-bottom: 18px; flex-wrap: wrap;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 18px;
+            flex-wrap: wrap;
         }
+
         .menu-search {
-            position: relative; flex: 1; min-width: 220px;
+            position: relative;
+            flex: 1;
+            min-width: 220px;
         }
+
         .menu-search i {
-            position: absolute; left: 13px; top: 50%;
-            transform: translateY(-50%); color: #aaa198; font-size: 14px;
+            position: absolute;
+            left: 13px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #aaa198;
+            font-size: 14px;
         }
+
         .menu-search input {
-            width: 100%; height: 42px;
-            border: 1px solid #e8e1d8; background: #fffdf9;
-            border-radius: 11px; padding: 0 12px 0 38px;
-            font-family: "DM Sans", sans-serif; font-size: 12px;
-            color: #292521; outline: none; transition: .2s ease;
+            width: 100%;
+            height: 42px;
+            border: 1px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 11px;
+            padding: 0 12px 0 38px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            transition: .2s ease;
         }
+
         .menu-search input:focus {
-            border-color: #d98a91; background: #fff;
+            border-color: #d98a91;
+            background: #fff;
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
         .menu-filter {
             height: 42px;
-            border: 1px solid #e8e1d8; background: #fffdf9;
-            border-radius: 11px; padding: 0 12px;
-            font-family: "DM Sans", sans-serif; font-size: 12px;
-            color: #292521; outline: none; cursor: pointer;
+            border: 1px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 11px;
+            padding: 0 12px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            cursor: pointer;
         }
+
         .menu-filter:focus {
-            border-color: #d98a91; background: #fff;
+            border-color: #d98a91;
+            background: #fff;
         }
 
         /* ---------- TABLE ---------- */
 
         .menu-table-wrap {
-            border: 1px solid #f0ebe4; border-radius: 14px;
+            border: 1px solid #f0ebe4;
+            border-radius: 14px;
             overflow: hidden;
         }
 
         .menu-table {
-            width: 100%; border-collapse: collapse;
+            width: 100%;
+            border-collapse: collapse;
             font-family: "DM Sans", sans-serif;
         }
 
-        .menu-table thead { background: #faf7f0; }
+        .menu-table thead {
+            background: #faf7f0;
+        }
+
         .menu-table th {
             text-align: left;
-            font-size: 10px; font-weight: 800;
+            font-size: 10px;
+            font-weight: 800;
             text-transform: uppercase;
             letter-spacing: .6px;
             color: #6f675f;
@@ -158,181 +214,528 @@ function fmtDateTime(string $dbDate): string
             border-bottom: 1px solid #f0ebe4;
             white-space: nowrap;
         }
+
         .menu-table td {
-            font-size: 12px; color: #302923;
+            font-size: 12px;
+            color: #302923;
             padding: 14px;
             border-bottom: 1px solid #f5efe6;
             vertical-align: middle;
         }
-        .menu-table tr:last-child td { border-bottom: none; }
-        .menu-table tbody tr:hover { background: #fffaf9; }
+
+        .menu-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .menu-table tbody tr:hover {
+            background: #fffaf9;
+        }
 
         .menu-name-cell {
-            display: flex; flex-direction: column; gap: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
             max-width: 320px;
         }
+
         .menu-name-main {
-            font-weight: 800; font-size: 12.5px; color: #302923;
+            font-weight: 800;
+            font-size: 12.5px;
+            color: #302923;
         }
+
         .menu-code-tag {
             display: inline-block;
-            font-size: 9px; font-weight: 700;
-            background: #faf7f0; color: #6f5a3f;
-            padding: 2px 7px; border-radius: 5px;
+            font-size: 9px;
+            font-weight: 700;
+            background: #faf7f0;
+            color: #6f5a3f;
+            padding: 2px 7px;
+            border-radius: 5px;
             letter-spacing: .5px;
             width: fit-content;
         }
 
-        .menu-counts { display: flex; flex-direction: column; gap: 4px; }
-        .menu-count-item {
-            font-size: 11px; color: #6f675f;
-            display: inline-flex; align-items: center; gap: 6px;
+        .menu-counts {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
         }
-        .menu-count-item i { color: #b51f2c; font-size: 11px; }
-        .menu-count-item strong { color: #302923; font-weight: 800; }
+
+        .menu-count-item {
+            font-size: 11px;
+            color: #6f675f;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .menu-count-item i {
+            color: #b51f2c;
+            font-size: 11px;
+        }
+
+        .menu-count-item strong {
+            color: #302923;
+            font-weight: 800;
+        }
 
         .menu-dates {
-            display: flex; flex-direction: column; gap: 5px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
             min-width: 180px;
         }
+
         .menu-date-line {
-            font-size: 11px; color: #4e4841;
-            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px;
+            color: #4e4841;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
-        .menu-date-line i { color: #b51f2c; font-size: 11px; }
-        .menu-date-line.start i { color: #2e7d32; }
-        .menu-date-line.end   i { color: #c62828; }
+
+        .menu-date-line i {
+            color: #b51f2c;
+            font-size: 11px;
+        }
+
+        .menu-date-line.start i {
+            color: #2e7d32;
+        }
+
+        .menu-date-line.end i {
+            color: #c62828;
+        }
 
         .status-pill {
-            display: inline-flex; align-items: center; gap: 6px;
-            font-size: 10px; font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 800;
             padding: 5px 10px;
             border-radius: 20px;
             letter-spacing: .3px;
             text-transform: uppercase;
         }
+
         .status-pill.live {
-            background: #e8f6ea; color: #2e7d32;
+            background: #e8f6ea;
+            color: #2e7d32;
             border: 1px solid #b6e0bd;
         }
+
         .status-pill.upcoming {
-            background: #eef4fd; color: #1565c0;
+            background: #eef4fd;
+            color: #1565c0;
             border: 1px solid #cfe0f5;
         }
+
         .status-pill.expired {
-            background: #fde6e6; color: #c62828;
+            background: #fde6e6;
+            color: #c62828;
             border: 1px solid #f3c8cc;
         }
+
         .status-pill .dot {
-            width: 7px; height: 7px; border-radius: 50%;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
             background: currentColor;
         }
+
         .status-pill.live .dot {
             box-shadow: 0 0 0 3px rgba(46, 125, 50, .2);
             animation: pulse 1.6s infinite;
         }
+
         @keyframes pulse {
-            0%, 100% { box-shadow: 0 0 0 3px rgba(46, 125, 50, .2); }
-            50%      { box-shadow: 0 0 0 6px rgba(46, 125, 50, 0); }
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 3px rgba(46, 125, 50, .2);
+            }
+
+            50% {
+                box-shadow: 0 0 0 6px rgba(46, 125, 50, 0);
+            }
         }
 
         .row-actions {
-            display: flex; align-items: center; gap: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
             justify-content: flex-end;
         }
+
         .row-btn {
-            width: 34px; height: 34px;
+            width: 34px;
+            height: 34px;
             border-radius: 9px;
-            display: inline-flex; align-items: center; justify-content: center;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             border: 1px solid transparent;
             font-size: 14px;
-            cursor: pointer; transition: .2s;
+            cursor: pointer;
+            transition: .2s;
             text-decoration: none;
             background: #fff;
         }
+
         .row-btn.edit {
             color: #1565c0;
             border-color: #cfe0f5;
         }
-        .row-btn.edit:hover { background: #eef4fd; color: #0d47a1; }
+
+        .row-btn.edit:hover {
+            background: #eef4fd;
+            color: #0d47a1;
+        }
+
         .row-btn.delete {
             color: #b51f2c;
             border-color: #f0d6d8;
         }
-        .row-btn.delete:hover { background: #fde6e6; color: #c62828; }
+
+        .row-btn.delete:hover {
+            background: #fde6e6;
+            color: #c62828;
+        }
 
         .table-empty {
-            text-align: center; padding: 50px 20px;
-            color: #948c82; font-size: 12px;
+            text-align: center;
+            padding: 50px 20px;
+            color: #948c82;
+            font-size: 12px;
         }
+
         .table-empty i {
-            font-size: 40px; color: #d5cbbd;
-            display: block; margin-bottom: 12px;
+            font-size: 40px;
+            color: #d5cbbd;
+            display: block;
+            margin-bottom: 12px;
+        }
+
+        /* =====================================================
+           PAGINATION
+        ===================================================== */
+        .menu-pagination {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 15px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #f2ede5;
+            flex-wrap: wrap;
+        }
+
+        .pagination-left {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+
+        .pagination-info {
+            font-size: 11px;
+            color: #817a71;
+        }
+
+        .pagination-info strong {
+            color: #302923;
+            font-weight: 700;
+        }
+
+        .pagination-perpage {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 11px;
+            color: #817a71;
+        }
+
+        .pagination-perpage select {
+            height: 32px;
+            border: 1px solid #eee7dc;
+            border-radius: 8px;
+            background: #fffdf9;
+            padding: 0 26px 0 10px;
+            font-family: inherit;
+            font-size: 11px;
+            font-weight: 700;
+            color: #4c4640;
+            cursor: pointer;
+            outline: none;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 9px center;
+            transition: .2s ease;
+        }
+
+        .pagination-perpage select:hover {
+            border-color: #e4ddd3;
+            background-color: #fff;
+        }
+
+        .pagination-perpage select:focus {
+            border-color: #d98a91;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .pagination-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .pagination-controls button {
+            min-width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            border: 1px solid #eee7dc;
+            background: #fff;
+            color: #6f675f;
+            font-size: 11px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: .2s ease;
+            padding: 0 8px;
+            font-family: inherit;
+        }
+
+        .pagination-controls button:hover:not(:disabled):not(.active) {
+            background: #faf7f0;
+            border-color: #e4ddd3;
+            color: #302923;
+        }
+
+        .pagination-controls button.active {
+            background: #b51f2c;
+            border-color: #b51f2c;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
+            cursor: default;
+        }
+
+        .pagination-controls button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
+
+        .pagination-controls .page-ellipsis {
+            min-width: 26px;
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #b5aca2;
+            font-size: 12px;
+            font-weight: 700;
+            user-select: none;
+        }
+
+        .pagination-controls i {
+            font-size: 12px;
         }
 
         /* modal */
         .mm-modal-overlay {
-            position: fixed; inset: 0;
+            position: fixed;
+            inset: 0;
             background: rgba(30, 25, 22, .55);
             backdrop-filter: blur(3px);
-            display: flex; align-items: center; justify-content: center;
-            padding: 20px; z-index: 9999;
-            opacity: 0; visibility: hidden; transition: .2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: .2s;
         }
-        .mm-modal-overlay.show { opacity: 1; visibility: visible; }
+
+        .mm-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
 
         .mm-modal {
-            background: #fff; border-radius: 18px;
+            background: #fff;
+            border-radius: 18px;
             padding: 30px 26px 24px;
-            max-width: 420px; width: 100%; text-align: center;
+            max-width: 420px;
+            width: 100%;
+            text-align: center;
             box-shadow: 0 30px 80px rgba(0, 0, 0, .25);
             transform: translateY(15px) scale(.96);
             transition: transform .25s cubic-bezier(.2, .9, .3, 1.2);
         }
-        .mm-modal-overlay.show .mm-modal { transform: translateY(0) scale(1); }
+
+        .mm-modal-overlay.show .mm-modal {
+            transform: translateY(0) scale(1);
+        }
 
         .mm-modal-icon {
-            width: 66px; height: 66px; border-radius: 50%;
-            display: flex; align-items: center; justify-content: center;
-            font-size: 30px; margin: 0 auto 16px;
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            margin: 0 auto 16px;
             animation: popIn .35s cubic-bezier(.2, .9, .3, 1.4);
         }
-        .mm-modal-icon.success { background: #e8f6ea; color: #2e7d32; }
-        .mm-modal-icon.error   { background: #fde6e6; color: #c62828; }
-        .mm-modal-icon.danger  { background: #fde6e6; color: #c62828; }
+
+        .mm-modal-icon.success {
+            background: #e8f6ea;
+            color: #2e7d32;
+        }
+
+        .mm-modal-icon.error {
+            background: #fde6e6;
+            color: #c62828;
+        }
+
+        .mm-modal-icon.danger {
+            background: #fde6e6;
+            color: #c62828;
+        }
 
         @keyframes popIn {
-            0% { transform: scale(.5); opacity: 0; }
-            100% { transform: scale(1); opacity: 1; }
+            0% {
+                transform: scale(.5);
+                opacity: 0;
+            }
+
+            100% {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
-        .mm-modal-title { margin: 0 0 8px; font-size: 18px; font-weight: 800; color: #302923; }
-        .mm-modal-text { margin: 0 0 20px; font-size: 12px; color: #756d65; line-height: 1.6; }
-        .mm-modal-actions { display: flex; gap: 10px; }
+        .mm-modal-title {
+            margin: 0 0 8px;
+            font-size: 18px;
+            font-weight: 800;
+            color: #302923;
+        }
+
+        .mm-modal-text {
+            margin: 0 0 20px;
+            font-size: 12px;
+            color: #756d65;
+            line-height: 1.6;
+        }
+
+        .mm-modal-actions {
+            display: flex;
+            gap: 10px;
+        }
 
         .mm-btn {
-            flex: 1; height: 44px; border-radius: 11px; border: none;
-            font-size: 12px; font-weight: 700; cursor: pointer;
-            display: inline-flex; align-items: center; justify-content: center;
-            gap: 7px; text-decoration: none; transition: .2s ease;
+            flex: 1;
+            height: 44px;
+            border-radius: 11px;
+            border: none;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            text-decoration: none;
+            transition: .2s ease;
         }
-        .mm-btn-primary { background: #b51f2c; color: #fff; }
-        .mm-btn-primary:hover { background: #8e1722; color: #fff; }
+
+        .mm-btn-primary {
+            background: #b51f2c;
+            color: #fff;
+        }
+
+        .mm-btn-primary:hover {
+            background: #8e1722;
+            color: #fff;
+        }
+
         .mm-btn-ghost {
-            background: #fff; border: 1px solid #e4ddd3; color: #6f675f;
+            background: #fff;
+            border: 1px solid #e4ddd3;
+            color: #6f675f;
         }
-        .mm-btn-ghost:hover { background: #faf7f0; }
-        .mm-btn-danger { background: #c62828; color: #fff; }
-        .mm-btn-danger:hover { background: #a02020; }
+
+        .mm-btn-ghost:hover {
+            background: #faf7f0;
+        }
+
+        .mm-btn-danger {
+            background: #c62828;
+            color: #fff;
+        }
+
+        .mm-btn-danger:hover {
+            background: #a02020;
+        }
 
         @media (max-width: 768px) {
-            .menu-page { padding: 20px 15px 30px; }
-            .menu-header { flex-direction: column; align-items: flex-start; }
-            .menu-card { padding: 15px; border-radius: 16px; }
+            .menu-page {
+                padding: 20px 15px 30px;
+            }
+
+            .menu-header {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .menu-card {
+                padding: 15px;
+                border-radius: 16px;
+            }
+
             .menu-table th,
-            .menu-table td { padding: 10px; }
+            .menu-table td {
+                padding: 10px;
+            }
+
             .menu-table th:nth-child(3),
-            .menu-table td:nth-child(3) { display: none; }
+            .menu-table td:nth-child(3) {
+                display: none;
+            }
+
+            .menu-pagination {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pagination-left {
+                justify-content: center;
+            }
+
+            .pagination-info {
+                text-align: center;
+            }
+
+            .pagination-controls {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .pagination-controls button {
+                min-width: 30px;
+                height: 30px;
+                font-size: 10px;
+            }
         }
     </style>
 
@@ -389,8 +792,8 @@ function fmtDateTime(string $dbDate): string
                     <div class="menu-search">
                         <i class="bi bi-search"></i>
                         <input type="text"
-                               id="searchInput"
-                               placeholder="Search by name or code...">
+                            id="searchInput"
+                            placeholder="Search by name or code...">
                     </div>
 
                     <select id="statusFilter" class="menu-filter">
@@ -429,12 +832,11 @@ function fmtDateTime(string $dbDate): string
                                 <?php foreach ($menus as $m):
 
                                     $t = menuTimingStatus($m['start_at'], $m['end_at']);
-                                    ?>
+                                ?>
                                     <tr
                                         data-code="<?= htmlspecialchars(strtolower($m['menu_code'])) ?>"
                                         data-name="<?= htmlspecialchars(strtolower($m['menu_name'])) ?>"
-                                        data-status="<?= $t['key'] ?>"
-                                    >
+                                        data-status="<?= $t['key'] ?>">
                                         <td>
                                             <div class="menu-name-cell">
                                                 <div class="menu-name-main">
@@ -482,15 +884,15 @@ function fmtDateTime(string $dbDate): string
                                         <td>
                                             <div class="row-actions">
                                                 <a href="edit-menu.php?id=<?= (int) $m['id'] ?>"
-                                                   class="row-btn edit"
-                                                   title="Edit">
+                                                    class="row-btn edit"
+                                                    title="Edit">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
                                                 <button type="button"
-                                                        class="row-btn delete js-delete-btn"
-                                                        data-id="<?= (int) $m['id'] ?>"
-                                                        data-name="<?= htmlspecialchars($m['menu_name']) ?>"
-                                                        title="Delete">
+                                                    class="row-btn delete js-delete-btn"
+                                                    data-id="<?= (int) $m['id'] ?>"
+                                                    data-name="<?= htmlspecialchars($m['menu_name']) ?>"
+                                                    title="Delete">
                                                     <i class="bi bi-trash3"></i>
                                                 </button>
                                             </div>
@@ -500,6 +902,38 @@ function fmtDateTime(string $dbDate): string
                             <?php endif; ?>
                         </tbody>
                     </table>
+
+                </div>
+
+
+                <!-- =====================================================
+                     PAGINATION
+                ====================================================== -->
+
+                <div class="menu-pagination" id="menuPagination" style="display:none;">
+
+                    <div class="pagination-left">
+
+                        <div class="pagination-info" id="paginationInfo">
+                            Showing <strong>0</strong>–<strong>0</strong> of <strong>0</strong>
+                        </div>
+
+                        <label class="pagination-perpage">
+                            Show
+                            <select id="perPageSelect">
+                                <option value="10">10</option>
+                                <option value="25">25</option>
+                                <option value="50">50</option>
+                                <option value="100">100</option>
+                            </select>
+                            entries
+                        </label>
+
+                    </div>
+
+                    <div class="pagination-controls" id="paginationControls">
+                        <!-- filled by JS -->
+                    </div>
 
                 </div>
 

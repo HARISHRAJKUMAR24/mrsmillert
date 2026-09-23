@@ -52,7 +52,7 @@ $sidebarLogoUrl = $sidebarLogo
             Menu
         </a>
 
-        <a href="#">
+        <a href="orders.php">
             <i class="bi bi-bag"></i>
             Orders
         </a>

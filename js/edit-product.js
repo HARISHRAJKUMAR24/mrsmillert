@@ -1,7 +1,7 @@
 /* =========================================================
    MRS MILL@ — EDIT PRODUCT UX
    File: ./js/edit-product.js
-   - Loads product + variants + status
+   - Loads product + variants (with container) + status
    - Add / remove / update variants
    - Replace / Remove image
    - Apartment multi-select
@@ -21,56 +21,56 @@
 
     /* ---------------- DOM ---------------- */
 
-    const form        = document.getElementById("productForm");
+    const form = document.getElementById("productForm");
     const formLoading = document.getElementById("formLoading");
-    const saveBtn     = document.getElementById("saveBtn");
-    const saveText    = document.getElementById("saveBtnText");
-    const prodBadge   = document.getElementById("prodCodeBadge");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveText = document.getElementById("saveBtnText");
+    const prodBadge = document.getElementById("prodCodeBadge");
 
-    const fileInput    = document.getElementById("product_image");
-    const imgZone      = document.getElementById("imgZone");
+    const fileInput = document.getElementById("product_image");
+    const imgZone = document.getElementById("imgZone");
     const imgPlacehold = document.getElementById("imgPlaceholder");
-    const imgWrap      = document.getElementById("imgPreviewWrap");
-    const imgPreview   = document.getElementById("imgPreview");
-    const imgReplace   = document.getElementById("imgReplaceBtn");
-    const imgRemove    = document.getElementById("imgRemoveBtn");
-    const newNote      = document.getElementById("newImageNote");
-    const removedNote  = document.getElementById("removedImageNote");
-    const removeFlag   = document.getElementById("remove_image");
+    const imgWrap = document.getElementById("imgPreviewWrap");
+    const imgPreview = document.getElementById("imgPreview");
+    const imgReplace = document.getElementById("imgReplaceBtn");
+    const imgRemove = document.getElementById("imgRemoveBtn");
+    const newNote = document.getElementById("newImageNote");
+    const removedNote = document.getElementById("removedImageNote");
+    const removeFlag = document.getElementById("remove_image");
 
     /* variants */
     const addVariantBtn = document.getElementById("addVariantBtn");
-    const variantsList  = document.getElementById("variantsList");
+    const variantsList = document.getElementById("variantsList");
     const variantsEmpty = document.getElementById("variantsEmpty");
 
     /* status */
     const statusInput = document.getElementById("product_status");
-    const statusRow   = document.getElementById("statusToggleRow");
+    const statusRow = document.getElementById("statusToggleRow");
     const statusTitle = document.getElementById("statusToggleTitle");
-    const statusDesc  = document.getElementById("statusToggleDesc");
+    const statusDesc = document.getElementById("statusToggleDesc");
 
     /* apartments */
-    const aptBox      = document.getElementById("apartmentsBox");
-    const aptHead     = document.getElementById("apartmentsHead");
-    const aptList     = document.getElementById("aptList");
-    const aptSearch   = document.getElementById("aptSearchInput");
-    const countLabel  = document.getElementById("selectedCount");
+    const aptBox = document.getElementById("apartmentsBox");
+    const aptHead = document.getElementById("apartmentsHead");
+    const aptList = document.getElementById("aptList");
+    const aptSearch = document.getElementById("aptSearchInput");
+    const countLabel = document.getElementById("selectedCount");
     const selectAllBtn = document.getElementById("selectAllBtn");
     const selectAllTxt = document.getElementById("selectAllText");
 
     /* modals */
     const confirmOverlay = document.getElementById("confirmOverlay");
-    const confirmCancel  = document.getElementById("confirmCancel");
-    const confirmRemove  = document.getElementById("confirmRemove");
+    const confirmCancel = document.getElementById("confirmCancel");
+    const confirmRemove = document.getElementById("confirmRemove");
 
     const errorOverlay = document.getElementById("errorOverlay");
-    const errorText    = document.getElementById("errorText");
-    const errorTitle   = document.getElementById("errorTitle");
-    const errorOkBtn   = document.getElementById("errorOkBtn");
+    const errorText = document.getElementById("errorText");
+    const errorTitle = document.getElementById("errorTitle");
+    const errorOkBtn = document.getElementById("errorOkBtn");
 
     const successOverlay = document.getElementById("successOverlay");
-    const successText    = document.getElementById("successText");
-    const stayBtn        = document.getElementById("stayBtn");
+    const successText = document.getElementById("successText");
+    const stayBtn = document.getElementById("stayBtn");
 
     if (!form) return;
 
@@ -119,12 +119,8 @@
 
         const active = statusInput.checked;
 
-        if (statusRow) {
-            statusRow.classList.toggle("is-active", active);
-        }
-        if (statusTitle) {
-            statusTitle.textContent = active ? "Active" : "Inactive";
-        }
+        if (statusRow) statusRow.classList.toggle("is-active", active);
+        if (statusTitle) statusTitle.textContent = active ? "Active" : "Inactive";
         if (statusDesc) {
             statusDesc.textContent = active
                 ? "Product will be visible to customers."
@@ -132,15 +128,13 @@
         }
     }
 
-    if (statusInput) {
-        statusInput.addEventListener("change", applyStatusUI);
-    }
+    if (statusInput) statusInput.addEventListener("change", applyStatusUI);
 
     /* ---------------- ERROR ---------------- */
 
     function showError(message, title) {
         if (errorTitle) errorTitle.textContent = title || "Oops!";
-        if (errorText)  errorText.textContent  = message || "Something went wrong.";
+        if (errorText) errorText.textContent = message || "Something went wrong.";
         errorOverlay.classList.add("show");
         errorOverlay.setAttribute("aria-hidden", "false");
     }
@@ -264,13 +258,13 @@
     /* ---------------- VARIANTS ---------------- */
 
     const UNIT_OPTIONS = [
-        { v: "liter",      t: "Liter" },
+        { v: "liter", t: "Liter" },
         { v: "milliliter", t: "Milliliter" },
-        { v: "gram",       t: "Gram" },
-        { v: "kilogram",   t: "Kilogram" },
-        { v: "plate",      t: "Plate" },
-        { v: "packet",     t: "Packet" },
-        { v: "bucket",     t: "Bucket" }
+        { v: "gram", t: "Gram" },
+        { v: "kilogram", t: "Kilogram" },
+        { v: "plate", t: "Plate" },
+        { v: "packet", t: "Packet" },
+        { v: "bucket", t: "Bucket" }
     ];
 
     function buildUnitOptions(selectedVal) {
@@ -297,8 +291,12 @@
 
     function addVariantRow(data) {
         variantCounter++;
-
         data = data || {};
+
+        const contEnabled = Number(data.container_enabled || 0) === 1;
+        const contPrice = data.container_price !== undefined && data.container_price !== null
+            ? Number(data.container_price)
+            : "";
 
         const row = document.createElement("div");
         row.className = "variant-row";
@@ -354,9 +352,60 @@
                            value="${escapeHtml(data.price || "")}">
                 </div>
             </div>
+
+            <!-- ============================================
+                 CONTAINER BOX (optional — price only)
+            ============================================ -->
+            <div class="container-box js-container-box ${contEnabled ? "active" : ""}">
+
+                <div class="container-toggle-row">
+                    <div class="container-toggle-info">
+                        <i class="bi bi-box2-heart"></i>
+                        <div>
+                            <h5>
+                                Container Box
+                                <span class="optional-tag">Optional</span>
+                            </h5>
+                            <p>Add a container charge that is added to the variant price.</p>
+                        </div>
+                    </div>
+
+                    <label class="mm-switch-sm">
+                        <input type="checkbox" class="js-container-toggle" ${contEnabled ? "checked" : ""}>
+                        <span class="mm-switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="container-fields">
+                    <label class="field-label">Container Price (₹) <span class="required">*</span></label>
+                    <input type="number"
+                           class="variant-input js-container-price"
+                           placeholder="Eg: 50"
+                           min="0"
+                           step="0.01"
+                           inputmode="decimal"
+                           value="${contEnabled && contPrice !== '' ? escapeHtml(String(contPrice)) : ''}">
+                </div>
+
+            </div>
         `;
 
         variantsList.appendChild(row);
+
+        /* Wire container toggle */
+        const toggle = row.querySelector(".js-container-toggle");
+        const box = row.querySelector(".js-container-box");
+        const contInp = row.querySelector(".js-container-price");
+
+        toggle.addEventListener("change", function () {
+            box.classList.toggle("active", toggle.checked);
+            if (toggle.checked) {
+                setTimeout(() => contInp.focus(), 100);
+            } else {
+                contInp.value = "";
+            }
+        });
+
         renumberVariants();
         refreshVariantsEmpty();
     }
@@ -391,12 +440,21 @@
 
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
+
+            const containerToggle = r.querySelector(".js-container-toggle");
+            const containerOn = !!(containerToggle && containerToggle.checked);
+            const containerPrice = containerOn
+                ? (r.querySelector(".js-container-price")?.value || "").trim()
+                : "";
+
             out.push({
                 index: i + 1,
-                quantity:      (r.querySelector(".js-quantity")?.value || "").trim(),
+                quantity: (r.querySelector(".js-quantity")?.value || "").trim(),
                 quantity_unit: (r.querySelector(".js-unit")?.value || "").trim(),
                 quantity_name: (r.querySelector(".js-qname")?.value || "").trim(),
-                price:         (r.querySelector(".js-price")?.value || "").trim()
+                price: (r.querySelector(".js-price")?.value || "").trim(),
+                container_enabled: containerOn ? 1 : 0,
+                container_price: containerPrice
             });
         }
         return out;
@@ -428,6 +486,13 @@
             if (v.price === "" || isNaN(Number(v.price)) || Number(v.price) < 0) {
                 showError(label + ": please enter a valid price.", "Invalid price");
                 return null;
+            }
+
+            if (v.container_enabled) {
+                if (v.container_price === "" || isNaN(Number(v.container_price)) || Number(v.container_price) < 0) {
+                    showError(label + ": please enter a valid container price.", "Invalid container price");
+                    return null;
+                }
             }
         }
         return variants;
@@ -547,71 +612,73 @@
         fetch(BASE_URL + "ajax/product-get.php?id=" + PRODUCT_ID, {
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
-        .then(data => {
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+            .then(data => {
 
-            if (!data.success || !data.data) {
-                formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">' +
-                    (data.message || "Product not found.") + '</div>';
-                return;
-            }
-
-            const p = data.data;
-
-            document.getElementById("product_id").value  = p.id;
-            document.getElementById("product_name").value = p.product_name || "";
-            document.getElementById("category_id").value  = p.category_id || "";
-
-            if (prodBadge) prodBadge.textContent = "#" + (p.product_code || "");
-
-            if (removeFlag) removeFlag.value = "0";
-
-            /* ---- STATUS ---- */
-            const active = String(p.status) === "1";
-            if (statusInput) statusInput.checked = active;
-            applyStatusUI();
-
-            if (p.image_url) {
-                showPreviewFromUrl(p.image_url);
-            } else {
-                hidePreview();
-            }
-            resetNotes();
-
-            /* ---- VARIANTS ---- */
-            variantsList.innerHTML = "";
-            variantCounter = 0;
-
-            if (Array.isArray(p.variants) && p.variants.length > 0) {
-                p.variants.forEach(v => addVariantRow({
-                    quantity:      v.quantity,
-                    quantity_unit: v.quantity_unit,
-                    quantity_name: v.quantity_name,
-                    price:         v.price
-                }));
-            } else {
-                addVariantRow();
-            }
-            refreshVariantsEmpty();
-
-            /* ---- APARTMENTS ---- */
-            selected.clear();
-            const linkedCodes = Array.isArray(p.apartments) ? p.apartments : [];
-            APARTMENTS.forEach(a => {
-                if (linkedCodes.includes(a.apartment_code)) {
-                    selected.add(Number(a.id));
+                if (!data.success || !data.data) {
+                    formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">' +
+                        (data.message || "Product not found.") + '</div>';
+                    return;
                 }
+
+                const p = data.data;
+
+                document.getElementById("product_id").value = p.id;
+                document.getElementById("product_name").value = p.product_name || "";
+                document.getElementById("category_id").value = p.category_id || "";
+
+                if (prodBadge) prodBadge.textContent = "#" + (p.product_code || "");
+
+                if (removeFlag) removeFlag.value = "0";
+
+                /* ---- STATUS ---- */
+                const active = String(p.status) === "1";
+                if (statusInput) statusInput.checked = active;
+                applyStatusUI();
+
+                if (p.image_url) {
+                    showPreviewFromUrl(p.image_url);
+                } else {
+                    hidePreview();
+                }
+                resetNotes();
+
+                /* ---- VARIANTS ---- */
+                variantsList.innerHTML = "";
+                variantCounter = 0;
+
+                if (Array.isArray(p.variants) && p.variants.length > 0) {
+                    p.variants.forEach(v => addVariantRow({
+                        quantity: v.quantity,
+                        quantity_unit: v.quantity_unit,
+                        quantity_name: v.quantity_name,
+                        price: v.price,
+                        container_enabled: v.container_enabled || 0,
+                        container_price: v.container_price || ""
+                    }));
+                } else {
+                    addVariantRow();
+                }
+                refreshVariantsEmpty();
+
+                /* ---- APARTMENTS ---- */
+                selected.clear();
+                const linkedCodes = Array.isArray(p.apartments) ? p.apartments : [];
+                APARTMENTS.forEach(a => {
+                    if (linkedCodes.includes(a.apartment_code)) {
+                        selected.add(Number(a.id));
+                    }
+                });
+                renderAptList("");
+                updateCount();
+
+                formLoading.style.display = "none";
+                form.style.display = "";
+
+            })
+            .catch(() => {
+                formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">Unable to connect to server.</div>';
             });
-            renderAptList("");
-            updateCount();
-
-            formLoading.style.display = "none";
-            form.style.display = "";
-
-        })
-        .catch(() => {
-            formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">Unable to connect to server.</div>';
-        });
     }
 
     /* ---------------- SUBMIT ---------------- */
@@ -620,13 +687,13 @@
 
         e.preventDefault();
 
-        const id         = Number(document.getElementById("product_id").value || 0);
-        const name       = document.getElementById("product_name").value.trim();
+        const id = Number(document.getElementById("product_id").value || 0);
+        const name = document.getElementById("product_name").value.trim();
         const categoryId = Number(document.getElementById("category_id").value);
-        const removeImg  = removeFlag ? removeFlag.value : "0";
+        const removeImg = removeFlag ? removeFlag.value : "0";
 
-        if (id <= 0)         return showError("Invalid product ID.", "Error");
-        if (!name)           return showError("Product name is required.", "Missing name");
+        if (id <= 0) return showError("Invalid product ID.", "Error");
+        if (!name) return showError("Product name is required.", "Missing name");
         if (categoryId <= 0) return showError("Please choose a category.", "Category required");
 
         const variants = validateVariants();
@@ -645,7 +712,6 @@
             return showError("Please upload a product image.", "Image required");
         }
 
-        /* ---- STATUS ---- */
         const status = (statusInput && statusInput.checked) ? "1" : "0";
 
         setLoading(true);
@@ -657,11 +723,14 @@
         formData.append("product_status", status);
         formData.append("remove_image", removeImg);
         formData.append("apartment_ids", JSON.stringify(Array.from(selected)));
+
         formData.append("variants", JSON.stringify(variants.map(v => ({
             quantity: parseFloat(v.quantity).toFixed(2),
             quantity_unit: v.quantity_unit,
             quantity_name: v.quantity_name,
-            price: parseFloat(v.price).toFixed(2)
+            price: parseFloat(v.price).toFixed(2),
+            container_enabled: v.container_enabled ? 1 : 0,
+            container_price: v.container_price !== "" ? parseFloat(v.container_price).toFixed(2) : "0.00"
         }))));
 
         if (hasNewFile) {
@@ -673,26 +742,26 @@
             body: formData,
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
-        .then(data => {
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+            .then(data => {
 
-            if (data.success) {
-                if (successText) successText.textContent = data.message || "Product updated.";
-                successOverlay.classList.add("show");
-                successOverlay.setAttribute("aria-hidden", "false");
+                if (data.success) {
+                    if (successText) successText.textContent = data.message || "Product updated.";
+                    successOverlay.classList.add("show");
+                    successOverlay.setAttribute("aria-hidden", "false");
+                    setLoading(false);
+                    fileInput.value = "";
+                    if (removeFlag) removeFlag.value = "0";
+                    resetNotes();
+                } else {
+                    showError(data.message || "Failed to update.", "Save failed");
+                    setLoading(false);
+                }
+            })
+            .catch(() => {
+                showError("Unable to connect to server.", "Network error");
                 setLoading(false);
-                fileInput.value = "";
-                if (removeFlag) removeFlag.value = "0";
-                resetNotes();
-            } else {
-                showError(data.message || "Failed to update.", "Save failed");
-                setLoading(false);
-            }
-        })
-        .catch(() => {
-            showError("Unable to connect to server.", "Network error");
-            setLoading(false);
-        });
+            });
     });
 
     if (successOverlay) {

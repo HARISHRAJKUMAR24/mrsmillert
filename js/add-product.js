@@ -5,7 +5,8 @@
    - Collapsible Apartment Management box
    - All apartments preselected by default
    - Product image upload
-   - MULTI QUANTITY VARIANTS (quantity + unit + name + price)
+   - MULTI QUANTITY VARIANTS with OPTIONAL CONTAINER PRICE
+   - Add Variant button at top AND bottom
    - Active / Inactive status toggle
    - All errors shown in popup modal
    ========================================================= */
@@ -21,48 +22,47 @@
 
     /* ---------------- DOM ---------------- */
 
-    const form     = document.getElementById("productForm");
-    const saveBtn  = document.getElementById("saveBtn");
+    const form = document.getElementById("productForm");
+    const saveBtn = document.getElementById("saveBtn");
     const saveText = document.getElementById("saveBtnText");
 
     /* image */
-    const fileInput    = document.getElementById("product_image");
-    const imgZone      = document.getElementById("imgZone");
+    const fileInput = document.getElementById("product_image");
+    const imgZone = document.getElementById("imgZone");
     const imgPlacehold = document.getElementById("imgPlaceholder");
-    const imgWrap      = document.getElementById("imgPreviewWrap");
-    const imgPreview   = document.getElementById("imgPreview");
-    const imgReplace   = document.getElementById("imgReplaceBtn");
-    const imgRemove    = document.getElementById("imgRemoveBtn");
+    const imgWrap = document.getElementById("imgPreviewWrap");
+    const imgPreview = document.getElementById("imgPreview");
+    const imgReplace = document.getElementById("imgReplaceBtn");
+    const imgRemove = document.getElementById("imgRemoveBtn");
 
     /* variants */
     const addVariantBtn = document.getElementById("addVariantBtn");
-    const variantsList  = document.getElementById("variantsList");
-    const variantsEmpty = document.getElementById("variantsEmpty");
+    const addVariantBtnBottom = document.getElementById("addVariantBtnBottom");
+    const variantsList = document.getElementById("variantsList");
 
     /* status */
-    const statusInput    = document.getElementById("product_status");
-    const statusRow      = document.getElementById("statusToggleRow");
-    const statusTitle    = document.getElementById("statusToggleTitle");
-    const statusDesc     = document.getElementById("statusToggleDesc");
+    const statusInput = document.getElementById("product_status");
+    const statusRow = document.getElementById("statusToggleRow");
+    const statusTitle = document.getElementById("statusToggleTitle");
+    const statusDesc = document.getElementById("statusToggleDesc");
 
     /* apartments */
-    const aptBox      = document.getElementById("apartmentsBox");
-    const aptHead     = document.getElementById("apartmentsHead");
-    const aptBody     = document.getElementById("apartmentsBody");
-    const aptList     = document.getElementById("aptList");
-    const aptSearch   = document.getElementById("aptSearchInput");
-    const countLabel  = document.getElementById("selectedCount");
+    const aptBox = document.getElementById("apartmentsBox");
+    const aptHead = document.getElementById("apartmentsHead");
+    const aptList = document.getElementById("aptList");
+    const aptSearch = document.getElementById("aptSearchInput");
+    const countLabel = document.getElementById("selectedCount");
     const selectAllBtn = document.getElementById("selectAllBtn");
     const selectAllTxt = document.getElementById("selectAllText");
 
     /* popups */
     const errorOverlay = document.getElementById("errorOverlay");
-    const errorText    = document.getElementById("errorText");
-    const errorTitle   = document.getElementById("errorTitle");
-    const errorOkBtn   = document.getElementById("errorOkBtn");
+    const errorText = document.getElementById("errorText");
+    const errorTitle = document.getElementById("errorTitle");
+    const errorOkBtn = document.getElementById("errorOkBtn");
 
     const successOverlay = document.getElementById("successOverlay");
-    const successText    = document.getElementById("successText");
+    const successText = document.getElementById("successText");
 
     if (!form) return;
 
@@ -111,12 +111,8 @@
 
         const active = statusInput.checked;
 
-        if (statusRow) {
-            statusRow.classList.toggle("is-active", active);
-        }
-        if (statusTitle) {
-            statusTitle.textContent = active ? "Active" : "Inactive";
-        }
+        if (statusRow) statusRow.classList.toggle("is-active", active);
+        if (statusTitle) statusTitle.textContent = active ? "Active" : "Inactive";
         if (statusDesc) {
             statusDesc.textContent = active
                 ? "Product will be visible to customers."
@@ -124,15 +120,13 @@
         }
     }
 
-    if (statusInput) {
-        statusInput.addEventListener("change", applyStatusUI);
-    }
+    if (statusInput) statusInput.addEventListener("change", applyStatusUI);
 
     /* ---------------- ERROR POPUP ---------------- */
 
     function showError(message, title) {
         if (errorTitle) errorTitle.textContent = title || "Oops!";
-        if (errorText)  errorText.textContent  = message || "Something went wrong.";
+        if (errorText) errorText.textContent = message || "Something went wrong.";
         if (errorOverlay) {
             errorOverlay.classList.add("show");
             errorOverlay.setAttribute("aria-hidden", "false");
@@ -231,13 +225,13 @@
     /* ---------------- VARIANTS ---------------- */
 
     const UNIT_OPTIONS = [
-        { v: "liter",      t: "Liter" },
+        { v: "liter", t: "Liter" },
         { v: "milliliter", t: "Milliliter" },
-        { v: "gram",       t: "Gram" },
-        { v: "kilogram",   t: "Kilogram" },
-        { v: "plate",      t: "Plate" },
-        { v: "packet",     t: "Packet" },
-        { v: "bucket",     t: "Bucket" }
+        { v: "gram", t: "Gram" },
+        { v: "kilogram", t: "Kilogram" },
+        { v: "plate", t: "Plate" },
+        { v: "packet", t: "Packet" },
+        { v: "bucket", t: "Bucket" }
     ];
 
     function buildUnitOptions(selectedVal) {
@@ -245,15 +239,6 @@
             const sel = (u.v === selectedVal) ? "selected" : "";
             return `<option value="${u.v}" ${sel}>${u.t}</option>`;
         }).join("");
-    }
-
-    function refreshVariantsEmpty() {
-        const rows = variantsList.querySelectorAll(".variant-row");
-        if (rows.length === 0) {
-            variantsEmpty.style.display = "block";
-        } else {
-            variantsEmpty.style.display = "none";
-        }
     }
 
     function addVariantRow() {
@@ -310,12 +295,71 @@
                            inputmode="decimal">
                 </div>
             </div>
+
+            <!-- ============================================
+                 CONTAINER BOX (optional — price only)
+            ============================================ -->
+            <div class="container-box js-container-box">
+
+                <div class="container-toggle-row">
+                    <div class="container-toggle-info">
+                        <i class="bi bi-box2-heart"></i>
+                        <div>
+                            <h5>
+                                Container Box
+                                <span class="optional-tag">Optional</span>
+                            </h5>
+                            <p>Add a container charge that is added to the variant price.</p>
+                        </div>
+                    </div>
+
+                    <label class="mm-switch-sm">
+                        <input type="checkbox" class="js-container-toggle">
+                        <span class="mm-switch-slider"></span>
+                    </label>
+                </div>
+
+                <div class="container-fields">
+                    <label class="field-label">Container Price (₹) <span class="required">*</span></label>
+                    <input type="number"
+                           class="variant-input js-container-price"
+                           placeholder="Eg: 50"
+                           min="0"
+                           step="0.01"
+                           inputmode="decimal">
+                </div>
+
+            </div>
         `;
 
         variantsList.appendChild(row);
 
+        wireVariantEvents(row);
+
         renumberVariants();
-        refreshVariantsEmpty();
+
+        /* Scroll new variant into view */
+        setTimeout(() => {
+            row.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }, 80);
+    }
+
+    /* Wire events for a variant row */
+    function wireVariantEvents(row) {
+
+        const toggle = row.querySelector(".js-container-toggle");
+        const box = row.querySelector(".js-container-box");
+        const priceInput = row.querySelector(".js-container-price");
+
+        toggle.addEventListener("change", function () {
+            box.classList.toggle("active", toggle.checked);
+
+            if (toggle.checked) {
+                setTimeout(() => priceInput.focus(), 100);
+            } else {
+                priceInput.value = "";
+            }
+        });
     }
 
     function renumberVariants() {
@@ -328,8 +372,16 @@
         });
     }
 
+    /* TOP Add Variant button */
     if (addVariantBtn) {
         addVariantBtn.addEventListener("click", function () {
+            addVariantRow();
+        });
+    }
+
+    /* BOTTOM Add Variant button */
+    if (addVariantBtnBottom) {
+        addVariantBtnBottom.addEventListener("click", function () {
             addVariantRow();
         });
     }
@@ -349,7 +401,6 @@
             setTimeout(function () {
                 row.remove();
                 renumberVariants();
-                refreshVariantsEmpty();
             }, 180);
         });
     }
@@ -360,17 +411,23 @@
 
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
-            const qty   = (r.querySelector(".js-quantity")?.value || "").trim();
-            const unit  = (r.querySelector(".js-unit")?.value || "").trim();
+            const qty = (r.querySelector(".js-quantity")?.value || "").trim();
+            const unit = (r.querySelector(".js-unit")?.value || "").trim();
             const qname = (r.querySelector(".js-qname")?.value || "").trim();
             const price = (r.querySelector(".js-price")?.value || "").trim();
+
+            const containerToggle = r.querySelector(".js-container-toggle");
+            const containerOn = !!(containerToggle && containerToggle.checked);
+            const containerPrice = containerOn ? (r.querySelector(".js-container-price")?.value || "").trim() : "";
 
             out.push({
                 index: i + 1,
                 quantity: qty,
                 quantity_unit: unit,
                 quantity_name: qname,
-                price: price
+                price: price,
+                container_enabled: containerOn ? 1 : 0,
+                container_price: containerPrice
             });
         }
 
@@ -404,6 +461,13 @@
                 showError(label + ": please enter a valid price.", "Invalid price");
                 return null;
             }
+
+            if (v.container_enabled) {
+                if (v.container_price === "" || isNaN(Number(v.container_price)) || Number(v.container_price) < 0) {
+                    showError(label + ": please enter a valid container price.", "Invalid container price");
+                    return null;
+                }
+            }
         }
 
         return variants;
@@ -413,10 +477,8 @@
 
     if (aptHead && aptBox) {
         aptHead.addEventListener("click", function (e) {
-
             if (e.target.closest(".select-all-btn")) return;
             if (e.target.closest(".apt-search")) return;
-
             aptBox.classList.toggle("collapsed");
         });
     }
@@ -461,21 +523,14 @@
                 : '<span class="apt-division-chip">No divisions</span>';
 
             return `
-                <div class="apt-item ${isSelected ? "selected" : ""}"
-                     data-id="${Number(a.id)}">
-
-                    <div class="apt-tick">
-                        <i class="bi bi-check-lg"></i>
-                    </div>
-
+                <div class="apt-item ${isSelected ? "selected" : ""}" data-id="${Number(a.id)}">
+                    <div class="apt-tick"><i class="bi bi-check-lg"></i></div>
                     <div class="apt-main">
                         <div class="apt-name">
                             ${escapeHtml(a.apartment_name)}
                             <span class="apt-code">#${escapeHtml(a.apartment_code)}</span>
                         </div>
-                        <div class="apt-divisions">
-                            ${divisionsHtml}
-                        </div>
+                        <div class="apt-divisions">${divisionsHtml}</div>
                     </div>
                 </div>
             `;
@@ -484,7 +539,6 @@
 
     if (aptList) {
         aptList.addEventListener("click", function (e) {
-
             const item = e.target.closest(".apt-item");
             if (!item) return;
 
@@ -538,22 +592,20 @@
 
         e.preventDefault();
 
-        const name       = document.getElementById("product_name").value.trim();
+        const name = document.getElementById("product_name").value.trim();
         const categoryId = Number(document.getElementById("category_id").value);
 
-        if (!name)             return showError("Product name is required.", "Missing product name");
-        if (categoryId <= 0)   return showError("Please choose a category.", "Category required");
+        if (!name) return showError("Product name is required.", "Missing product name");
+        if (categoryId <= 0) return showError("Please choose a category.", "Category required");
         if (!fileInput.files[0])
-                               return showError("Please upload a product image.", "Image required");
+            return showError("Please upload a product image.", "Image required");
 
-        /* ---- VARIANTS ---- */
         const variants = validateVariants();
         if (!variants) return;
 
         if (selected.size === 0)
             return showError("Please select at least one apartment.", "No apartments selected");
 
-        /* ---- STATUS ---- */
         const status = (statusInput && statusInput.checked) ? "1" : "0";
 
         setLoading(true);
@@ -563,12 +615,16 @@
         formData.append("category_id", categoryId);
         formData.append("product_status", status);
         formData.append("apartment_ids", JSON.stringify(Array.from(selected)));
+
         formData.append("variants", JSON.stringify(variants.map(v => ({
             quantity: parseFloat(v.quantity).toFixed(2),
             quantity_unit: v.quantity_unit,
             quantity_name: v.quantity_name,
-            price: parseFloat(v.price).toFixed(2)
+            price: parseFloat(v.price).toFixed(2),
+            container_enabled: v.container_enabled ? 1 : 0,
+            container_price: v.container_price !== "" ? parseFloat(v.container_price).toFixed(2) : "0.00"
         }))));
+
         formData.append("product_image", fileInput.files[0]);
 
         fetch(BASE_URL + "ajax/add-product.php", {
@@ -576,49 +632,45 @@
             body: formData,
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({
-            success: false,
-            message: "Unexpected server response."
-        })))
-        .then(data => {
+            .then(r => r.json().catch(() => ({
+                success: false,
+                message: "Unexpected server response."
+            })))
+            .then(data => {
 
-            if (data.success) {
+                if (data.success) {
 
-                if (successText) {
-                    successText.textContent = data.message || "Product added successfully.";
+                    if (successText) {
+                        successText.textContent = data.message || "Product added successfully.";
+                    }
+
+                    successOverlay.classList.add("show");
+                    successOverlay.setAttribute("aria-hidden", "false");
+
+                    setLoading(false);
+                    form.reset();
+                    resetImage();
+
+                    variantsList.innerHTML = "";
+                    variantCounter = 0;
+
+                    selected.clear();
+                    APARTMENTS.forEach(a => selected.add(Number(a.id)));
+                    renderAptList(aptSearch ? aptSearch.value : "");
+                    updateCount();
+
+                    if (statusInput) statusInput.checked = true;
+                    applyStatusUI();
+
+                } else {
+                    showError(data.message || "Failed to save product.", "Save failed");
+                    setLoading(false);
                 }
-
-                successOverlay.classList.add("show");
-                successOverlay.setAttribute("aria-hidden", "false");
-
+            })
+            .catch(() => {
+                showError("Unable to connect to server.", "Network error");
                 setLoading(false);
-                form.reset();
-                resetImage();
-
-                /* reset variants */
-                variantsList.innerHTML = "";
-                variantCounter = 0;
-                refreshVariantsEmpty();
-
-                /* reset apartments */
-                selected.clear();
-                APARTMENTS.forEach(a => selected.add(Number(a.id)));
-                renderAptList(aptSearch ? aptSearch.value : "");
-                updateCount();
-
-                /* reset status to Active */
-                if (statusInput) statusInput.checked = true;
-                applyStatusUI();
-
-            } else {
-                showError(data.message || "Failed to save product.", "Save failed");
-                setLoading(false);
-            }
-        })
-        .catch(() => {
-            showError("Unable to connect to server.", "Network error");
-            setLoading(false);
-        });
+            });
     });
 
     if (successOverlay) {
@@ -637,10 +689,8 @@
     renderAptList("");
     updateCount();
 
-    /* Start with 1 empty variant */
     addVariantRow();
 
-    /* Apply initial status UI */
     applyStatusUI();
 
 })();

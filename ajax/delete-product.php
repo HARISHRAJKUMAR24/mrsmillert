@@ -26,9 +26,7 @@ if ($id <= 0) {
 
 try {
 
-    $stmt = $pdo->prepare(
-        "SELECT * FROM products WHERE id = ? LIMIT 1"
-    );
+    $stmt = $pdo->prepare("SELECT * FROM products WHERE id = ? LIMIT 1");
     $stmt->execute([$id]);
 
     $row = $stmt->fetch();
@@ -42,15 +40,11 @@ try {
     $pdo->beginTransaction();
 
     /* 1) delete all variants */
-    $delVar = $pdo->prepare(
-        "DELETE FROM product_variants WHERE product_code = ?"
-    );
+    $delVar = $pdo->prepare("DELETE FROM product_variants WHERE product_code = ?");
     $delVar->execute([$productCode]);
 
     /* 2) delete apartment links */
-    $delApt = $pdo->prepare(
-        "DELETE FROM product_apartments WHERE product_code = ?"
-    );
+    $delApt = $pdo->prepare("DELETE FROM product_apartments WHERE product_code = ?");
     $delApt->execute([$productCode]);
 
     /* 3) delete product row */

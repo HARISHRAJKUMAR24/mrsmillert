@@ -2,12 +2,11 @@
 /* =========================================================
    MRS MILL@ — AJAX: ADD PRODUCT
    File: ./ajax/add-product.php
-   - Auto-generates product_code (PRD001, PRD002 ...)
+   - Auto-generates product_code
    - Uploads product image
-   - Inserts MULTIPLE quantity variants into product_variants
-   - Links apartments by CODE (apartment_code) into
-     product_apartments
-   - Saves product status (active/inactive)
+   - Inserts MULTIPLE variants with OPTIONAL container price
+   - Links apartments by CODE
+   - Saves product status
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -28,13 +27,12 @@ $variantsRaw  = $_POST['variants'] ?? '[]';
 $apartmentIds = json_decode($aptIdsRaw, true);
 $variants     = json_decode($variantsRaw, true);
 
-/* Status: 1 = Active, 0 = Inactive */
 $status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
 /* ---------------- VALIDATION ---------------- */
 
-if ($name === '')         jsonResponse(false, 'Product name is required.');
-if ($categoryId <= 0)     jsonResponse(false, 'Please choose a category.');
+if ($name === '')       jsonResponse(false, 'Product name is required.');
+if ($categoryId <= 0)   jsonResponse(false, 'Please choose a category.');
 
 if (!is_array($apartmentIds) || count($apartmentIds) === 0) {
     jsonResponse(false, 'Please select at least one apartment.');
@@ -65,6 +63,9 @@ foreach ($variants as $i => $v) {
     $qname = trim((string)($v['quantity_name'] ?? ''));
     $price = trim((string)($v['price'] ?? ''));
 
+    $contEnabled = isset($v['container_enabled']) ? (int)$v['container_enabled'] : 0;
+    $contPrice   = trim((string)($v['container_price'] ?? '0'));
+
     if ($qty === '' || !is_numeric($qty) || (float)$qty <= 0) {
         jsonResponse(false, $label . ': please enter a valid quantity.');
     }
@@ -78,11 +79,21 @@ foreach ($variants as $i => $v) {
         jsonResponse(false, $label . ': please enter a valid price.');
     }
 
+    if ($contEnabled === 1) {
+        if ($contPrice === '' || !is_numeric($contPrice) || (float)$contPrice < 0) {
+            jsonResponse(false, $label . ': please enter a valid container price.');
+        }
+    } else {
+        $contPrice = '0';
+    }
+
     $cleanVariants[] = [
-        'quantity'      => number_format((float)$qty, 2, '.', ''),
-        'quantity_unit' => $unit,
-        'quantity_name' => $qname,
-        'price'         => number_format((float)$price, 2, '.', '')
+        'quantity'          => number_format((float)$qty, 2, '.', ''),
+        'quantity_unit'     => $unit,
+        'quantity_name'     => $qname,
+        'price'             => number_format((float)$price, 2, '.', ''),
+        'container_enabled' => $contEnabled === 1 ? 1 : 0,
+        'container_price'   => number_format((float)$contPrice, 2, '.', '')
     ];
 }
 
@@ -90,7 +101,6 @@ if (count($cleanVariants) === 0) {
     jsonResponse(false, 'Please add at least one valid quantity variant.');
 }
 
-/* image required */
 if (!isset($_FILES['product_image']) ||
     ($_FILES['product_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
     jsonResponse(false, 'Please upload a product image.');
@@ -116,9 +126,7 @@ try {
     $placeholders = implode(',', array_fill(0, count($apartmentIds), '?'));
 
     $stmt = $pdo->prepare(
-        "SELECT apartment_code
-         FROM apartments
-         WHERE id IN ($placeholders)"
+        "SELECT apartment_code FROM apartments WHERE id IN ($placeholders)"
     );
 
     $stmt->execute($apartmentIds);
@@ -222,8 +230,9 @@ try {
     /* 2) product_variants */
     $vStmt = $pdo->prepare(
         "INSERT INTO product_variants
-            (product_code, quantity, quantity_unit, quantity_name, price)
-         VALUES (?, ?, ?, ?, ?)"
+            (product_code, quantity, quantity_unit, quantity_name, price,
+             container_enabled, container_price)
+         VALUES (?, ?, ?, ?, ?, ?, ?)"
     );
 
     foreach ($cleanVariants as $v) {
@@ -232,14 +241,15 @@ try {
             $v['quantity'],
             $v['quantity_unit'],
             $v['quantity_name'],
-            $v['price']
+            $v['price'],
+            $v['container_enabled'],
+            $v['container_price']
         ]);
     }
 
     /* 3) product_apartments */
     $link = $pdo->prepare(
-        "INSERT INTO product_apartments (product_code, apartment_code)
-         VALUES (?, ?)"
+        "INSERT INTO product_apartments (product_code, apartment_code) VALUES (?, ?)"
     );
 
     foreach ($apartmentCodes as $code) {
@@ -252,12 +262,12 @@ try {
         true,
         'Product added successfully.',
         [
-            'id'          => $productId,
-            'code'        => $productCode,
-            'status'      => $status,
-            'variants'    => $cleanVariants,
-            'image_url'   => ADMIN_URL . $relPath,
-            'apartments'  => $apartmentCodes
+            'id'         => $productId,
+            'code'       => $productCode,
+            'status'     => $status,
+            'variants'   => $cleanVariants,
+            'image_url'  => ADMIN_URL . $relPath,
+            'apartments' => $apartmentCodes
         ]
     );
 

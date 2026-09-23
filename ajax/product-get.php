@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: GET ONE PRODUCT
    File: ./ajax/product-get.php
    Accepts: ?id=1
-   Returns: product + variants + apartment codes + status
+   Returns: product + variants (with container) + apartment codes + status
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -46,21 +46,36 @@ try {
     $stmt2->execute([$row['product_code']]);
     $row['apartments'] = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
-    /* Variants */
+    /* Variants (with container fields) */
     $stmt3 = $pdo->prepare(
-        "SELECT id, quantity, quantity_unit, quantity_name, price
+        "SELECT id, quantity, quantity_unit, quantity_name, price,
+                container_enabled, container_price
          FROM product_variants
          WHERE product_code = ?
          ORDER BY id ASC"
     );
     $stmt3->execute([$row['product_code']]);
-    $row['variants'] = $stmt3->fetchAll();
+    $variants = $stmt3->fetchAll();
+
+    $cleanVariants = [];
+    foreach ($variants as $v) {
+        $cleanVariants[] = [
+            'id'                => (int)$v['id'],
+            'quantity'          => (float)$v['quantity'],
+            'quantity_unit'     => $v['quantity_unit'],
+            'quantity_name'     => $v['quantity_name'],
+            'price'             => (float)$v['price'],
+            'container_enabled' => (int)($v['container_enabled'] ?? 0),
+            'container_price'   => (float)($v['container_price'] ?? 0)
+        ];
+    }
+    $row['variants'] = $cleanVariants;
 
     /* Status (cast to int) */
     $row['status'] = isset($row['status']) ? (int)$row['status'] : 1;
 
     /* Image URL */
-    $row['image_url'] = $row['product_image']
+    $row['image_url'] = !empty($row['product_image'])
         ? ADMIN_URL . $row['product_image']
         : '';
 
