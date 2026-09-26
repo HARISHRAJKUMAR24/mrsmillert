@@ -1,9 +1,10 @@
 /* =========================================================
    MRS MILL@ — ORDERS LIST (admin panel)
    File: ./js/orders.js
-   Client-side pagination + per-page selector
-   Row click → navigates to order-view.php?id=X
-   Containers column removed.
+   - Payment tabs (All / Paid / Unpaid / Today)
+   - Date filter dropdown (All / Today / Yesterday / Week / Month / Custom)
+   - Search
+   - Client-side pagination + per-page selector
    ========================================================= */
 
 (function () {
@@ -17,6 +18,10 @@
     const tbody       = document.getElementById("orTbody");
     const searchInput = document.getElementById("orSearch");
     const tabs        = document.querySelectorAll(".or-tab");
+    const dateSelect  = document.getElementById("orDateFilter");
+    const dateFrom    = document.getElementById("orDateFrom");
+    const dateTo      = document.getElementById("orDateTo");
+    const dateCustom  = document.getElementById("orDateCustom");
 
     const paginationWrap     = document.getElementById("orPagination");
     const paginationInfo     = document.getElementById("paginationInfo");
@@ -32,7 +37,8 @@
     let allRows      = [];
     let filteredRows = [];
     let currentPage  = 1;
-    let activeFilter = "all";
+    let activeFilter = "all";   // payment filter
+    let activeDate   = "all";   // date filter
     let searchTerm   = "";
 
     /* HELPERS */
@@ -287,9 +293,17 @@
             </tr>`;
         if (paginationWrap) paginationWrap.style.display = "none";
 
-        const url = BASE_URL + "ajax/get-orders.php?filter=" +
-                    encodeURIComponent(activeFilter) +
-                    "&q=";
+        const params = new URLSearchParams();
+        params.set("filter", activeFilter);
+        params.set("date",   activeDate);
+        params.set("q",      ""); // search handled client-side
+
+        if (activeDate === "custom") {
+            if (dateFrom && dateFrom.value) params.set("from", dateFrom.value);
+            if (dateTo   && dateTo.value)   params.set("to",   dateTo.value);
+        }
+
+        const url = BASE_URL + "ajax/get-orders.php?" + params.toString();
 
         fetch(url, { credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
@@ -299,7 +313,7 @@
                     tbody.innerHTML = `
                         <tr>
                             <td colspan="7" style="text-align:center;padding:40px;color:#b51f2c;">
-                                Failed to load orders.
+                                ${escapeHtml((res && res.message) || "Failed to load orders.")}
                             </td>
                         </tr>`;
                     return;
@@ -338,6 +352,41 @@
             loadOrders();
         });
     });
+
+    /* DATE FILTER */
+    if (dateSelect) {
+        dateSelect.addEventListener("change", function () {
+            activeDate = this.value || "all";
+
+            if (dateCustom) {
+                dateCustom.style.display = (activeDate === "custom") ? "flex" : "none";
+            }
+
+            // Auto-load only when not custom, or when custom has both dates
+            if (activeDate !== "custom" ||
+                (dateFrom && dateFrom.value && dateTo && dateTo.value)) {
+                currentPage = 1;
+                loadOrders();
+            }
+        });
+    }
+
+    if (dateFrom) {
+        dateFrom.addEventListener("change", function () {
+            if (activeDate === "custom" && dateTo && dateTo.value) {
+                currentPage = 1;
+                loadOrders();
+            }
+        });
+    }
+    if (dateTo) {
+        dateTo.addEventListener("change", function () {
+            if (activeDate === "custom" && dateFrom && dateFrom.value) {
+                currentPage = 1;
+                loadOrders();
+            }
+        });
+    }
 
     /* SEARCH */
     let searchTimer = null;

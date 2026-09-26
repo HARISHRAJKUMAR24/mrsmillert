@@ -2,6 +2,7 @@
    MRS MILL@ — PRODUCT LIST UX
    File: ./js/product-list.js
    Client-side search + pagination + per-page + delete.
+   Remembers last page via URL (?page=&perPage=&q=)
    ========================================================= */
 
 (function () {
@@ -32,10 +33,44 @@
     const DEFAULT_PAGE_SIZE = 10;
 
     let pageSize        = DEFAULT_PAGE_SIZE;
-    let allRows         = [];        // full list from server
-    let filteredRows    = [];        // after search
+    let allRows         = [];
+    let filteredRows    = [];
     let currentPage     = 1;
     let pendingDeleteId = null;
+    let isFirstLoad     = true;
+
+    /* =========================================
+       URL STATE HELPERS
+       Keeps ?page=2&perPage=25&q=rice in the URL
+       so that Edit → Back returns to the same view.
+    ========================================= */
+
+    function readUrlState() {
+        const p = new URLSearchParams(window.location.search);
+        return {
+            page:    Math.max(1, parseInt(p.get("page") || "1", 10) || 1),
+            perPage: Math.max(1, parseInt(p.get("perPage") || String(DEFAULT_PAGE_SIZE), 10) || DEFAULT_PAGE_SIZE),
+            q:       p.get("q") || ""
+        };
+    }
+
+    function writeUrlState(replace) {
+        const p = new URLSearchParams(window.location.search);
+        p.set("page", String(currentPage));
+        p.set("perPage", String(pageSize));
+        if (search && search.value.trim() !== "") {
+            p.set("q", search.value.trim());
+        } else {
+            p.delete("q");
+        }
+
+        const newUrl = window.location.pathname + "?" + p.toString();
+        if (replace) {
+            window.history.replaceState(null, "", newUrl);
+        } else {
+            window.history.pushState(null, "", newUrl);
+        }
+    }
 
     /* =========================================
        HELPERS
@@ -140,7 +175,6 @@
                     closeModal();
                     showToast("success", data.message || "Product deleted.");
 
-                    /* Remove locally, keep current page if possible */
                     allRows = allRows.filter(r => String(r.id) !== String(id));
 
                     const q = (search ? search.value : "").trim().toLowerCase();
@@ -207,6 +241,11 @@
             ? `<img src="${escapeHtml(p.image_url)}" alt="" class="prod-thumb" onerror="this.outerHTML='<div class=\\'prod-thumb-placeholder\\'><i class=\\'bi bi-image\\'></i></div>'">`
             : `<div class="prod-thumb-placeholder"><i class="bi bi-image"></i></div>`;
 
+        /* Preserve the current page state when navigating to Edit */
+        const editHref =
+            BASE_URL + "edit-product.php?id=" + encodeURIComponent(p.id) +
+            "&back=" + encodeURIComponent(window.location.pathname + window.location.search);
+
         return `
             <tr data-id="${p.id}">
                 <td>${img}</td>
@@ -232,7 +271,7 @@
                 <td>
                     <div class="action-buttons">
                         <a class="table-action" title="Edit"
-                           href="${BASE_URL}edit-product.php?id=${p.id}">
+                           href="${editHref}">
                             <i class="bi bi-pencil"></i>
                         </a>
                         <button class="table-action delete"
@@ -266,6 +305,7 @@
                 </tr>
             `;
             if (paginationWrap) paginationWrap.style.display = "none";
+            writeUrlState(true);
             return;
         }
 
@@ -287,6 +327,10 @@
 
         renderPaginationControls(totalPages);
         if (paginationWrap) paginationWrap.style.display = "flex";
+
+        /* Keep URL in sync — replaceState so pagination clicks
+           don't spam browser history */
+        writeUrlState(true);
     }
 
     /* =========================================
@@ -417,7 +461,7 @@
     }
 
     /* =========================================
-       LOAD LIST (all rows once)
+       LOAD LIST
     ========================================= */
 
     function loadProducts() {
@@ -445,6 +489,38 @@
                 }
 
                 allRows = Array.isArray(data.data) ? data.data : [];
+
+                /* Restore URL state once, after data is loaded */
+                if (isFirstLoad) {
+                    const urlState = readUrlState();
+                    pageSize = urlState.perPage;
+                    if (perPageSelect) perPageSelect.value = String(pageSize);
+                    if (search && urlState.q) search.value = urlState.q;
+
+                    /* Build filtered set first so page clamp is correct */
+                    const q = (search ? search.value : "").trim().toLowerCase();
+                    if (!q) {
+                        filteredRows = allRows.slice();
+                    } else {
+                        filteredRows = allRows.filter(function (p) {
+                            const name = (p.product_name || "").toLowerCase();
+                            const code = (p.product_code || "").toLowerCase();
+                            const cat  = (p.category_name || "").toLowerCase();
+                            return name.indexOf(q) !== -1 ||
+                                   code.indexOf(q) !== -1 ||
+                                   cat.indexOf(q) !== -1;
+                        });
+                    }
+
+                    const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+                    currentPage = Math.min(Math.max(1, urlState.page), totalPages);
+
+                    isFirstLoad = false;
+
+                    renderPage();
+                    return;
+                }
+
                 currentPage = 1;
                 applyFilterAndRender();
             })
@@ -488,6 +564,36 @@
             openModal(id, name);
         });
     }
+
+    /* =========================================
+       BROWSER BACK / FORWARD
+       If user clicks Back, restore the page.
+    ========================================= */
+
+    window.addEventListener("popstate", function () {
+        const urlState = readUrlState();
+        pageSize = urlState.perPage;
+        if (perPageSelect) perPageSelect.value = String(pageSize);
+        if (search) search.value = urlState.q;
+
+        const q = (search ? search.value : "").trim().toLowerCase();
+        if (!q) {
+            filteredRows = allRows.slice();
+        } else {
+            filteredRows = allRows.filter(function (p) {
+                const name = (p.product_name || "").toLowerCase();
+                const code = (p.product_code || "").toLowerCase();
+                const cat  = (p.category_name || "").toLowerCase();
+                return name.indexOf(q) !== -1 ||
+                       code.indexOf(q) !== -1 ||
+                       cat.indexOf(q) !== -1;
+            });
+        }
+
+        const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+        currentPage = Math.min(Math.max(1, urlState.page), totalPages);
+        renderPage();
+    });
 
     /* =========================================
        INIT

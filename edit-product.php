@@ -9,6 +9,19 @@ if ($id <= 0) {
     exit;
 }
 
+/* Back URL — where to return after cancel / save */
+$backUrl = $_GET['back'] ?? 'products.php';
+
+// Safety: only allow internal relative URLs
+if (
+    $backUrl === '' ||
+    strpos($backUrl, '://') !== false ||
+    strpos($backUrl, '..') !== false ||
+    strpos($backUrl, 'javascript:') !== false
+) {
+    $backUrl = 'products.php';
+}
+
 /* LOAD CATEGORIES */
 
 $categories = [];
@@ -1529,7 +1542,7 @@ try {
 
 
                     <div class="form-actions">
-                        <a href="category.php" class="btn-cancel">Cancel</a>
+                        <a href="<?= htmlspecialchars($backUrl) ?>" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Update Product</span>
@@ -1587,7 +1600,7 @@ try {
             <h3 class="mm-modal-title">Product Updated!</h3>
             <p class="mm-modal-text" id="successText">Your product has been updated.</p>
             <div class="mm-modal-actions">
-                <a href="products.php" class="mm-btn mm-btn-ghost">
+                <a href="<?= htmlspecialchars($backUrl) ?>" class="mm-btn mm-btn-ghost">
                     <i class="bi bi-list-ul"></i> Back to List
                 </a>
                 <button type="button" class="mm-btn mm-btn-primary" id="stayBtn">
@@ -1602,6 +1615,7 @@ try {
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";
         window.PRODUCT_ID = <?= (int) $id; ?>;
         window.APARTMENTS = <?= json_encode($apartments, JSON_UNESCAPED_UNICODE); ?>;
+          window.BACK_URL   = <?= json_encode($backUrl, JSON_UNESCAPED_UNICODE); ?>;
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

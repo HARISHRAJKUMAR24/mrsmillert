@@ -7,6 +7,8 @@
    - Apartment multi-select
    - Active / Inactive status toggle
    - Popup errors
+   - 🔁 Remembers "back" param so the user returns
+        to the exact page they came from (e.g. ?page=3)
    ========================================================= */
 
 (function () {
@@ -18,6 +20,22 @@
 
     const PRODUCT_ID = Number(window.PRODUCT_ID || 0);
     const APARTMENTS = Array.isArray(window.APARTMENTS) ? window.APARTMENTS : [];
+
+    /* ---------------- 🔁 BACK URL ---------------- */
+    /* Comes from edit-product.php?id=X&back=/products.php%3Fpage%3D3 */
+    function getBackUrl() {
+        try {
+            const p = new URLSearchParams(window.location.search);
+            const raw = p.get("back") || "";
+
+            // Only allow internal relative paths — reject absolute or ../
+            if (raw && raw.indexOf("://") === -1 && raw.indexOf("..") === -1) {
+                return raw;
+            }
+        } catch (_) {}
+        return "product-list.php";
+    }
+    const BACK_URL = getBackUrl();
 
     /* ---------------- DOM ---------------- */
 
@@ -353,9 +371,6 @@
                 </div>
             </div>
 
-            <!-- ============================================
-                 CONTAINER BOX (optional — price only)
-            ============================================ -->
             <div class="container-box js-container-box ${contEnabled ? "active" : ""}">
 
                 <div class="container-toggle-row">
@@ -392,7 +407,6 @@
 
         variantsList.appendChild(row);
 
-        /* Wire container toggle */
         const toggle = row.querySelector(".js-container-toggle");
         const box = row.querySelector(".js-container-box");
         const contInp = row.querySelector(".js-container-price");
@@ -631,7 +645,6 @@
 
                 if (removeFlag) removeFlag.value = "0";
 
-                /* ---- STATUS ---- */
                 const active = String(p.status) === "1";
                 if (statusInput) statusInput.checked = active;
                 applyStatusUI();
@@ -643,7 +656,6 @@
                 }
                 resetNotes();
 
-                /* ---- VARIANTS ---- */
                 variantsList.innerHTML = "";
                 variantCounter = 0;
 
@@ -661,7 +673,6 @@
                 }
                 refreshVariantsEmpty();
 
-                /* ---- APARTMENTS ---- */
                 selected.clear();
                 const linkedCodes = Array.isArray(p.apartments) ? p.apartments : [];
                 APARTMENTS.forEach(a => {
@@ -724,6 +735,9 @@
         formData.append("remove_image", removeImg);
         formData.append("apartment_ids", JSON.stringify(Array.from(selected)));
 
+        /* 🔁 send back URL so update-product.php can redirect if needed */
+        formData.append("back", BACK_URL);
+
         formData.append("variants", JSON.stringify(variants.map(v => ({
             quantity: parseFloat(v.quantity).toFixed(2),
             quantity_unit: v.quantity_unit,
@@ -764,11 +778,18 @@
             });
     });
 
+    /* 🔁 When the user closes the success popup, send them back
+       to the page they came from (e.g. product list page 3). */
+    function goBackToList() {
+        window.location.href = BACK_URL;
+    }
+
     if (successOverlay) {
         successOverlay.addEventListener("click", e => {
             if (e.target === successOverlay) {
                 successOverlay.classList.remove("show");
                 successOverlay.setAttribute("aria-hidden", "true");
+                goBackToList();   /* 🔁 auto return */
             }
         });
     }
