@@ -11,13 +11,16 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 
-/* ---------------- STATS ---------------- */
+/* ---------------- STATS (PICKUP ONLY) ---------------- */
 $stats = [
     'total'    => 0,
     'paid'     => 0,
     'unpaid'   => 0,
     'today'    => 0,
     'revenue'  => 0,
+    'pending'  => 0,
+    'ready'    => 0,
+    'delivered'=> 0,
 ];
 
 try {
@@ -27,16 +30,23 @@ try {
             SUM(CASE WHEN payment_status = 'paid' THEN 1 ELSE 0 END) AS paid,
             SUM(CASE WHEN payment_status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid,
             SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) AS today,
-            SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS revenue
-         FROM orders"
+            SUM(CASE WHEN payment_status = 'paid' THEN total_amount ELSE 0 END) AS revenue,
+            SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
+            SUM(CASE WHEN status = 'processing' THEN 1 ELSE 0 END) AS ready,
+            SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered
+         FROM orders
+         WHERE delivery_mode = 'pickup'"
     )->fetch();
 
     if ($s) {
-        $stats['total']   = (int)$s['total'];
-        $stats['paid']    = (int)$s['paid'];
-        $stats['unpaid']  = (int)$s['unpaid'];
-        $stats['today']   = (int)$s['today'];
-        $stats['revenue'] = (float)$s['revenue'];
+        $stats['total']     = (int)$s['total'];
+        $stats['paid']      = (int)$s['paid'];
+        $stats['unpaid']    = (int)$s['unpaid'];
+        $stats['today']     = (int)$s['today'];
+        $stats['revenue']   = (float)$s['revenue'];
+        $stats['pending']   = (int)$s['pending'];
+        $stats['ready']     = (int)$s['ready'];
+        $stats['delivered'] = (int)$s['delivered'];
     }
 } catch (PDOException $e) {
 }
@@ -72,6 +82,21 @@ try {
             margin: 0;
             color: #817a71;
             font-size: 13px;
+        }
+
+        .pickup-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: #fdf1e2;
+            color: #a35a0e;
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .4px;
+            text-transform: uppercase;
+            border: 1.5px solid #f5d9b0;
         }
 
         .or-stats {
@@ -120,6 +145,7 @@ try {
         .or-stat.red .or-stat-value { color: #b51f2c; }
         .or-stat.green .or-stat-value { color: #2e7d32; }
         .or-stat.gold .or-stat-value { color: #b8893c; }
+        .or-stat.orange .or-stat-value { color: #a35a0e; }
 
         /* Filters */
         .or-filters {
@@ -144,7 +170,7 @@ try {
 
         .or-date-filter:focus-within {
             border-color: #b51f2c;
-            box-shadow: 0 0 0 4px rgba(181, 31, 44, .08);
+            box-shadow: 0 0 0 4px rgba(181,31,44,.08);
         }
 
         .or-date-filter > i {
@@ -208,11 +234,6 @@ try {
             outline: none;
             cursor: pointer;
             font-weight: 700;
-        }
-
-        .or-date-custom input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-            opacity: .55;
         }
 
         .or-tabs {
@@ -300,7 +321,7 @@ try {
         .or-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 980px;
+            min-width: 1050px;
         }
 
         .or-table thead th {
@@ -341,21 +362,21 @@ try {
             width: 40px;
             height: 40px;
             border-radius: 11px;
-            background: linear-gradient(135deg, #b51f2c 0%, #8e1722 100%);
+            background: linear-gradient(135deg, #a35a0e 0%, #7a4208 100%);
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 15px;
             flex-shrink: 0;
-            box-shadow: 0 4px 12px rgba(181, 31, 44, .2);
+            box-shadow: 0 4px 12px rgba(163, 90, 14, .2);
         }
 
         .order-info { min-width: 0; }
 
         .order-code {
             font-weight: 800;
-            color: #b51f2c;
+            color: #a35a0e;
             font-size: 12.5px;
         }
 
@@ -384,7 +405,7 @@ try {
         }
 
         .cust-meta i {
-            color: #b51f2c;
+            color: #a35a0e;
             margin-right: 4px;
             font-size: 10px;
         }
@@ -410,8 +431,8 @@ try {
         .pay-unpaid { background: #fff4d6; color: #8a6a1e; }
         .pay-failed { background: #fdeaea; color: #b51f2c; }
 
-        /* Mode pill */
-        .mode-pill {
+        /* Branch pill */
+        .branch-pill {
             display: inline-flex;
             align-items: center;
             gap: 5px;
@@ -422,18 +443,47 @@ try {
             letter-spacing: .3px;
             text-transform: uppercase;
             white-space: nowrap;
+            background: #fdf1e2;
+            color: #a35a0e;
         }
-        .mode-pill i { font-size: 10px; }
-
-        .mode-delivery { background: #e5eefb; color: #1565c0; }
-        .mode-pickup { background: #fdf1e2; color: #a35a0e; }
+        .branch-pill i { font-size: 10px; }
 
         .amount-cell {
             font-family: "Playfair Display", serif;
             font-weight: 700;
-            color: #b51f2c;
+            color: #a35a0e;
             font-size: 14px;
             white-space: nowrap;
+        }
+
+        /* Status dropdown */
+        .status-select {
+            appearance: none;
+            -webkit-appearance: none;
+            border: 1.5px solid #ece5da;
+            background: #fffdf9;
+            border-radius: 9px;
+            padding: 6px 28px 6px 10px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 11px;
+            font-weight: 700;
+            color: #4e4841;
+            cursor: pointer;
+            outline: none;
+            transition: .2s ease;
+            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+        }
+
+        .status-select:focus {
+            border-color: #b51f2c;
+            box-shadow: 0 0 0 3px rgba(181,31,44,.08);
+        }
+
+        .status-select.saving {
+            opacity: .6;
+            pointer-events: none;
         }
 
         .row-view {
@@ -452,8 +502,8 @@ try {
         }
 
         .or-table tbody tr:hover .row-view {
-            background: #b51f2c;
-            border-color: #b51f2c;
+            background: #a35a0e;
+            border-color: #a35a0e;
             color: #fff;
         }
 
@@ -477,7 +527,46 @@ try {
             font-weight: 700;
         }
 
-        .or-empty p { margin: 0; font-size: 12px; }
+        .or-empty p {
+            margin: 0;
+            font-size: 12px;
+        }
+
+        /* Toast */
+        .toast-wrap {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .toast {
+            background: #fff;
+            border-left: 4px solid #2e7d32;
+            border-radius: 10px;
+            padding: 12px 18px;
+            box-shadow: 0 10px 30px rgba(0,0,0,.12);
+            font-size: 12px;
+            font-weight: 600;
+            color: #302923;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            animation: slideIn .3s ease;
+            min-width: 220px;
+        }
+
+        .toast.error { border-left-color: #b51f2c; }
+        .toast i { font-size: 15px; color: #2e7d32; }
+        .toast.error i { color: #b51f2c; }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
 
         /* Pagination */
         .or-pagination {
@@ -533,7 +622,6 @@ try {
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
             background-repeat: no-repeat;
             background-position: right 9px center;
-            transition: .2s ease;
         }
 
         .pagination-controls {
@@ -567,10 +655,10 @@ try {
         }
 
         .pagination-controls button.active {
-            background: #b51f2c;
-            border-color: #b51f2c;
+            background: #a35a0e;
+            border-color: #a35a0e;
             color: #fff;
-            box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
+            box-shadow: 0 4px 12px rgba(163, 90, 14, .22);
             cursor: default;
         }
 
@@ -630,7 +718,7 @@ try {
             </button>
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search orders, products...">
+                <input type="text" placeholder="Search pickup orders...">
             </div>
             <div class="top-right">
                 <button class="notification">
@@ -652,36 +740,39 @@ try {
 
             <div class="or-header">
                 <div class="or-title">
-                    <h1>Orders</h1>
-                    <p>Click a row to view full details.</p>
+                    <h1>Pickup Orders</h1>
+                    <p>Manage customer pickup orders &amp; update their status.</p>
+                </div>
+                <div class="pickup-badge">
+                    <i class="bi bi-shop"></i> Pickup Only
                 </div>
             </div>
 
 
             <div class="or-stats">
 
-                <div class="or-stat">
-                    <div class="or-stat-label">Total Orders</div>
+                <div class="or-stat orange">
+                    <div class="or-stat-label">Total Pickups</div>
                     <div class="or-stat-value"><?= $stats['total'] ?></div>
                     <div class="or-stat-sub">All time</div>
                 </div>
 
-                <div class="or-stat green">
-                    <div class="or-stat-label">Paid</div>
-                    <div class="or-stat-value"><?= $stats['paid'] ?></div>
-                    <div class="or-stat-sub">₹<?= number_format($stats['revenue'], 2) ?> collected</div>
+                <div class="or-stat gold">
+                    <div class="or-stat-label">Pending</div>
+                    <div class="or-stat-value"><?= $stats['pending'] ?></div>
+                    <div class="or-stat-sub">Awaiting preparation</div>
                 </div>
 
-                <div class="or-stat red">
-                    <div class="or-stat-label">Unpaid</div>
-                    <div class="or-stat-value"><?= $stats['unpaid'] ?></div>
-                    <div class="or-stat-sub">Awaiting payment</div>
+                <div class="or-stat green">
+                    <div class="or-stat-label">Ready / Processing</div>
+                    <div class="or-stat-value"><?= $stats['ready'] ?></div>
+                    <div class="or-stat-sub">Ready for pickup</div>
                 </div>
 
                 <div class="or-stat">
-                    <div class="or-stat-label">Today</div>
-                    <div class="or-stat-value"><?= $stats['today'] ?></div>
-                    <div class="or-stat-sub">New orders</div>
+                    <div class="or-stat-label">Picked Up</div>
+                    <div class="or-stat-value"><?= $stats['delivered'] ?></div>
+                    <div class="or-stat-sub">Completed</div>
                 </div>
 
             </div>
@@ -690,11 +781,12 @@ try {
             <div class="or-filters">
 
                 <div class="or-tabs">
-                    <button class="or-tab active" data-filter="all">All</button>
+                    <button class="or-tab active" data-filter="all">All Pickups</button>
+                    <button class="or-tab" data-filter="pending">Pending</button>
+                    <button class="or-tab" data-filter="processing">Ready</button>
+                    <button class="or-tab" data-filter="delivered">Picked Up</button>
                     <button class="or-tab" data-filter="paid">Paid</button>
                     <button class="or-tab" data-filter="unpaid">Unpaid</button>
-                    <button class="or-tab" data-filter="delivery">Delivery</button>
-                    <button class="or-tab" data-filter="pickup">Pickup</button>
                     <button class="or-tab" data-filter="today">Today</button>
                 </div>
 
@@ -732,18 +824,17 @@ try {
                             <tr>
                                 <th>Order</th>
                                 <th>Customer</th>
-                                <th>Mode / Branch</th>
-                                <th>Delivery Boy</th>
-                                <th>Status</th>
+                                <th>Pickup Branch</th>
                                 <th>Payment</th>
                                 <th>Amount</th>
+                                <th>Status</th>
                                 <th style="text-align:right;">View</th>
                             </tr>
                         </thead>
                         <tbody id="orTbody">
                             <tr>
-                                <td colspan="8" style="text-align:center;padding:40px;color:#948c82;">
-                                    Loading orders...
+                                <td colspan="7" style="text-align:center;padding:40px;color:#948c82;">
+                                    Loading pickup orders...
                                 </td>
                             </tr>
                         </tbody>
@@ -777,6 +868,8 @@ try {
 
     </main>
 
+    <!-- Toast container -->
+    <div class="toast-wrap" id="toastWrap"></div>
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
@@ -784,7 +877,7 @@ try {
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
-    <script src="<?= ADMIN_URL ?>js/orders.js"></script>
+    <script src="<?= ADMIN_URL ?>js/pickup-orders.js"></script>
 
 </body>
 

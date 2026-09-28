@@ -514,3 +514,28 @@ if (!function_exists('generateDiscountCode')) {
         }
     }
 }
+
+
+
+/* ---------- ACTIVE MENU ---------- */
+if (!function_exists('getActiveMenu')) {
+    function getActiveMenu($pdo)
+    {
+        try {
+            $stmt = $pdo->prepare(
+                "SELECT id, menu_code, menu_name, start_at, end_at
+                 FROM menus
+                 WHERE status = 1
+                   AND start_at <= NOW()
+                   AND end_at   >= NOW()
+                 ORDER BY start_at DESC
+                 LIMIT 1"
+            );
+            $stmt->execute();
+            $row = $stmt->fetch(PDO::FETCH_ASSOC);
+            return $row ?: null;
+        } catch (PDOException $e) {
+            return null;
+        }
+    }
+}

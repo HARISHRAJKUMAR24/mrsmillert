@@ -2,13 +2,8 @@
 /* =========================================================
    MRS MILL@ — AJAX: GET ORDERS (admin panel)
    File: ./ajax/get-orders.php
-   Accepts:
-     filter  = all | paid | unpaid | today | yesterday | week | month
-     date    = all | today | yesterday | week | month        (optional, overrides filter date part)
-     from    = YYYY-MM-DD  (optional custom range start)
-     to      = YYYY-MM-DD  (optional custom range end)
-     q       = search text
-   Container totals are computed from products_json (no order_containers table).
+   Returns ALL orders by default (delivery + pickup).
+   Only filters by mode when $filter = 'delivery' or 'pickup'.
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -29,11 +24,15 @@ $q      = trim($_GET['q']      ?? '');
 $where  = [];
 $params = [];
 
-/* ---------- Payment filter ---------- */
+/* ---------- Payment / mode filter (ONLY when user selects it) ---------- */
 if ($filter === 'paid') {
     $where[] = "o.payment_status = 'paid'";
 } elseif ($filter === 'unpaid') {
     $where[] = "o.payment_status = 'unpaid'";
+} elseif ($filter === 'delivery') {
+    $where[] = "o.delivery_mode = 'delivery'";
+} elseif ($filter === 'pickup') {
+    $where[] = "o.delivery_mode = 'pickup'";
 } elseif ($filter === 'today') {
     $where[] = "DATE(o.created_at) = CURDATE()";
 } elseif ($filter === 'yesterday') {
@@ -44,8 +43,9 @@ if ($filter === 'paid') {
     $where[] = "YEAR(o.created_at) = YEAR(CURDATE())
                 AND MONTH(o.created_at) = MONTH(CURDATE())";
 }
+/* NOTE: 'all' adds NOTHING → returns every order */
 
-/* ---------- Date filter (independent of payment filter) ---------- */
+/* ---------- Date filter ---------- */
 if ($date !== '' && $date !== 'all') {
     if ($date === 'today') {
         $where[] = "DATE(o.created_at) = CURDATE()";
@@ -59,7 +59,7 @@ if ($date !== '' && $date !== 'all') {
     }
 }
 
-/* ---------- Custom range (overrides date if provided) ---------- */
+/* ---------- Custom range ---------- */
 if ($from !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) {
     $where[]  = "DATE(o.created_at) >= ?";
     $params[] = $from;
@@ -82,12 +82,13 @@ $whereSql = $where ? ('WHERE ' . implode(' AND ', $where)) : '';
 
 try {
 
-    /* Base order query — no order_containers table referenced */
     $sql = "SELECT o.id, o.order_code, o.customer_name, o.customer_mobile,
                    o.apartment_code, o.apartment_name, o.division,
                    o.division_charge, o.subtotal, o.total_amount,
-                   o.products_json, o.status, o.payment_status,
-                   o.paid_at, o.created_at,
+                   o.delivery_mode,
+                   o.pickup_branch_id, o.pickup_branch_name,
+                   o.products_json, o.status, o.delivery_status,
+                   o.payment_status, o.paid_at, o.created_at,
                    b.full_name AS boy_name, b.delivery_code AS boy_code
             FROM orders o
             LEFT JOIN delivery_boys b ON b.id = o.delivery_boy_id
@@ -106,24 +107,21 @@ try {
         $products = json_decode($r['products_json'] ?? '[]', true);
         if (!is_array($products)) $products = [];
 
-        /* ---- Compute container totals from products_json ---- */
         $containerIssued    = 0;
         $containerReturned  = 0;
         $containerTotalAmt  = 0.0;
 
         foreach ($products as $p) {
-
             $enabled = (int)($p['container_enabled'] ?? 0) === 1;
             if (!$enabled) continue;
 
-            $qty             = (int)($p['qty'] ?? 0);
-            $containerPrice  = (float)($p['container_price'] ?? 0);
-            $lineTotal       = (float)($p['container_line_total'] ?? ($containerPrice * $qty));
+            $qty            = (int)($p['qty'] ?? 0);
+            $containerPrice = (float)($p['container_price'] ?? 0);
+            $lineTotal      = (float)($p['container_line_total'] ?? ($containerPrice * $qty));
 
             $containerIssued   += $qty;
             $containerTotalAmt += $lineTotal;
 
-            /* If you later add container_returned inside JSON, read it here */
             $returned = (int)($p['container_returned'] ?? 0);
             $containerReturned += $returned;
         }
@@ -131,25 +129,34 @@ try {
         $containerBalance = max(0, $containerIssued - $containerReturned);
 
         $out[] = [
-            'id'              => (int)$r['id'],
-            'order_code'      => $r['order_code'],
-            'customer_name'   => $r['customer_name'],
-            'customer_mobile' => $r['customer_mobile'],
-            'apartment_code'  => $r['apartment_code'],
-            'apartment_name'  => $r['apartment_name'],
-            'division'        => $r['division'],
-            'division_charge' => (float)$r['division_charge'],
-            'subtotal'        => (float)$r['subtotal'],
-            'total_amount'    => (float)$r['total_amount'],
-            'products'        => $products,
-            'status'          => $r['status'],
-            'payment_status'  => $r['payment_status'],
-            'paid_at'         => $r['paid_at'],
-            'created_at'      => $r['created_at'],
-            'boy_name'        => $r['boy_name'] ?: '—',
-            'boy_code'        => $r['boy_code'] ?: '',
+            'id'               => (int)$r['id'],
+            'order_code'       => $r['order_code'],
+            'customer_name'    => $r['customer_name'],
+            'customer_mobile'  => $r['customer_mobile'],
 
-            /* Derived container fields (from JSON) */
+            'delivery_mode'    => $r['delivery_mode'] ?: 'delivery',
+
+            'apartment_code'   => $r['apartment_code'],
+            'apartment_name'   => $r['apartment_name'],
+            'division'         => $r['division'],
+            'division_charge'  => (float)$r['division_charge'],
+
+            'pickup_branch_id'   => (int)$r['pickup_branch_id'],
+            'pickup_branch_name' => $r['pickup_branch_name'] ?: '',
+
+            'subtotal'         => (float)$r['subtotal'],
+            'total_amount'     => (float)$r['total_amount'],
+            'products'         => $products,
+
+            'status'           => $r['status'],
+            'delivery_status'  => $r['delivery_status'],
+            'payment_status'   => $r['payment_status'],
+            'paid_at'          => $r['paid_at'],
+            'created_at'       => $r['created_at'],
+
+            'boy_name'         => $r['boy_name'] ?: '—',
+            'boy_code'         => $r['boy_code'] ?: '',
+
             'container_total_amount' => $containerTotalAmt,
             'containers_balance'     => $containerBalance,
             'container_issued'       => $containerIssued,

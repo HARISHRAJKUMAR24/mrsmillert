@@ -57,6 +57,11 @@ $sidebarLogoUrl = $sidebarLogo
             Orders
         </a>
 
+        <a href="pickup-orders.php">
+            <i class="bi bi-shop"></i>
+            Pickup Orders
+        </a>
+
         <a href="products.php">
             <i class="bi bi-box-seam"></i>
             Products
@@ -72,9 +77,14 @@ $sidebarLogoUrl = $sidebarLogo
             Customers
         </a>
 
-        <a href="#">
+        <a href="reports.php">
             <i class="bi bi-bar-chart"></i>
             Reports
+        </a>
+
+        <a href="urgency-assign-orders.php">
+            <i class="bi bi-alarm-fill"></i>
+            Urgency Swap Orders
         </a>
 
         <div class="menu-title px-2 pt-4">
@@ -89,6 +99,12 @@ $sidebarLogoUrl = $sidebarLogo
         <a href="delivery-boys.php">
             <i class="bi bi-person-walking"></i>
             Delivery Boys
+        </a>
+
+
+        <a href="order-allocations.php">
+            <i class="bi bi-person-check me-1"></i>
+            Apartment Allocate
         </a>
 
         <a href="discounts.php">

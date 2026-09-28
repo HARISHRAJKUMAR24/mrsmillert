@@ -1,18 +1,14 @@
 /* =========================================================
-   MRS MILL@ — ORDERS LIST (admin panel)
-   File: ./js/orders.js
-   Returns ALL orders by default (delivery + pickup)
+   MRS MILL@ — PICKUP ORDERS LIST (admin panel)
+   File: ./js/pickup-orders.js
    ========================================================= */
 
 (function () {
     "use strict";
 
-    let BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
+    const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
         ? window.ADMIN_URL
         : "./";
-
-    /* Ensure trailing slash */
-    if (!BASE_URL.endsWith("/")) BASE_URL += "/";
 
     /* DOM */
     const tbody       = document.getElementById("orTbody");
@@ -27,6 +23,7 @@
     const paginationInfo     = document.getElementById("paginationInfo");
     const paginationControls = document.getElementById("paginationControls");
     const perPageSelect      = document.getElementById("perPageSelect");
+    const toastWrap          = document.getElementById("toastWrap");
 
     if (!tbody) return;
 
@@ -41,8 +38,16 @@
     let activeDate   = "all";
     let searchTerm   = "";
 
+    const STATUS_OPTIONS = [
+        { value: "pending",    label: "Pending" },
+        { value: "confirmed",  label: "Confirmed" },
+        { value: "processing", label: "Ready" },
+        { value: "delivered",  label: "Picked Up" },
+        { value: "cancelled",  label: "Cancelled" }
+    ];
+
     /* HELPERS */
-    function money(n) { return "₹" + Math.round(Number(n) || 0); }
+    function money(n) { return "₹" + (Number(n) || 0).toFixed(2); }
 
     function escapeHtml(s) {
         return String(s == null ? "" : s)
@@ -64,17 +69,6 @@
         return `${dd} ${mon} ${yr} · ${hh}:${mm}`;
     }
 
-    function orderStatusBadge(s) {
-        const map = {
-            pending:    "status-pending",
-            confirmed:  "status-confirmed",
-            processing: "status-processing",
-            delivered:  "status-delivered",
-            cancelled:  "status-cancelled"
-        };
-        return `<span class="order-status ${map[s] || "status-pending"}">${escapeHtml(s)}</span>`;
-    }
-
     function payStatusBadge(s) {
         const map = {
             paid:   "pay-paid",
@@ -84,34 +78,33 @@
         return `<span class="payment-status ${map[s] || "pay-unpaid"}">${escapeHtml(s)}</span>`;
     }
 
+    function showToast(msg, isError) {
+        if (!toastWrap) return;
+        const el = document.createElement("div");
+        el.className = "toast" + (isError ? " error" : "");
+        el.innerHTML = `<i class="bi bi-${isError ? "exclamation-circle" : "check-circle-fill"}"></i> ${escapeHtml(msg)}`;
+        toastWrap.appendChild(el);
+
+        setTimeout(() => {
+            el.style.opacity = "0";
+            el.style.transform = "translateX(100%)";
+            el.style.transition = "all .3s ease";
+            setTimeout(() => el.remove(), 300);
+        }, 2800);
+    }
+
     /* RENDER ROW */
     function renderRow(o) {
-        const initial  = (o.customer_name || "?").trim().charAt(0).toUpperCase();
-        const isPickup = o.delivery_mode === "pickup";
+        const initial = (o.customer_name || "?").trim().charAt(0).toUpperCase();
+        const branch  = o.pickup_branch_name || "No branch selected";
 
-        let modeCell = "";
-
-        if (isPickup) {
-            modeCell = `
-                <div class="mode-pill mode-pickup">
-                    <i class="bi bi-shop"></i> Pickup
-                </div>
-                <div class="cust-meta" style="margin-top:4px;">
-                    ${escapeHtml(o.pickup_branch_name || "No branch")}
-                </div>`;
-        } else {
-            modeCell = `
-                <div class="mode-pill mode-delivery">
-                    <i class="bi bi-truck"></i> Delivery
-                </div>
-                <div class="cust-meta" style="margin-top:4px;">
-                    ${escapeHtml(o.apartment_name || "—")}
-                    ${o.division ? " · Div " + escapeHtml(o.division) : ""}
-                </div>`;
-        }
+        const statusOptionsHtml = STATUS_OPTIONS.map(opt => {
+            const sel = opt.value === o.status ? " selected" : "";
+            return `<option value="${opt.value}"${sel}>${opt.label}</option>`;
+        }).join("");
 
         return `
-            <tr data-id="${o.id}" data-href="${BASE_URL}order-view.php?id=${o.id}">
+            <tr data-id="${o.id}">
                 <td>
                     <div class="order-cell">
                         <div class="order-avatar">${escapeHtml(initial)}</div>
@@ -132,22 +125,24 @@
                     </div>
                 </td>
 
-                <td>${modeCell}</td>
-
                 <td>
-                    ${isPickup
-                        ? `<span style="color:#948c82;font-size:11px;">—</span>`
-                        : `<div class="cust-name">${escapeHtml(o.boy_name || "—")}</div>
-                           ${o.boy_code ? `<div class="cust-meta">#${escapeHtml(o.boy_code)}</div>` : ""}`
-                    }
+                    <div class="branch-pill">
+                        <i class="bi bi-shop"></i> ${escapeHtml(branch)}
+                    </div>
                 </td>
 
-                <td>${orderStatusBadge(o.status)}</td>
                 <td>${payStatusBadge(o.payment_status)}</td>
+
                 <td><div class="amount-cell">${money(o.total_amount)}</div></td>
 
+                <td>
+                    <select class="status-select" data-id="${o.id}">
+                        ${statusOptionsHtml}
+                    </select>
+                </td>
+
                 <td style="text-align:right;">
-                    <a href="${BASE_URL}order-view.php?id=${o.id}" class="row-view">
+                    <a href="${BASE_URL}order-view.php?id=${o.id}" class="row-view" title="View details">
                         <i class="bi bi-eye"></i>
                     </a>
                 </td>
@@ -162,10 +157,10 @@
         if (total === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8">
+                    <td colspan="7">
                         <div class="or-empty">
-                            <i class="bi bi-inbox"></i>
-                            <h3>No orders found</h3>
+                            <i class="bi bi-shop-window"></i>
+                            <h3>No pickup orders found</h3>
                             <p>Nothing matches your filter or search.</p>
                         </div>
                     </td>
@@ -299,10 +294,7 @@
                     o.order_code || "",
                     o.customer_name || "",
                     o.customer_mobile || "",
-                    o.boy_name || "",
-                    o.boy_code || "",
-                    o.pickup_branch_name || "",
-                    o.apartment_name || ""
+                    o.pickup_branch_name || ""
                 ].join(" ").toLowerCase();
                 return hay.indexOf(q) !== -1;
             });
@@ -316,8 +308,8 @@
     function loadOrders() {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align:center;padding:40px;color:#948c82;">
-                    Loading orders...
+                <td colspan="7" style="text-align:center;padding:40px;color:#948c82;">
+                    Loading pickup orders...
                 </td>
             </tr>`;
         if (paginationWrap) paginationWrap.style.display = "none";
@@ -332,7 +324,7 @@
             if (dateTo   && dateTo.value)   params.set("to",   dateTo.value);
         }
 
-        const url = BASE_URL + "ajax/get-orders.php?" + params.toString();
+        const url = BASE_URL + "ajax/get-pickup-orders.php?" + params.toString();
 
         fetch(url, { credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
@@ -341,8 +333,8 @@
                 if (!res || !res.success || !Array.isArray(res.data)) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="8" style="text-align:center;padding:40px;color:#b51f2c;">
-                                ${escapeHtml((res && res.message) || "Failed to load orders.")}
+                            <td colspan="7" style="text-align:center;padding:40px;color:#b51f2c;">
+                                ${escapeHtml((res && res.message) || "Failed to load pickup orders.")}
                             </td>
                         </tr>`;
                     return;
@@ -355,22 +347,74 @@
             .catch(() => {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align:center;padding:40px;color:#b51f2c;">
+                        <td colspan="7" style="text-align:center;padding:40px;color:#b51f2c;">
                             Unable to connect to server.
                         </td>
                     </tr>`;
             });
     }
 
+    /* =========================================================
+       STATUS CHANGE HANDLER (inline dropdown)
+       ========================================================= */
+    tbody.addEventListener("change", function (e) {
+        const select = e.target.closest(".status-select");
+        if (!select) return;
+
+        const orderId = Number(select.dataset.id);
+        const newStatus = select.value;
+        if (!orderId || !newStatus) return;
+
+        select.classList.add("saving");
+
+        const body = new URLSearchParams();
+        body.set("order_id", orderId);
+        body.set("status", newStatus);
+
+        fetch(BASE_URL + "ajax/update-pickup-order-status.php", {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+                "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8"
+            },
+            body: body.toString()
+        })
+        .then(r => r.json().catch(() => null))
+        .then(res => {
+            select.classList.remove("saving");
+
+            if (!res || !res.success) {
+                showToast((res && res.message) || "Failed to update status.", true);
+                // reload to revert the dropdown
+                loadOrders();
+                return;
+            }
+
+            // Update local data
+            const row = allRows.find(o => o.id === orderId);
+            if (row) row.status = newStatus;
+
+            // Update table stats in DOM (optional, simple reload instead)
+            showToast("Order status updated.");
+        })
+        .catch(() => {
+            select.classList.remove("saving");
+            showToast("Network error. Please try again.", true);
+            loadOrders();
+        });
+    });
+
     /* ROW CLICK → navigate */
     tbody.addEventListener("click", function (e) {
-        if (e.target.closest(".row-view")) return;
+        /* Skip if clicked inside the view button or status dropdown */
+        if (e.target.closest(".row-view") || e.target.closest(".status-select")) return;
 
         const tr = e.target.closest("tr[data-id]");
         if (!tr) return;
 
-        const href = tr.dataset.href;
-        if (href) window.location.href = href;
+        /* We don't have data-href on pickup rows — build it */
+        const id = tr.dataset.id;
+        if (id) window.location.href = BASE_URL + "order-view.php?id=" + id;
     });
 
     /* FILTER TABS */

@@ -15,7 +15,15 @@ if ($id <= 0) {
     exit;
 }
 
-/* Fetch order */
+$order    = null;
+$products = [];
+$custOrders              = [];
+$custTotalAmount         = 0;
+$custTotalOrderCount     = 0;
+$custTotalPaidOrders     = 0;
+$custTotalUnpaidOrders   = 0;
+
+/* ---------- 1. Fetch order ---------- */
 try {
     $stmt = $pdo->prepare(
         "SELECT o.*, b.full_name AS boy_name, b.delivery_code AS boy_code
@@ -27,63 +35,80 @@ try {
     $order = $stmt->fetch();
 
     if (!$order) {
-        header('Location: orders.php');
-        exit;
-    }
+        /* Try without delivery_boys join in case table missing */
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $order = $stmt->fetch();
 
-    $products = json_decode($order['products_json'] ?? '[]', true);
-    if (!is_array($products)) $products = [];
-
-    /* CUSTOMER SUMMARY */
-    $customerMobile = $order['customer_mobile'];
-
-    $custOrdersStmt = $pdo->prepare(
-        "SELECT o.id, o.order_code, o.customer_name, o.created_at,
-                o.total_amount, o.payment_status, o.status,
-                o.container_total_amount,
-                COALESCE(SUM(oc.qty_issued), 0)      AS issued,
-                COALESCE(SUM(oc.qty_returned), 0)    AS returned,
-                COALESCE(SUM(oc.amount_refunded), 0) AS refunded,
-                COALESCE(SUM(oc.refund_pending), 0)  AS pending
-         FROM orders o
-         LEFT JOIN order_containers oc ON oc.order_id = o.id
-         WHERE o.customer_mobile = ?
-         GROUP BY o.id
-         ORDER BY o.id DESC"
-    );
-    $custOrdersStmt->execute([$customerMobile]);
-    $custOrders = $custOrdersStmt->fetchAll();
-
-    $custTotalIssued       = 0;
-    $custTotalReturned     = 0;
-    $custTotalRefunded     = 0;
-    $custTotalAmount       = 0;
-    $custTotalOrderCount   = 0;
-    $custTotalPaidOrders   = 0;
-    $custTotalUnpaidOrders = 0;
-
-    foreach ($custOrders as $co) {
-        $custTotalIssued   += (int)$co['issued'];
-        $custTotalReturned += (int)$co['returned'];
-        $custTotalRefunded += (float)$co['refunded'];
-        $custTotalAmount   += (float)$co['total_amount'];
-        $custTotalOrderCount++;
-
-        if ($co['payment_status'] === 'paid') {
-            $custTotalPaidOrders++;
-        } else {
-            $custTotalUnpaidOrders++;
+        if ($order) {
+            $order['boy_name'] = '—';
+            $order['boy_code'] = '';
         }
     }
-
-    $custBalance = $custTotalIssued - $custTotalReturned;
 } catch (PDOException $e) {
+    /* Last resort — try bare SELECT */
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $order = $stmt->fetch();
+        if ($order) {
+            $order['boy_name'] = '—';
+            $order['boy_code'] = '';
+        }
+    } catch (PDOException $e2) {
+        $order = null;
+    }
+}
+
+if (!$order) {
     header('Location: orders.php');
     exit;
 }
 
+/* ---------- 2. Decode products ---------- */
+$products = json_decode($order['products_json'] ?? '[]', true);
+if (!is_array($products)) $products = [];
+
+/* ---------- 3. Customer summary ---------- */
+$customerMobile = $order['customer_mobile'] ?? '';
+
+try {
+    $custOrdersStmt = $pdo->prepare(
+        "SELECT id, order_code, customer_name, created_at,
+                total_amount, payment_status, status
+         FROM orders
+         WHERE customer_mobile = ?
+         ORDER BY id DESC"
+    );
+    $custOrdersStmt->execute([$customerMobile]);
+    $custOrders = $custOrdersStmt->fetchAll();
+} catch (PDOException $e) {
+    $custOrders = [];
+}
+
+/* ---------- 4. Compute summary ---------- */
+foreach ($custOrders as $co) {
+    $custTotalAmount += (float)($co['total_amount'] ?? 0);
+    $custTotalOrderCount++;
+
+    if (($co['payment_status'] ?? '') === 'paid') {
+        $custTotalPaidOrders++;
+    } else {
+        $custTotalUnpaidOrders++;
+    }
+}
+
+/* ---------- 5. Settings ---------- */
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
+
+/* ---------- 6. Back URL based on order type ---------- */
+$backUrl  = 'orders.php';
+$backText = 'Back to Orders';
+if (!empty($order['delivery_mode']) && $order['delivery_mode'] === 'pickup') {
+    $backUrl  = 'pickup-orders.php';
+    $backText = 'Back to Pickup Orders';
+}
 
 function fmtNoDec($n)
 {
@@ -228,17 +253,6 @@ function fmtNoDec($n)
 
         .ov-product-meta strong { color: #b51f2c; font-weight: 800; }
 
-        .ov-product-container {
-            font-size: 10px; color: #b8893c;
-            background: #fdf7ec;
-            border: 1px dashed #e8d5a8;
-            padding: 3px 8px; border-radius: 6px;
-            margin-top: 5px;
-            display: inline-flex;
-            align-items: center; gap: 5px;
-            font-weight: 700;
-        }
-
         .ov-product-total {
             font-family: "Playfair Display", serif;
             font-size: 14px; font-weight: 700;
@@ -271,8 +285,6 @@ function fmtNoDec($n)
             font-family: "Playfair Display", serif;
             font-size: 19px; color: #b51f2c;
         }
-
-        .ov-total-row.container strong { color: #b8893c; }
 
         /* CUSTOMER SUMMARY */
         .ov-cust-summary {
@@ -314,7 +326,7 @@ function fmtNoDec($n)
 
         .ov-cust-summary-grid {
             display: grid;
-            grid-template-columns: repeat(5, 1fr);
+            grid-template-columns: repeat(4, 1fr);
             gap: 10px;
             margin-bottom: 14px;
         }
@@ -416,8 +428,6 @@ function fmtNoDec($n)
         }
 
         .ov-cust-order-stat.green strong { color: #2e7d32; }
-        .ov-cust-order-stat.red strong   { color: #b51f2c; }
-        .ov-cust-order-stat.blue strong  { color: #1565c0; }
 
         .ov-cust-order-badge {
             display: inline-block;
@@ -549,7 +559,7 @@ function fmtNoDec($n)
             position: sticky;
             bottom: 0;
             margin-top: 20px;
-            background: linear-gradient(180deg, rgba(255,255,255,0) 0%, #fff 30%);
+           
             padding: 16px 0 4px;
             display: flex;
             justify-content: flex-end;
@@ -606,7 +616,7 @@ function fmtNoDec($n)
 
         @media (max-width: 1024px) {
             .ov-layout { grid-template-columns: 1fr; }
-            .ov-cust-summary-grid { grid-template-columns: repeat(3, 1fr); }
+            .ov-cust-summary-grid { grid-template-columns: repeat(2, 1fr); }
         }
 
         @media (max-width: 768px) {
@@ -677,9 +687,9 @@ function fmtNoDec($n)
                     <p>Placed <?= date('d M Y · h:i A', strtotime($order['created_at'])) ?></p>
                 </div>
 
-                <a href="orders.php" class="ov-back">
+                <a href="<?= $backUrl ?>" class="ov-back">
                     <i class="bi bi-arrow-left"></i>
-                    Back to Orders
+                    <?= $backText ?>
                 </a>
 
             </div>
@@ -719,10 +729,6 @@ function fmtNoDec($n)
                             <div class="ov-cust-summary-item blue">
                                 <span>Total Value ₹</span>
                                 <strong>₹<?= fmtNoDec($custTotalAmount) ?></strong>
-                            </div>
-                            <div class="ov-cust-summary-item">
-                                <span>Avg. Order ₹</span>
-                                <strong>₹<?= $custTotalOrderCount > 0 ? fmtNoDec($custTotalAmount / $custTotalOrderCount) : 0 ?></strong>
                             </div>
                         </div>
 
@@ -808,23 +814,35 @@ function fmtNoDec($n)
                                 <strong><?= htmlspecialchars($order['customer_mobile']) ?></strong>
                             </div>
                             <div class="ov-cust-item">
-                                <span>Apartment</span>
+                                <span><?= ($order['delivery_mode'] === 'pickup') ? 'Pickup Branch' : 'Apartment' ?></span>
                                 <strong>
-                                    <?= htmlspecialchars($order['apartment_name'] ?: '—') ?>
-                                    <?php if ($order['apartment_code']): ?>
-                                        (<?= htmlspecialchars($order['apartment_code']) ?>)
+                                    <?php if ($order['delivery_mode'] === 'pickup'): ?>
+                                        <?= htmlspecialchars($order['pickup_branch_name'] ?: '—') ?>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($order['apartment_name'] ?: '—') ?>
+                                        <?php if (!empty($order['apartment_code'])): ?>
+                                            (<?= htmlspecialchars($order['apartment_code']) ?>)
+                                        <?php endif; ?>
                                     <?php endif; ?>
                                 </strong>
                             </div>
                             <div class="ov-cust-item">
-                                <span>Division</span>
-                                <strong><?= htmlspecialchars($order['division'] ?: '—') ?></strong>
+                                <span><?= ($order['delivery_mode'] === 'pickup') ? 'Order Mode' : 'Division' ?></span>
+                                <strong>
+                                    <?php if ($order['delivery_mode'] === 'pickup'): ?>
+                                        <span style="background:#fdf1e2;color:#a35a0e;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
+                                            <i class="bi bi-shop"></i> Pickup
+                                        </span>
+                                    <?php else: ?>
+                                        <?= htmlspecialchars($order['division'] ?: '—') ?>
+                                    <?php endif; ?>
+                                </strong>
                             </div>
                             <div class="ov-cust-item">
                                 <span>Delivery Boy</span>
                                 <strong>
                                     <?= htmlspecialchars($order['boy_name'] ?: '—') ?>
-                                    <?php if ($order['boy_code']): ?>
+                                    <?php if (!empty($order['boy_code'])): ?>
                                         <span style="font-size:10px;color:#948c82;font-weight:600;">
                                             #<?= htmlspecialchars($order['boy_code']) ?>
                                         </span>
@@ -871,20 +889,6 @@ function fmtNoDec($n)
                                         : '';
 
                                     $lineTotal = $p['line_total'] ?? ($p['price'] * $p['qty']);
-
-                                    $contEnabled = (int)($p['container_enabled'] ?? 0);
-                                    $contPrice   = (float)($p['container_price'] ?? 0);
-                                    $contLine    = (float)($p['container_line_total'] ?? 0);
-
-                                    $contHtml = '';
-                                    if ($contEnabled && $contPrice > 0) {
-                                        $contHtml = '
-                                            <div class="ov-product-container">
-                                                <i class="bi bi-box2-heart"></i>
-                                                Container ₹' . fmtNoDec($contPrice) .
-                                                ' × ' . (int)$p['qty'] . ' = ₹' . fmtNoDec($contLine) .
-                                            '</div>';
-                                    }
                                 ?>
 
                                     <div class="ov-product">
@@ -898,7 +902,6 @@ function fmtNoDec($n)
                                                 · <strong>₹<?= fmtNoDec($p['price']) ?></strong>
                                                 × <?= (int)$p['qty'] ?>
                                             </div>
-                                            <?= $contHtml ?>
                                         </div>
                                         <div class="ov-product-total">
                                             ₹<?= fmtNoDec($lineTotal) ?>
@@ -917,17 +920,11 @@ function fmtNoDec($n)
                                 <strong>₹<?= fmtNoDec($order['subtotal']) ?></strong>
                             </div>
                             <div class="ov-total-row">
-                                <span>Delivery Charge</span>
+                                <span><?= ($order['delivery_mode'] === 'pickup') ? 'Delivery Charge (Free)' : 'Delivery Charge' ?></span>
                                 <strong>₹<?= fmtNoDec($order['division_charge']) ?></strong>
                             </div>
-                            <?php if ((float)$order['container_total_amount'] > 0): ?>
-                                <div class="ov-total-row container">
-                                    <span>Container Deposit (Refundable)</span>
-                                    <strong>₹<?= fmtNoDec($order['container_total_amount']) ?></strong>
-                                </div>
-                            <?php endif; ?>
                             <div class="ov-total-row grand">
-                                <span>Total Paid</span>
+                                <span>Total <?= ($order['payment_status'] === 'paid') ? 'Paid' : 'Amount' ?></span>
                                 <strong>₹<?= fmtNoDec($order['total_amount']) ?></strong>
                             </div>
                         </div>
@@ -953,11 +950,12 @@ function fmtNoDec($n)
                                 <label>Order Status</label>
                                 <select id="ovOrderStatus">
                                     <?php
+                                    $isPickup = ($order['delivery_mode'] === 'pickup');
                                     $orderStatuses = [
                                         'pending'    => 'Pending',
                                         'confirmed'  => 'Confirmed',
-                                        'processing' => 'Processing',
-                                        'delivered'  => 'Delivered',
+                                        'processing' => $isPickup ? 'Ready' : 'Processing',
+                                        'delivered'  => $isPickup ? 'Picked Up' : 'Delivered',
                                         'cancelled'  => 'Cancelled'
                                     ];
                                     foreach ($orderStatuses as $k => $label):

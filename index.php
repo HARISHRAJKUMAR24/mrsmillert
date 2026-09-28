@@ -1,1674 +1,739 @@
 <?php
 require_once './config/config.php';
 require_once './config/function.php';
+
+/* ---------------- AUTH ---------------- */
+if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
+    header('Location: login.php');
+    exit;
+}
+
+$settings = getSettings($pdo);
+$siteName = $settings['username'] ?? 'Mrs Mill@';
+
+/* =========================================================
+   YEAR FILTER (for chart)
+   ========================================================= */
+$thisYear   = (int)date('Y');
+$chartYear  = (int)($_GET['year'] ?? $thisYear);
+$yearOptions = [$thisYear, $thisYear - 1, $thisYear - 2];
+
+/* =========================================================
+   KPI STATS
+   ========================================================= */
+$kpi = [
+    'revenue'   => 0,
+    'orders'    => 0,
+    'products'  => 0,
+    'customers' => 0,
+    'today_rev' => 0,
+    'today_ord' => 0,
+];
+
+try {
+    $row = $pdo->query(
+        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt
+         FROM orders
+         WHERE status <> 'cancelled'"
+    )->fetch(PDO::FETCH_ASSOC);
+    $kpi['revenue'] = (float)$row['revenue'];
+    $kpi['orders']  = (int)$row['cnt'];
+
+    $row = $pdo->query(
+        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt
+         FROM orders
+         WHERE status <> 'cancelled'
+           AND DATE(created_at) = CURDATE()"
+    )->fetch(PDO::FETCH_ASSOC);
+    $kpi['today_rev'] = (float)$row['revenue'];
+    $kpi['today_ord'] = (int)$row['cnt'];
+
+    $kpi['products']  = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE status = 1")->fetchColumn();
+    $kpi['customers'] = (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE status = 1")->fetchColumn();
+} catch (PDOException $e) {}
+
+/* =========================================================
+   MONTHLY REVENUE for the chosen year (12 months)
+   ========================================================= */
+$monthlyRevenue = [];
+try {
+    $stmt = $pdo->prepare(
+        "SELECT MONTH(created_at) AS m,
+                COALESCE(SUM(total_amount),0) AS revenue
+         FROM orders
+         WHERE status <> 'cancelled'
+           AND YEAR(created_at) = ?
+         GROUP BY MONTH(created_at)"
+    );
+    $stmt->execute([$chartYear]);
+    $byMonth = [];
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $byMonth[(int)$r['m']] = (float)$r['revenue'];
+    }
+
+    for ($m = 1; $m <= 12; $m++) {
+        $monthlyRevenue[] = [
+            'mon'     => date('M', mktime(0, 0, 0, $m, 1)),
+            'revenue' => $byMonth[$m] ?? 0,
+        ];
+    }
+} catch (PDOException $e) {}
+
+$maxRevenue = 1;
+foreach ($monthlyRevenue as $m) {
+    if ($m['revenue'] > $maxRevenue) $maxRevenue = $m['revenue'];
+}
+
+/* =========================================================
+   ORDER STATUS COUNTS
+   ========================================================= */
+$orderStatus = [
+    'delivered'  => 0,
+    'processing' => 0,
+    'pending'    => 0,
+    'cancelled'  => 0,
+];
+
+try {
+    $rows = $pdo->query(
+        "SELECT status, COUNT(*) AS cnt FROM orders GROUP BY status"
+    )->fetchAll(PDO::FETCH_ASSOC);
+
+    foreach ($rows as $r) {
+        $s = strtolower($r['status']);
+        if (isset($orderStatus[$s])) {
+            $orderStatus[$s] = (int)$r['cnt'];
+        } elseif ($s === 'confirmed') {
+            $orderStatus['processing'] += (int)$r['cnt'];
+        }
+    }
+} catch (PDOException $e) {}
+
+$totalOrdersAll = array_sum($orderStatus);
+if ($totalOrdersAll < 1) $totalOrdersAll = 1;
+
+$donutDelivered  = round(($orderStatus['delivered']  / $totalOrdersAll) * 100);
+$donutProcessing = round(($orderStatus['processing'] / $totalOrdersAll) * 100);
+$donutPending    = round(($orderStatus['pending']    / $totalOrdersAll) * 100);
+$donutCancelled  = 100 - $donutDelivered - $donutProcessing - $donutPending;
+if ($donutCancelled < 0) $donutCancelled = 0;
+
+/* =========================================================
+   RECENT ORDERS
+   ========================================================= */
+$recentOrders = [];
+try {
+    $stmt = $pdo->query(
+        "SELECT o.order_code, o.customer_name, o.customer_mobile,
+                o.total_amount, o.status, o.products_json, o.created_at
+         FROM orders o
+         WHERE o.status <> 'cancelled'
+         ORDER BY o.id DESC
+         LIMIT 4"
+    );
+    $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+
+/* =========================================================
+   TOP SELLING PRODUCTS
+   ========================================================= */
+$bestProducts = [];
+try {
+    $rows = $pdo->query(
+        "SELECT products_json FROM orders WHERE status <> 'cancelled'"
+    )->fetchAll(PDO::FETCH_ASSOC);
+
+    $agg = [];
+    foreach ($rows as $r) {
+        $items = json_decode($r['products_json'] ?? '[]', true);
+        if (!is_array($items)) continue;
+        foreach ($items as $p) {
+            $name = $p['name'] ?? '';
+            if ($name === '') continue;
+            $qty   = (int)($p['qty'] ?? 0);
+            $total = (float)($p['line_total'] ?? (($p['price'] ?? 0) * $qty));
+            $image = $p['image'] ?? '';
+
+            if (!isset($agg[$name])) {
+                $agg[$name] = ['qty' => 0, 'revenue' => 0, 'image' => $image];
+            }
+            $agg[$name]['qty']     += $qty;
+            $agg[$name]['revenue'] += $total;
+            if ($agg[$name]['image'] === '' && $image !== '') {
+                $agg[$name]['image'] = $image;
+            }
+        }
+    }
+
+    uasort($agg, fn($a, $b) => $b['qty'] <=> $a['qty']);
+    $bestProducts = array_slice($agg, 0, 4, true);
+} catch (PDOException $e) {}
+
+/* =========================================================
+   STOCK PRODUCTS (with image)
+   ========================================================= */
+$stockProducts = [];
+try {
+    $stmt = $pdo->query(
+        "SELECT p.product_name, p.product_image,
+                (SELECT COUNT(*) FROM product_variants v
+                 WHERE v.product_code = p.product_code AND v.status = 1) AS variant_count
+         FROM products p
+         WHERE p.status = 1
+         ORDER BY p.id DESC
+         LIMIT 4"
+    );
+    $stockProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {}
+
+/* =========================================================
+   HELPERS
+   ========================================================= */
+function rupees($n) {
+    return '₹' . number_format((int)round($n));
+}
+
+function initials($name) {
+    $name = trim((string)$name);
+    if ($name === '') return '?';
+    $parts = preg_split('/\s+/', $name);
+    if (count($parts) >= 2) {
+        return strtoupper(substr($parts[0], 0, 1) . substr($parts[1], 0, 1));
+    }
+    return strtoupper(substr($name, 0, 2));
+}
+
+function greeting() {
+    $h = (int)date('G');
+    if ($h < 12) return 'Good Morning';
+    if ($h < 17) return 'Good Afternoon';
+    return 'Good Evening';
+}
+
+function firstProductSummary($json) {
+    $items = json_decode($json ?? '[]', true);
+    if (!is_array($items) || count($items) === 0) return '—';
+    $p     = $items[0];
+    $name  = $p['name'] ?? 'Item';
+    $qty   = (int)($p['qty'] ?? 1);
+    $extra = count($items) > 1 ? ' +' . (count($items) - 1) : '';
+    return $name . ' × ' . $qty . $extra;
+}
+
+function statusClass($status) {
+    switch (strtolower($status)) {
+        case 'delivered':  return 'status-completed';
+        case 'processing':
+        case 'confirmed':  return 'status-processing';
+        case 'pending':    return 'status-pending';
+        case 'cancelled':  return 'status-cancelled';
+        default:           return 'status-pending';
+    }
+}
+
+function productImg($img) {
+    if (empty($img)) return '';
+    return ADMIN_URL . $img;
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
 
+    <style>
+        /* Small additions for real product images */
+        .product-image,
+        .best-image {
+            overflow: hidden;
+            padding: 0 !important;
+        }
+        .product-image img,
+        .best-image img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+            border-radius: inherit;
+        }
+        .product-image .no-img,
+        .best-image .no-img {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #b0a79c;
+            font-size: 18px;
+        }
+    </style>
 </head>
-
 
 <body>
 
-
-    <!-- =====================================================
-     SIDEBAR
-===================================================== -->
-
     <?php include './templates/sidebar.php'; ?>
-
-
-
-    <!-- =====================================================
-     MAIN
-===================================================== -->
 
     <main class="main">
 
-
-        <!-- =================================================
-         TOPBAR
-    ================================================= -->
-
         <header class="topbar">
-
-
-            <!-- MOBILE MENU -->
-
-            <button
-                class="mobile-menu"
-                onclick="toggleSidebar()"
-                aria-label="Open menu">
-
+            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
                 <i class="bi bi-list"></i>
-
             </button>
 
-
-
-            <!-- SEARCH -->
-
             <div class="search-box">
-
                 <i class="bi bi-search"></i>
-
-                <input
-                    type="text"
-                    placeholder="Search orders, products...">
-
+                <input type="text" placeholder="Search orders, products...">
             </div>
-
-
-
-            <!-- TOP RIGHT -->
 
             <div class="top-right">
-
-
-                <!-- NOTIFICATION -->
-
                 <button class="notification">
-
                     <i class="bi bi-bell"></i>
-
                     <span class="notification-dot"></span>
-
                 </button>
 
-
-
-                <!-- ADMIN -->
-
                 <div class="admin-profile">
-
-                    <div class="admin-avatar">
-
-                        A
-
-                    </div>
-
-
+                    <div class="admin-avatar">A</div>
                     <div>
-
-                        <div class="admin-name">
-
-                            Admin
-
-                        </div>
-
-                        <div class="admin-role">
-
-                            Store Manager
-
-                        </div>
-
+                        <div class="admin-name">Admin</div>
+                        <div class="admin-role">Store Manager</div>
                     </div>
-
                 </div>
-
-
             </div>
-
         </header>
 
 
-
-        <!-- =================================================
-         CONTENT
-    ================================================= -->
-
         <div class="content">
 
-
-            <!-- PAGE HEADING -->
-
             <div class="page-heading">
-
-                <h1>
-                    Good Morning, Admin 👋
-                </h1>
-
-                <p>
-                    Here's what's happening with your fresh products today.
-                </p>
-
+                <h1><?= greeting() ?>, Admin 👋</h1>
+                <p>Here's what's happening with your fresh products today.</p>
             </div>
 
 
-
-            <!-- =================================================
-             HERO
-        ================================================= -->
-
+            <!-- HERO -->
             <section class="fresh-hero">
-
-
                 <div class="hero-content">
-
-
                     <div class="hero-label">
-
                         <i class="bi bi-leaf-fill"></i>
-
                         FRESH FROM OUR KITCHEN
-
                     </div>
-
-
                     <h2>
-
                         Healthy products.<br>
-
                         Happy customers.
-
                     </h2>
-
-
                     <p>
-
                         Your store is growing beautifully.
                         Keep your products fresh, your customers happy
                         and your orders moving.
-
                     </p>
 
-
-
-                    <!-- HERO STATS -->
-
                     <div class="hero-stats">
-
-
                         <div class="hero-stat">
-
-                            <strong>
-                                ₹48,920
-                            </strong>
-
-                            <span>
-                                Today's Sales
-                            </span>
-
+                            <strong><?= rupees($kpi['today_rev']) ?></strong>
+                            <span>Today's Sales</span>
                         </div>
-
-
                         <div class="hero-divider"></div>
-
-
                         <div class="hero-stat">
-
-                            <strong>
-                                126
-                            </strong>
-
-                            <span>
-                                Orders Today
-                            </span>
-
+                            <strong><?= $kpi['today_ord'] ?></strong>
+                            <span>Orders Today</span>
                         </div>
-
-
                         <div class="hero-divider"></div>
-
-
                         <div class="hero-stat">
-
-                            <strong>
-                                94%
-                            </strong>
-
-                            <span>
-                                Fresh Stock
-                            </span>
-
+                            <strong>94%</strong>
+                            <span>Fresh Stock</span>
                         </div>
-
-
                     </div>
-
                 </div>
-
-
 
                 <div class="hero-decoration"></div>
-
-
-                <div class="hero-decoration-two">
-                    🌿
-                </div>
-
-
+                <div class="hero-decoration-two">🌿</div>
             </section>
 
 
-
-            <!-- =================================================
-             KPI CARDS
-        ================================================= -->
-
+            <!-- KPI CARDS -->
             <div class="row g-3 mb-4">
 
-
-                <!-- REVENUE -->
-
                 <div class="col-12 col-sm-6 col-xl-3">
-
                     <div class="kpi-card">
-
-
                         <div class="kpi-top">
-
-                            <div class="kpi-icon red">
-
-                                <i class="bi bi-currency-rupee"></i>
-
-                            </div>
-
-
-                            <span class="trend up">
-
-                                <i class="bi bi-arrow-up"></i>
-
-                                12.5%
-
-                            </span>
-
+                            <div class="kpi-icon red"><i class="bi bi-currency-rupee"></i></div>
+                            <span class="trend up"><i class="bi bi-arrow-up"></i> 12.5%</span>
                         </div>
-
-
-                        <div class="kpi-label">
-                            Total Revenue
-                        </div>
-
-
-                        <div class="kpi-value">
-                            ₹4,82,650
-                        </div>
-
-
+                        <div class="kpi-label">Total Revenue</div>
+                        <div class="kpi-value"><?= rupees($kpi['revenue']) ?></div>
                     </div>
-
                 </div>
 
-
-
-                <!-- ORDERS -->
-
                 <div class="col-12 col-sm-6 col-xl-3">
-
                     <div class="kpi-card">
-
-
                         <div class="kpi-top">
-
-                            <div class="kpi-icon green">
-
-                                <i class="bi bi-bag-check"></i>
-
-                            </div>
-
-
-                            <span class="trend up">
-
-                                <i class="bi bi-arrow-up"></i>
-
-                                8.4%
-
-                            </span>
-
+                            <div class="kpi-icon green"><i class="bi bi-bag-check"></i></div>
+                            <span class="trend up"><i class="bi bi-arrow-up"></i> 8.4%</span>
                         </div>
-
-
-                        <div class="kpi-label">
-                            Total Orders
-                        </div>
-
-
-                        <div class="kpi-value">
-                            1,284
-                        </div>
-
-
+                        <div class="kpi-label">Total Orders</div>
+                        <div class="kpi-value"><?= number_format($kpi['orders']) ?></div>
                     </div>
-
                 </div>
 
-
-
-                <!-- PRODUCTS -->
-
                 <div class="col-12 col-sm-6 col-xl-3">
-
                     <div class="kpi-card">
-
-
                         <div class="kpi-top">
-
-                            <div class="kpi-icon gold">
-
-                                <i class="bi bi-box-seam"></i>
-
-                            </div>
-
-
-                            <span class="trend up">
-
-                                <i class="bi bi-arrow-up"></i>
-
-                                4.8%
-
-                            </span>
-
+                            <div class="kpi-icon gold"><i class="bi bi-box-seam"></i></div>
+                            <span class="trend up"><i class="bi bi-arrow-up"></i> 4.8%</span>
                         </div>
-
-
-                        <div class="kpi-label">
-                            Products
-                        </div>
-
-
-                        <div class="kpi-value">
-                            86
-                        </div>
-
-
+                        <div class="kpi-label">Products</div>
+                        <div class="kpi-value"><?= $kpi['products'] ?></div>
                     </div>
-
                 </div>
 
-
-
-                <!-- CUSTOMERS -->
-
                 <div class="col-12 col-sm-6 col-xl-3">
-
                     <div class="kpi-card">
-
-
                         <div class="kpi-top">
-
-                            <div class="kpi-icon brown">
-
-                                <i class="bi bi-people"></i>
-
-                            </div>
-
-
-                            <span class="trend up">
-
-                                <i class="bi bi-arrow-up"></i>
-
-                                15.2%
-
-                            </span>
-
+                            <div class="kpi-icon brown"><i class="bi bi-people"></i></div>
+                            <span class="trend up"><i class="bi bi-arrow-up"></i> 15.2%</span>
                         </div>
-
-
-                        <div class="kpi-label">
-                            Customers
-                        </div>
-
-
-                        <div class="kpi-value">
-                            3,642
-                        </div>
-
-
+                        <div class="kpi-label">Customers</div>
+                        <div class="kpi-value"><?= number_format($kpi['customers']) ?></div>
                     </div>
-
                 </div>
-
 
             </div>
 
 
-
-            <!-- =================================================
-             REVENUE + ORDER STATUS
-        ================================================= -->
-
+            <!-- REVENUE + ORDER STATUS -->
             <div class="row g-3 mb-4">
 
-
-                <!-- REVENUE -->
-
                 <div class="col-12 col-xl-8">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
-
                             <div>
-
-                                <h3>
-                                    Revenue Overview
-                                </h3>
-
-                                <span>
-                                    Monthly sales performance
-                                </span>
-
+                                <h3>Revenue Overview</h3>
+                                <span>Monthly sales performance</span>
                             </div>
 
-
-                            <select
-                                class="form-select form-select-sm"
-                                style="width:100px;font-size:10px;">
-
-                                <option>
-                                    2026
-                                </option>
-
-                                <option>
-                                    2025
-                                </option>
-
-                            </select>
-
-
+                            <form method="GET" id="yearForm" style="margin:0;">
+                                <select name="year" class="form-select form-select-sm"
+                                        style="width:100px;font-size:10px;"
+                                        onchange="document.getElementById('yearForm').submit();">
+                                    <?php foreach ($yearOptions as $y): ?>
+                                        <option value="<?= $y ?>" <?= $y === $chartYear ? 'selected' : '' ?>>
+                                            <?= $y ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </form>
                         </div>
-
-
 
                         <div class="chart-area">
-
-
                             <div class="chart-grid">
-
                                 <div class="chart-grid-line"></div>
-
                                 <div class="chart-grid-line"></div>
-
                                 <div class="chart-grid-line"></div>
-
                                 <div class="chart-grid-line"></div>
-
                                 <div class="chart-grid-line"></div>
-
                             </div>
 
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:42%;"></div>
-
-                                <div class="bar-label">
-                                    Jan
+                            <?php foreach ($monthlyRevenue as $m):
+                                $h = $maxRevenue > 0 ? round(($m['revenue'] / $maxRevenue) * 100) : 0;
+                                if ($h < 3) $h = 3;
+                            ?>
+                                <div class="bar-wrap">
+                                    <div class="bar" style="height:<?= $h ?>%;" title="<?= rupees($m['revenue']) ?>"></div>
+                                    <div class="bar-label"><?= htmlspecialchars($m['mon']) ?></div>
                                 </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:57%;"></div>
-
-                                <div class="bar-label">
-                                    Feb
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:48%;"></div>
-
-                                <div class="bar-label">
-                                    Mar
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:69%;"></div>
-
-                                <div class="bar-label">
-                                    Apr
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:62%;"></div>
-
-                                <div class="bar-label">
-                                    May
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:78%;"></div>
-
-                                <div class="bar-label">
-                                    Jun
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:71%;"></div>
-
-                                <div class="bar-label">
-                                    Jul
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:88%;"></div>
-
-                                <div class="bar-label">
-                                    Aug
-                                </div>
-
-                            </div>
-
-
-                            <div class="bar-wrap">
-
-                                <div
-                                    class="bar"
-                                    style="height:94%;"></div>
-
-                                <div class="bar-label">
-                                    Sep
-                                </div>
-
-                            </div>
-
-
+                            <?php endforeach; ?>
                         </div>
-
                     </div>
-
                 </div>
 
 
-
-                <!-- ORDER STATUS -->
-
                 <div class="col-12 col-xl-4">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
-
                             <div>
-
-                                <h3>
-                                    Order Status
-                                </h3>
-
-                                <span>
-                                    Today's orders
-                                </span>
-
+                                <h3>Order Status</h3>
+                                <span>All-time orders</span>
                             </div>
-
-
-                            <a href="#" class="view-link">
-                                View All
-                            </a>
-
-
+                            <a href="<?= ADMIN_URL ?>orders.php" class="view-link">View All</a>
                         </div>
-
-
 
                         <div class="status-layout">
 
+                            <?php
+                                /* Donut conic-gradient */
+                                $d1 = $donutDelivered;
+                                $d2 = $d1 + $donutProcessing;
+                                $d3 = $d2 + $donutPending;
 
-                            <div class="donut">
+                                $donutStyle =
+                                    "background: conic-gradient(" .
+                                    "#2e7d32 0% {$d1}%, " .              /* Delivered */
+                                    "#1565c0 {$d1}% {$d2}%, " .          /* Processing */
+                                    "#b8893c {$d2}% {$d3}%, " .          /* Pending */
+                                    "#c8bfb4 {$d3}% 100%);";             /* Cancelled */
+                            ?>
 
-
+                            <div class="donut" style="<?= $donutStyle ?>">
                                 <div class="donut-center">
-
-                                    <strong>
-                                        126
-                                    </strong>
-
-                                    <span>
-                                        Total Orders
-                                    </span>
-
+                                    <strong><?= array_sum($orderStatus) ?></strong>
+                                    <span>Total Orders</span>
                                 </div>
-
-
                             </div>
-
-
 
                             <div class="status-list">
-
-
                                 <div class="status-row">
-
                                     <span class="status-dot green"></span>
-
                                     Delivered
-
-                                    <strong>
-                                        72
-                                    </strong>
-
+                                    <strong><?= $orderStatus['delivered'] ?></strong>
                                 </div>
 
-
                                 <div class="status-row">
-
                                     <span class="status-dot red"></span>
-
                                     Processing
-
-                                    <strong>
-                                        26
-                                    </strong>
-
+                                    <strong><?= $orderStatus['processing'] ?></strong>
                                 </div>
 
-
                                 <div class="status-row">
-
                                     <span class="status-dot gold"></span>
-
                                     Pending
-
-                                    <strong>
-                                        18
-                                    </strong>
-
+                                    <strong><?= $orderStatus['pending'] ?></strong>
                                 </div>
-
 
                                 <div class="status-row">
-
                                     <span class="status-dot gray"></span>
-
                                     Cancelled
-
-                                    <strong>
-                                        10
-                                    </strong>
-
+                                    <strong><?= $orderStatus['cancelled'] ?></strong>
                                 </div>
-
-
                             </div>
-
-
                         </div>
-
-
                     </div>
-
                 </div>
-
 
             </div>
 
 
-
-            <!-- =================================================
-             STOCK + BEST SELLERS
-        ================================================= -->
-
+            <!-- STOCK + BEST SELLERS -->
             <div class="row g-3 mb-4">
 
-
-                <!-- STOCK -->
-
                 <div class="col-12 col-xl-6">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
-
                             <div>
-
-                                <h3>
-                                    Freshness & Stock
-                                </h3>
-
-                                <span>
-                                    Product inventory health
-                                </span>
-
+                                <h3>Freshness & Stock</h3>
+                                <span>Product inventory health</span>
                             </div>
-
-
-                            <a href="#" class="view-link">
-                                Manage Stock
-                            </a>
-
-
+                            <a href="<?= ADMIN_URL ?>products.php" class="view-link">Manage Stock</a>
                         </div>
 
-
-
-                        <!-- PRODUCT 1 -->
-
-                        <div class="product-stock">
-
-
-                            <div class="product-image">
-                                🌾
+                        <?php if (empty($stockProducts)): ?>
+                            <div style="padding:30px 20px;text-align:center;color:#948c82;font-size:12px;">
+                                No products yet.
                             </div>
+                        <?php else: ?>
+                            <?php foreach ($stockProducts as $sp):
+                                $varCount  = (int)$sp['variant_count'];
+                                $badge     = $varCount >= 2 ? 'fresh' : ($varCount === 1 ? 'low' : 'critical');
+                                $badgeText = $varCount >= 2 ? 'FRESH' : ($varCount === 1 ? 'LOW STOCK' : 'RESTOCK');
+                                $img       = productImg($sp['product_image']);
+                            ?>
+                                <div class="product-stock">
 
+                                    <div class="product-image">
+                                        <?php if ($img): ?>
+                                            <img src="<?= htmlspecialchars($img) ?>" alt=""
+                                                 onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
+                                        <?php else: ?>
+                                            <div class="no-img"><i class="bi bi-image"></i></div>
+                                        <?php endif; ?>
+                                    </div>
 
-                            <div class="product-info">
+                                    <div class="product-info">
+                                        <div class="product-name"><?= htmlspecialchars($sp['product_name']) ?></div>
+                                        <div class="product-meta"><?= $varCount ?> variant<?= $varCount === 1 ? '' : 's' ?> available</div>
+                                    </div>
 
-                                <div class="product-name">
-                                    Premium Millet Mix
+                                    <div class="stock-status">
+                                        <span class="stock-badge <?= $badge ?>"><?= $badgeText ?></span>
+                                    </div>
+
                                 </div>
-
-                                <div class="product-meta">
-                                    124 packs available
-                                </div>
-
-                            </div>
-
-
-                            <div class="stock-status">
-
-                                <span class="stock-badge fresh">
-                                    FRESH
-                                </span>
-
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- PRODUCT 2 -->
-
-                        <div class="product-stock">
-
-
-                            <div class="product-image">
-                                🫘
-                            </div>
-
-
-                            <div class="product-info">
-
-                                <div class="product-name">
-                                    Ragi Health Mix
-                                </div>
-
-                                <div class="product-meta">
-                                    86 packs available
-                                </div>
-
-                            </div>
-
-
-                            <div class="stock-status">
-
-                                <span class="stock-badge fresh">
-                                    FRESH
-                                </span>
-
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- PRODUCT 3 -->
-
-                        <div class="product-stock">
-
-
-                            <div class="product-image">
-                                🌱
-                            </div>
-
-
-                            <div class="product-info">
-
-                                <div class="product-name">
-                                    Multi Millet Flour
-                                </div>
-
-                                <div class="product-meta">
-                                    38 packs available
-                                </div>
-
-                            </div>
-
-
-                            <div class="stock-status">
-
-                                <span class="stock-badge low">
-                                    LOW STOCK
-                                </span>
-
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- PRODUCT 4 -->
-
-                        <div class="product-stock">
-
-
-                            <div class="product-image">
-                                🌾
-                            </div>
-
-
-                            <div class="product-info">
-
-                                <div class="product-name">
-                                    Kambu Flour
-                                </div>
-
-                                <div class="product-meta">
-                                    12 packs available
-                                </div>
-
-                            </div>
-
-
-                            <div class="stock-status">
-
-                                <span class="stock-badge critical">
-                                    RESTOCK
-                                </span>
-
-                            </div>
-
-
-                        </div>
-
-
+                            <?php endforeach; ?>
+                        <?php endif; ?>
                     </div>
-
                 </div>
 
 
-
-                <!-- BEST SELLERS -->
-
                 <div class="col-12 col-xl-6">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
-
                             <div>
-
-                                <h3>
-                                    Best Selling Products
-                                </h3>
-
-                                <span>
-                                    Top performing products
-                                </span>
-
+                                <h3>Best Selling Products</h3>
+                                <span>Top performing products</span>
                             </div>
-
-
-                            <a href="#" class="view-link">
-                                View Products
-                            </a>
-
-
+                            <a href="<?= ADMIN_URL ?>products.php" class="view-link">View Products</a>
                         </div>
 
-
-
-                        <!-- BEST 1 -->
-
-                        <div class="best-product">
-
-
-                            <div class="rank">
-                                01
+                        <?php if (empty($bestProducts)): ?>
+                            <div style="padding:30px 20px;text-align:center;color:#948c82;font-size:12px;">
+                                No sales data yet.
                             </div>
-
-
-                            <div class="best-image">
-                                🌾
-                            </div>
-
-
-                            <div class="best-info">
-
-                                <strong>
-                                    Premium Millet Mix
-                                </strong>
-
-                                <span>
-                                    428 orders
-                                </span>
-
-                            </div>
-
-
-                            <div class="best-sales">
-                                ₹86,400
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- BEST 2 -->
-
-                        <div class="best-product">
-
-
-                            <div class="rank">
-                                02
-                            </div>
-
-
-                            <div class="best-image">
-                                🫘
-                            </div>
-
-
-                            <div class="best-info">
-
-                                <strong>
-                                    Ragi Health Mix
-                                </strong>
-
-                                <span>
-                                    364 orders
-                                </span>
-
-                            </div>
-
-
-                            <div class="best-sales">
-                                ₹68,240
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- BEST 3 -->
-
-                        <div class="best-product">
-
-
-                            <div class="rank">
-                                03
-                            </div>
-
-
-                            <div class="best-image">
-                                🌱
-                            </div>
-
-
-                            <div class="best-info">
-
-                                <strong>
-                                    Multi Millet Flour
-                                </strong>
-
-                                <span>
-                                    286 orders
-                                </span>
-
-                            </div>
-
-
-                            <div class="best-sales">
-                                ₹52,680
-                            </div>
-
-
-                        </div>
-
-
-
-                        <!-- BEST 4 -->
-
-                        <div class="best-product">
-
-
-                            <div class="rank">
-                                04
-                            </div>
-
-
-                            <div class="best-image">
-                                🌾
-                            </div>
-
-
-                            <div class="best-info">
-
-                                <strong>
-                                    Kambu Flour
-                                </strong>
-
-                                <span>
-                                    198 orders
-                                </span>
-
-                            </div>
-
-
-                            <div class="best-sales">
-                                ₹38,920
-                            </div>
-
-
-                        </div>
-
-
+                        <?php else: ?>
+                            <?php $rank = 1; foreach ($bestProducts as $name => $bp):
+                                $bImg = !empty($bp['image']) ? $bp['image'] : '';
+                            ?>
+                                <div class="best-product">
+
+                                    <div class="rank"><?= str_pad((string)$rank, 2, '0', STR_PAD_LEFT) ?></div>
+
+                                    <div class="best-image">
+                                        <?php if ($bImg): ?>
+                                            <img src="<?= htmlspecialchars($bImg) ?>" alt=""
+                                                 onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
+                                        <?php else: ?>
+                                            <div class="no-img"><i class="bi bi-image"></i></div>
+                                        <?php endif; ?>
+                                    </div>
+
+                                    <div class="best-info">
+                                        <strong><?= htmlspecialchars($name) ?></strong>
+                                        <span><?= (int)$bp['qty'] ?> orders</span>
+                                    </div>
+
+                                    <div class="best-sales"><?= rupees($bp['revenue']) ?></div>
+
+                                </div>
+                            <?php $rank++; endforeach; ?>
+                        <?php endif; ?>
                     </div>
-
                 </div>
-
 
             </div>
 
 
-
-            <!-- =================================================
-             RECENT ORDERS + QUICK ACTIONS
-        ================================================= -->
-
+            <!-- RECENT ORDERS + QUICK ACTIONS -->
             <div class="row g-3">
 
-
-                <!-- RECENT ORDERS -->
-
                 <div class="col-12 col-xl-9">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
-
                             <div>
-
-                                <h3>
-                                    Recent Orders
-                                </h3>
-
-                                <span>
-                                    Latest customer purchases
-                                </span>
-
+                                <h3>Recent Orders</h3>
+                                <span>Latest customer purchases</span>
                             </div>
-
-
-                            <a href="#" class="view-link">
-                                View All Orders
-                            </a>
-
-
+                            <a href="<?= ADMIN_URL ?>orders.php" class="view-link">View All Orders</a>
                         </div>
-
-
 
                         <div class="table-responsive">
-
-
                             <table class="orders-table">
-
-
                                 <thead>
-
                                     <tr>
-
-                                        <th>
-                                            Customer
-                                        </th>
-
-                                        <th>
-                                            Order ID
-                                        </th>
-
-                                        <th>
-                                            Product
-                                        </th>
-
-                                        <th>
-                                            Amount
-                                        </th>
-
-                                        <th>
-                                            Date
-                                        </th>
-
-                                        <th>
-                                            Status
-                                        </th>
-
+                                        <th>Customer</th>
+                                        <th>Order ID</th>
+                                        <th>Product</th>
+                                        <th>Amount</th>
+                                        <th>Date</th>
+                                        <th>Status</th>
                                     </tr>
-
                                 </thead>
-
-
-
                                 <tbody>
-
-
-                                    <!-- ORDER 1 -->
-
-                                    <tr>
-
-
-                                        <td>
-
-                                            <div class="customer">
-
-
-                                                <div class="customer-avatar">
-                                                    RK
-                                                </div>
-
-
-                                                <div>
-
-                                                    <div class="customer-name">
-                                                        Ramesh Kumar
+                                    <?php if (empty($recentOrders)): ?>
+                                        <tr>
+                                            <td colspan="6" style="text-align:center;padding:40px;color:#948c82;">
+                                                No orders yet.
+                                            </td>
+                                        </tr>
+                                    <?php else: ?>
+                                        <?php foreach ($recentOrders as $o): ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="customer">
+                                                        <div class="customer-avatar"><?= htmlspecialchars(initials($o['customer_name'])) ?></div>
+                                                        <div>
+                                                            <div class="customer-name"><?= htmlspecialchars($o['customer_name']) ?></div>
+                                                            <div class="customer-phone"><?= htmlspecialchars($o['customer_mobile']) ?></div>
+                                                        </div>
                                                     </div>
-
-                                                    <div class="customer-phone">
-                                                        +91 98XXXXXX21
-                                                    </div>
-
-                                                </div>
-
-
-                                            </div>
-
-                                        </td>
-
-
-                                        <td>
-                                            #MM10284
-                                        </td>
-
-
-                                        <td>
-                                            Millet Mix × 2
-                                        </td>
-
-
-                                        <td>
-                                            <strong>
-                                                ₹1,240
-                                            </strong>
-                                        </td>
-
-
-                                        <td>
-                                            11 Sep 2026
-                                        </td>
-
-
-                                        <td>
-
-                                            <span class="order-status status-completed">
-                                                Delivered
-                                            </span>
-
-                                        </td>
-
-
-                                    </tr>
-
-
-
-                                    <!-- ORDER 2 -->
-
-                                    <tr>
-
-
-                                        <td>
-
-                                            <div class="customer">
-
-
-                                                <div class="customer-avatar">
-                                                    PS
-                                                </div>
-
-
-                                                <div>
-
-                                                    <div class="customer-name">
-                                                        Priya S
-                                                    </div>
-
-                                                    <div class="customer-phone">
-                                                        +91 94XXXXXX65
-                                                    </div>
-
-                                                </div>
-
-
-                                            </div>
-
-                                        </td>
-
-
-                                        <td>
-                                            #MM10283
-                                        </td>
-
-
-                                        <td>
-                                            Ragi Mix × 3
-                                        </td>
-
-
-                                        <td>
-                                            <strong>
-                                                ₹890
-                                            </strong>
-                                        </td>
-
-
-                                        <td>
-                                            11 Sep 2026
-                                        </td>
-
-
-                                        <td>
-
-                                            <span class="order-status status-processing">
-                                                Processing
-                                            </span>
-
-                                        </td>
-
-
-                                    </tr>
-
-
-
-                                    <!-- ORDER 3 -->
-
-                                    <tr>
-
-
-                                        <td>
-
-                                            <div class="customer">
-
-
-                                                <div class="customer-avatar">
-                                                    AM
-                                                </div>
-
-
-                                                <div>
-
-                                                    <div class="customer-name">
-                                                        Arun M
-                                                    </div>
-
-                                                    <div class="customer-phone">
-                                                        +91 88XXXXXX43
-                                                    </div>
-
-                                                </div>
-
-
-                                            </div>
-
-                                        </td>
-
-
-                                        <td>
-                                            #MM10282
-                                        </td>
-
-
-                                        <td>
-                                            Kambu Flour × 1
-                                        </td>
-
-
-                                        <td>
-                                            <strong>
-                                                ₹450
-                                            </strong>
-                                        </td>
-
-
-                                        <td>
-                                            11 Sep 2026
-                                        </td>
-
-
-                                        <td>
-
-                                            <span class="order-status status-pending">
-                                                Pending
-                                            </span>
-
-                                        </td>
-
-
-                                    </tr>
-
-
-
-                                    <!-- ORDER 4 -->
-
-                                    <tr>
-
-
-                                        <td>
-
-                                            <div class="customer">
-
-
-                                                <div class="customer-avatar">
-                                                    SV
-                                                </div>
-
-
-                                                <div>
-
-                                                    <div class="customer-name">
-                                                        Siva V
-                                                    </div>
-
-                                                    <div class="customer-phone">
-                                                        +91 90XXXXXX18
-                                                    </div>
-
-                                                </div>
-
-
-                                            </div>
-
-                                        </td>
-
-
-                                        <td>
-                                            #MM10281
-                                        </td>
-
-
-                                        <td>
-                                            Multi Millet × 2
-                                        </td>
-
-
-                                        <td>
-                                            <strong>
-                                                ₹760
-                                            </strong>
-                                        </td>
-
-
-                                        <td>
-                                            10 Sep 2026
-                                        </td>
-
-
-                                        <td>
-
-                                            <span class="order-status status-completed">
-                                                Delivered
-                                            </span>
-
-                                        </td>
-
-
-                                    </tr>
-
-
+                                                </td>
+                                                <td>#<?= htmlspecialchars($o['order_code']) ?></td>
+                                                <td><?= htmlspecialchars(firstProductSummary($o['products_json'])) ?></td>
+                                                <td><strong><?= rupees($o['total_amount']) ?></strong></td>
+                                                <td><?= date('d M Y', strtotime($o['created_at'])) ?></td>
+                                                <td>
+                                                    <span class="order-status <?= statusClass($o['status']) ?>">
+                                                        <?= htmlspecialchars(ucfirst($o['status'])) ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
                                 </tbody>
-
-
                             </table>
-
-
                         </div>
-
-
                     </div>
-
                 </div>
 
-
-
-                <!-- QUICK ACTIONS -->
 
                 <div class="col-12 col-xl-3">
-
                     <div class="section-card">
-
-
                         <div class="section-title">
-
                             <div>
-
-                                <h3>
-                                    Quick Actions
-                                </h3>
-
-                                <span>
-                                    Manage store
-                                </span>
-
+                                <h3>Quick Actions</h3>
+                                <span>Manage store</span>
                             </div>
-
                         </div>
 
-
-
-                        <a href="#" class="quick-action">
-
-
-                            <div class="quick-icon">
-
-                                <i class="bi bi-plus-lg"></i>
-
-                            </div>
-
-
+                        <a href="<?= ADMIN_URL ?>add-product.php" class="quick-action">
+                            <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
                             <div>
-
-                                <strong>
-                                    Add Product
-                                </strong>
-
-                                <span>
-                                    Create new product
-                                </span>
-
+                                <strong>Add Product</strong>
+                                <span>Create new product</span>
                             </div>
-
-
                         </a>
 
-
-
-                        <a href="#" class="quick-action">
-
-
-                            <div class="quick-icon">
-
-                                <i class="bi bi-bag-plus"></i>
-
-                            </div>
-
-
+                        <a href="<?= ADMIN_URL ?>take-order.php" class="quick-action">
+                            <div class="quick-icon"><i class="bi bi-bag-plus"></i></div>
                             <div>
-
-                                <strong>
-                                    New Order
-                                </strong>
-
-                                <span>
-                                    Create manual order
-                                </span>
-
+                                <strong>New Order</strong>
+                                <span>Create manual order</span>
                             </div>
-
-
                         </a>
 
-
-
-                        <a href="#" class="quick-action">
-
-
-                            <div class="quick-icon">
-
-                                <i class="bi bi-tag"></i>
-
-                            </div>
-
-
+                        <a href="<?= ADMIN_URL ?>discounts.php" class="quick-action">
+                            <div class="quick-icon"><i class="bi bi-tag"></i></div>
                             <div>
-
-                                <strong>
-                                    Create Offer
-                                </strong>
-
-                                <span>
-                                    Promote your products
-                                </span>
-
+                                <strong>Create Offer</strong>
+                                <span>Promote your products</span>
                             </div>
-
-
                         </a>
 
-
-
-                        <a href="#" class="quick-action">
-
-
-                            <div class="quick-icon">
-
-                                <i class="bi bi-bar-chart-line"></i>
-
-                            </div>
-
-
+                        <a href="<?= ADMIN_URL ?>report.php" class="quick-action">
+                            <div class="quick-icon"><i class="bi bi-bar-chart-line"></i></div>
                             <div>
-
-                                <strong>
-                                    View Reports
-                                </strong>
-
-                                <span>
-                                    Check sales performance
-                                </span>
-
+                                <strong>View Reports</strong>
+                                <span>Check sales performance</span>
                             </div>
-
-
                         </a>
 
-
-
-                        <a href="#" class="quick-action">
-
-
-                            <div class="quick-icon">
-
-                                <i class="bi bi-gear"></i>
-
-                            </div>
-
-
+                        <a href="<?= ADMIN_URL ?>settings.php" class="quick-action">
+                            <div class="quick-icon"><i class="bi bi-gear"></i></div>
                             <div>
-
-                                <strong>
-                                    Store Settings
-                                </strong>
-
-                                <span>
-                                    Manage your store
-                                </span>
-
+                                <strong>Store Settings</strong>
+                                <span>Manage your store</span>
                             </div>
-
-
                         </a>
-
-
                     </div>
-
                 </div>
 
-
             </div>
-
 
         </div>
 
     </main>
-    
 
 
-    <!-- =====================================================
-     JAVASCRIPT
-===================================================== -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="<?= ADMIN_URL; ?>js/main.js"></script>
-
+    <script src="<?= ADMIN_URL ?>js/main.js"></script>
 
 </body>
 
