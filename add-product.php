@@ -19,29 +19,6 @@ try {
 } catch (PDOException $e) {
     $categories = [];
 }
-
-/* =========================================================
-   LOAD APARTMENTS
-   ========================================================= */
-
-$apartments = [];
-
-try {
-    $stmt = $pdo->query(
-        "SELECT id, apartment_code, apartment_name, divisions
-         FROM apartments
-         WHERE status = 1
-         ORDER BY apartment_name ASC"
-    );
-
-    $apartments = $stmt->fetchAll();
-
-    foreach ($apartments as &$a) {
-        $a['divisions'] = decodeDivisions($a['divisions'] ?? '');
-    }
-} catch (PDOException $e) {
-    $apartments = [];
-}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -493,8 +470,6 @@ try {
         }
 
 
-
-
         /* =====================================================
            CONTAINER BOX (optional per variant)
         ===================================================== */
@@ -623,7 +598,6 @@ try {
             display: block;
         }
 
-      
 
         /* IMAGE UPLOAD */
 
@@ -719,352 +693,6 @@ try {
             background: #fde6e6;
             border-color: #f5c0c0;
             color: #c62828;
-        }
-
-
-        /* =====================================================
-           APARTMENT MANAGEMENT (Collapsible)
-        ===================================================== */
-
-        .apartments-section {
-            margin-top: 22px;
-            padding-top: 20px;
-            border-top: 1px solid #f0ebe4;
-        }
-
-        .apartments-box {
-            border: 1px solid #f0ebe4;
-            border-radius: 14px;
-            background: #fffdf9;
-            overflow: hidden;
-            transition: .2s ease;
-        }
-
-        .apartments-box.collapsed .apartments-body {
-            display: none;
-        }
-
-        .apartments-box.collapsed {
-            background: #fff;
-        }
-
-        .apartments-head {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 12px;
-            padding: 14px 16px;
-            cursor: pointer;
-            user-select: none;
-            transition: .2s ease;
-            flex-wrap: wrap;
-        }
-
-        .apartments-head:hover {
-            background: #fffaf9;
-        }
-
-        .apartments-head-title {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            min-width: 0;
-        }
-
-        .apartments-head-title i.box-icon {
-            width: 34px;
-            height: 34px;
-            border-radius: 10px;
-            background: #fbe8e9;
-            color: #b51f2c;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 15px;
-            flex-shrink: 0;
-        }
-
-        .apartments-head-title h4 {
-            margin: 0;
-            font-size: 13px;
-            font-weight: 800;
-            color: #302923;
-        }
-
-        .apartments-head-title h4 .required {
-            color: #b51f2c;
-            margin-left: 2px;
-            display: inline !important;
-            white-space: nowrap;
-        }
-
-        .apartments-head-title span {
-            display: block;
-            font-size: 10px;
-            color: #817a71;
-            margin-top: 2px;
-        }
-
-        .apartments-head-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .apartments-selected-count {
-            font-size: 10px;
-            font-weight: 700;
-            background: #e8f1e8;
-            color: #52745b;
-            padding: 6px 10px;
-            border-radius: 20px;
-            white-space: nowrap;
-        }
-
-        .toggle-chevron {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            background: #fff;
-            border: 1px solid #e4ddd3;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #6f675f;
-            font-size: 14px;
-            flex-shrink: 0;
-            transition: transform .25s ease, background .2s ease;
-        }
-
-        .apartments-box.collapsed .toggle-chevron {
-            transform: rotate(-90deg);
-        }
-
-        .apartments-head:hover .toggle-chevron {
-            background: #faf7f0;
-            border-color: #d5cbbd;
-        }
-
-        .apartments-body {
-            padding: 0 16px 16px;
-        }
-
-        .select-all-row {
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            margin-bottom: 10px;
-        }
-
-        .select-all-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            border: 1px solid #e4ddd3;
-            background: #fff;
-            color: #6f675f;
-            padding: 7px 13px;
-            border-radius: 10px;
-            font-size: 10px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: .2s ease;
-        }
-
-        .select-all-btn:hover {
-            background: #faf7f0;
-            color: #302923;
-            border-color: #d5cbbd;
-        }
-
-        .select-all-btn.all-active {
-            background: #fde6e6;
-            border-color: #f5c0c0;
-            color: #c62828;
-        }
-
-        .apt-search {
-            position: relative;
-            margin-bottom: 12px;
-        }
-
-        .apt-search i {
-            position: absolute;
-            left: 13px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: #aaa198;
-            font-size: 14px;
-        }
-
-        .apt-search input {
-            width: 100%;
-            height: 42px;
-            border: 1px solid #e8e1d8;
-            background: #fff;
-            border-radius: 11px;
-            padding: 0 12px 0 38px;
-            font-family: "DM Sans", sans-serif;
-            font-size: 12px;
-            color: #292521;
-            outline: none;
-            transition: .2s ease;
-        }
-
-        .apt-search input:focus {
-            border-color: #d98a91;
-            background: #fff;
-            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
-        }
-
-        .apt-list {
-            max-height: 380px;
-            overflow-y: auto;
-            border: 1px solid #f0ebe4;
-            border-radius: 12px;
-            background: #fff;
-            padding: 8px;
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .apt-list::-webkit-scrollbar {
-            width: 8px;
-        }
-
-        .apt-list::-webkit-scrollbar-track {
-            background: transparent;
-        }
-
-        .apt-list::-webkit-scrollbar-thumb {
-            background: #e4ddd3;
-            border-radius: 8px;
-        }
-
-        .apt-item {
-            border: 1px solid #f0ebe4;
-            background: #fff;
-            border-radius: 12px;
-            padding: 12px 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: flex-start;
-            gap: 12px;
-            transition: .18s ease;
-            user-select: none;
-        }
-
-        .apt-item:hover {
-            border-color: #d98a91;
-            background: #fffaf9;
-        }
-
-        .apt-item.selected {
-            border-color: #b51f2c;
-            background: #fff5f5;
-            box-shadow: 0 4px 14px rgba(181, 31, 44, .08);
-        }
-
-        .apt-tick {
-            width: 22px;
-            height: 22px;
-            border-radius: 6px;
-            border: 2px solid #d5cbbd;
-            background: #fff;
-            flex-shrink: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 12px;
-            color: #fff;
-            transition: .18s ease;
-            margin-top: 1px;
-        }
-
-        .apt-tick i {
-            opacity: 0;
-            transition: .18s ease;
-        }
-
-        .apt-item.selected .apt-tick {
-            background: #b51f2c;
-            border-color: #b51f2c;
-        }
-
-        .apt-item.selected .apt-tick i {
-            opacity: 1;
-        }
-
-        .apt-main {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .apt-name {
-            font-size: 12px;
-            font-weight: 800;
-            color: #302923;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-wrap: wrap;
-        }
-
-        .apt-code {
-            font-size: 9px;
-            font-weight: 700;
-            background: #faf7f0;
-            color: #6f5a3f;
-            padding: 2px 7px;
-            border-radius: 5px;
-            letter-spacing: .5px;
-        }
-
-        .apt-divisions {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-            margin-top: 10px;
-            padding-top: 10px;
-            border-top: 1px dashed #f0ebe4;
-        }
-
-        .apt-division-chip {
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-            background: #f1e8df;
-            color: #755d48;
-            font-size: 10px;
-            font-weight: 700;
-            padding: 4px 8px;
-            border-radius: 8px;
-        }
-
-        .apt-division-chip em {
-            font-style: normal;
-            background: #fff;
-            color: #b51f2c;
-            padding: 1px 6px;
-            border-radius: 5px;
-            font-size: 9px;
-            font-weight: 800;
-        }
-
-        .apt-empty {
-            text-align: center;
-            padding: 30px 20px;
-            color: #948c82;
-            font-size: 11px;
-        }
-
-        .apt-empty i {
-            font-size: 30px;
-            color: #d5cbbd;
-            display: block;
-            margin-bottom: 8px;
         }
 
 
@@ -1286,14 +914,6 @@ try {
                 width: 100%;
                 justify-content: center;
             }
-
-            .apartments-head {
-                padding: 12px 14px;
-            }
-
-            .apartments-body {
-                padding: 0 14px 14px;
-            }
         }
     </style>
 
@@ -1334,9 +954,8 @@ try {
             <div class="product-header">
                 <div class="product-title">
                     <h1>Add Product</h1>
-                    <p>Add a new product, its quantity variants and which apartments can deliver it.</p>
+                    <p>Add a new product and its quantity variants.</p>
                 </div>
-
             </div>
 
 
@@ -1471,63 +1090,6 @@ try {
                     </div>
 
 
-                    <!-- APARTMENT MANAGEMENT (COLLAPSIBLE) -->
-
-                    <div class="apartments-section">
-
-                        <div class="apartments-box" id="apartmentsBox">
-
-                            <div class="apartments-head" id="apartmentsHead">
-
-                                <div class="apartments-head-title">
-                                    <i class="bi bi-buildings box-icon"></i>
-                                    <div>
-                                        <h4>
-                                            Apartment Management<span class="required">*</span>
-                                        </h4>
-                                        <span>Choose which apartments can deliver this product.</span>
-                                    </div>
-                                </div>
-
-                                <div class="apartments-head-actions">
-                                    <div class="apartments-selected-count" id="selectedCount">
-                                        0 selected
-                                    </div>
-
-                                    <div class="toggle-chevron" id="toggleChevron">
-                                        <i class="bi bi-chevron-down"></i>
-                                    </div>
-                                </div>
-
-                            </div>
-
-                            <div class="apartments-body" id="apartmentsBody">
-
-                                <div class="select-all-row">
-                                    <button type="button"
-                                        class="select-all-btn"
-                                        id="selectAllBtn">
-                                        <i class="bi bi-check2-square"></i>
-                                        <span id="selectAllText">Deselect All</span>
-                                    </button>
-                                </div>
-
-                                <div class="apt-search">
-                                    <i class="bi bi-search"></i>
-                                    <input type="text"
-                                        id="aptSearchInput"
-                                        placeholder="Search apartment by name or code...">
-                                </div>
-
-                                <div class="apt-list" id="aptList"></div>
-
-                            </div>
-
-                        </div>
-
-                    </div>
-
-
                     <div class="form-actions">
                         <a href="product.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
@@ -1586,7 +1148,6 @@ try {
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";
-        window.APARTMENTS = <?= json_encode($apartments, JSON_UNESCAPED_UNICODE); ?>;
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>

@@ -2,8 +2,6 @@
    MRS MILL@ — ADD PRODUCT UX
    File: ./js/add-product.js
    Features:
-   - Collapsible Apartment Management box
-   - All apartments preselected by default
    - Product image upload
    - MULTI QUANTITY VARIANTS with OPTIONAL CONTAINER PRICE
    - Add Variant button at top AND bottom
@@ -17,8 +15,6 @@
     const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
         ? window.ADMIN_URL
         : "./";
-
-    const APARTMENTS = Array.isArray(window.APARTMENTS) ? window.APARTMENTS : [];
 
     /* ---------------- DOM ---------------- */
 
@@ -46,15 +42,6 @@
     const statusTitle = document.getElementById("statusToggleTitle");
     const statusDesc = document.getElementById("statusToggleDesc");
 
-    /* apartments */
-    const aptBox = document.getElementById("apartmentsBox");
-    const aptHead = document.getElementById("apartmentsHead");
-    const aptList = document.getElementById("aptList");
-    const aptSearch = document.getElementById("aptSearchInput");
-    const countLabel = document.getElementById("selectedCount");
-    const selectAllBtn = document.getElementById("selectAllBtn");
-    const selectAllTxt = document.getElementById("selectAllText");
-
     /* popups */
     const errorOverlay = document.getElementById("errorOverlay");
     const errorText = document.getElementById("errorText");
@@ -68,40 +55,15 @@
 
     /* ---------------- STATE ---------------- */
 
-    const selected = new Set();
     let variantCounter = 0;
 
     /* ---------------- HELPERS ---------------- */
-
-    function escapeHtml(str) {
-        return String(str ?? "")
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-    }
 
     function setLoading(isLoading) {
         saveBtn.disabled = isLoading;
         saveText.innerHTML = isLoading
             ? '<span class="btn-spinner"></span> Saving...'
             : 'Save Product';
-    }
-
-    function updateCount() {
-        if (!countLabel) return;
-        countLabel.textContent = selected.size + " selected";
-
-        if (selectAllBtn && selectAllTxt) {
-            if (selected.size === APARTMENTS.length && APARTMENTS.length > 0) {
-                selectAllBtn.classList.add("all-active");
-                selectAllTxt.textContent = "Deselect All";
-            } else {
-                selectAllBtn.classList.remove("all-active");
-                selectAllTxt.textContent = "Select All";
-            }
-        }
     }
 
     /* ---------------- STATUS TOGGLE ---------------- */
@@ -473,119 +435,6 @@
         return variants;
     }
 
-    /* ---------------- COLLAPSIBLE BOX ---------------- */
-
-    if (aptHead && aptBox) {
-        aptHead.addEventListener("click", function (e) {
-            if (e.target.closest(".select-all-btn")) return;
-            if (e.target.closest(".apt-search")) return;
-            aptBox.classList.toggle("collapsed");
-        });
-    }
-
-    /* ---------------- APARTMENTS ---------------- */
-
-    function renderAptList(filter) {
-
-        filter = (filter || "").toLowerCase().trim();
-
-        const items = APARTMENTS.filter(function (a) {
-            if (!filter) return true;
-            return (
-                String(a.apartment_name).toLowerCase().includes(filter) ||
-                String(a.apartment_code).toLowerCase().includes(filter)
-            );
-        });
-
-        if (items.length === 0) {
-            aptList.innerHTML = `
-                <div class="apt-empty">
-                    <i class="bi bi-building"></i>
-                    No apartments found.
-                </div>
-            `;
-            return;
-        }
-
-        aptList.innerHTML = items.map(function (a) {
-
-            const isSelected = selected.has(Number(a.id));
-
-            const divisionsHtml = Array.isArray(a.divisions) && a.divisions.length
-                ? a.divisions.map(function (d) {
-                    return `
-                        <span class="apt-division-chip">
-                            ${escapeHtml(d.division)}
-                            <em>₹${Number(d.charge || 0).toFixed(0)}</em>
-                        </span>
-                    `;
-                }).join("")
-                : '<span class="apt-division-chip">No divisions</span>';
-
-            return `
-                <div class="apt-item ${isSelected ? "selected" : ""}" data-id="${Number(a.id)}">
-                    <div class="apt-tick"><i class="bi bi-check-lg"></i></div>
-                    <div class="apt-main">
-                        <div class="apt-name">
-                            ${escapeHtml(a.apartment_name)}
-                            <span class="apt-code">#${escapeHtml(a.apartment_code)}</span>
-                        </div>
-                        <div class="apt-divisions">${divisionsHtml}</div>
-                    </div>
-                </div>
-            `;
-        }).join("");
-    }
-
-    if (aptList) {
-        aptList.addEventListener("click", function (e) {
-            const item = e.target.closest(".apt-item");
-            if (!item) return;
-
-            const id = Number(item.dataset.id);
-            if (!id) return;
-
-            if (selected.has(id)) {
-                selected.delete(id);
-                item.classList.remove("selected");
-            } else {
-                selected.add(id);
-                item.classList.add("selected");
-            }
-
-            updateCount();
-        });
-    }
-
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener("click", function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-
-            if (selected.size === APARTMENTS.length && APARTMENTS.length > 0) {
-                selected.clear();
-            } else {
-                APARTMENTS.forEach(a => selected.add(Number(a.id)));
-            }
-
-            renderAptList(aptSearch ? aptSearch.value : "");
-            updateCount();
-        });
-    }
-
-    let searchTimer = null;
-    if (aptSearch) {
-        aptSearch.addEventListener("input", function () {
-            clearTimeout(searchTimer);
-            searchTimer = setTimeout(function () {
-                renderAptList(aptSearch.value);
-            }, 150);
-        });
-        aptSearch.addEventListener("click", function (e) {
-            e.stopPropagation();
-        });
-    }
-
     /* ---------------- SUBMIT ---------------- */
 
     form.addEventListener("submit", function (e) {
@@ -603,9 +452,6 @@
         const variants = validateVariants();
         if (!variants) return;
 
-        if (selected.size === 0)
-            return showError("Please select at least one apartment.", "No apartments selected");
-
         const status = (statusInput && statusInput.checked) ? "1" : "0";
 
         setLoading(true);
@@ -614,7 +460,6 @@
         formData.append("product_name", name);
         formData.append("category_id", categoryId);
         formData.append("product_status", status);
-        formData.append("apartment_ids", JSON.stringify(Array.from(selected)));
 
         formData.append("variants", JSON.stringify(variants.map(v => ({
             quantity: parseFloat(v.quantity).toFixed(2),
@@ -654,11 +499,6 @@
                     variantsList.innerHTML = "";
                     variantCounter = 0;
 
-                    selected.clear();
-                    APARTMENTS.forEach(a => selected.add(Number(a.id)));
-                    renderAptList(aptSearch ? aptSearch.value : "");
-                    updateCount();
-
                     if (statusInput) statusInput.checked = true;
                     applyStatusUI();
 
@@ -683,11 +523,6 @@
     }
 
     /* ---------------- INIT ---------------- */
-
-    APARTMENTS.forEach(a => selected.add(Number(a.id)));
-
-    renderAptList("");
-    updateCount();
 
     addVariantRow();
 

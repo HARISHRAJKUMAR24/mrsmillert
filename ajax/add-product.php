@@ -5,7 +5,6 @@
    - Auto-generates product_code
    - Uploads product image
    - Inserts MULTIPLE variants with OPTIONAL container price
-   - Links apartments by CODE
    - Saves product status
    ========================================================= */
 
@@ -21,10 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $name         = trim($_POST['product_name'] ?? '');
 $categoryId   = (int) ($_POST['category_id'] ?? 0);
 $statusRaw    = $_POST['product_status'] ?? '1';
-$aptIdsRaw    = $_POST['apartment_ids'] ?? '[]';
 $variantsRaw  = $_POST['variants'] ?? '[]';
 
-$apartmentIds = json_decode($aptIdsRaw, true);
 $variants     = json_decode($variantsRaw, true);
 
 $status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
@@ -33,17 +30,6 @@ $status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 
 
 if ($name === '')       jsonResponse(false, 'Product name is required.');
 if ($categoryId <= 0)   jsonResponse(false, 'Please choose a category.');
-
-if (!is_array($apartmentIds) || count($apartmentIds) === 0) {
-    jsonResponse(false, 'Please select at least one apartment.');
-}
-
-$apartmentIds = array_values(array_unique(array_map('intval', $apartmentIds)));
-$apartmentIds = array_values(array_filter($apartmentIds, fn ($v) => $v > 0));
-
-if (count($apartmentIds) === 0) {
-    jsonResponse(false, 'Please select at least one valid apartment.');
-}
 
 /* ---- Variants ---- */
 if (!is_array($variants) || count($variants) === 0) {
@@ -115,30 +101,6 @@ try {
     }
 } catch (PDOException $e) {
     jsonResponse(false, 'Server error. Please try again.');
-}
-
-/* ---------------- FETCH APARTMENT CODES ---------------- */
-
-$apartmentCodes = [];
-
-try {
-
-    $placeholders = implode(',', array_fill(0, count($apartmentIds), '?'));
-
-    $stmt = $pdo->prepare(
-        "SELECT apartment_code FROM apartments WHERE id IN ($placeholders)"
-    );
-
-    $stmt->execute($apartmentIds);
-
-    $apartmentCodes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (count($apartmentCodes) === 0) {
-        jsonResponse(false, 'No valid apartments found.');
-    }
-
-} catch (PDOException $e) {
-    jsonResponse(false, 'Failed to read apartments.');
 }
 
 /* ---------------- UPLOAD IMAGE ---------------- */
@@ -247,15 +209,6 @@ try {
         ]);
     }
 
-    /* 3) product_apartments */
-    $link = $pdo->prepare(
-        "INSERT INTO product_apartments (product_code, apartment_code) VALUES (?, ?)"
-    );
-
-    foreach ($apartmentCodes as $code) {
-        $link->execute([$productCode, $code]);
-    }
-
     $pdo->commit();
 
     jsonResponse(
@@ -266,8 +219,7 @@ try {
             'code'       => $productCode,
             'status'     => $status,
             'variants'   => $cleanVariants,
-            'image_url'  => ADMIN_URL . $relPath,
-            'apartments' => $apartmentCodes
+            'image_url'  => ADMIN_URL . $relPath
         ]
     );
 

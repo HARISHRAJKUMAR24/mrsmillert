@@ -25,13 +25,12 @@ try {
              LEFT JOIN categories c ON c.id = p.category_id
              WHERE p.product_name LIKE ?
                 OR p.product_code LIKE ?
-                OR p.quantity_name LIKE ?
                 OR c.category_name LIKE ?
              ORDER BY p.id DESC"
         );
 
         $like = '%' . $search . '%';
-        $stmt->execute([$like, $like, $like, $like]);
+        $stmt->execute([$like, $like, $like]);
 
     } else {
 
@@ -45,35 +44,14 @@ try {
 
     $rows = $stmt->fetchAll();
 
-    /* attach apartment codes for each product */
+    /* attach image URL for each product */
 
-    if (count($rows) > 0) {
-
-        $codes = array_column($rows, 'product_code');
-
-        $placeholders = implode(',', array_fill(0, count($codes), '?'));
-
-        $stmt2 = $pdo->prepare(
-            "SELECT product_code, apartment_code
-             FROM product_apartments
-             WHERE product_code IN ($placeholders)"
-        );
-
-        $stmt2->execute($codes);
-
-        $map = [];
-
-        while ($row = $stmt2->fetch()) {
-            $map[$row['product_code']][] = $row['apartment_code'];
-        }
-
-        foreach ($rows as &$r) {
-            $r['apartments'] = $map[$r['product_code']] ?? [];
-            $r['image_url']  = $r['product_image']
-                ? ADMIN_URL . $r['product_image']
-                : '';
-        }
+    foreach ($rows as &$r) {
+        $r['image_url'] = $r['product_image']
+            ? ADMIN_URL . $r['product_image']
+            : '';
     }
+    unset($r);
 
     jsonResponse(true, 'OK', $rows);
 

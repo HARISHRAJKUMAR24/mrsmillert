@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: GET ONE PRODUCT
    File: ./ajax/product-get.php
    Accepts: ?id=1
-   Returns: product + variants (with container) + apartment codes + status
+   Returns: product + variants (with container) + status
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -36,15 +36,6 @@ try {
     if (!$row) {
         jsonResponse(false, 'Product not found.');
     }
-
-    /* Apartment codes */
-    $stmt2 = $pdo->prepare(
-        "SELECT apartment_code
-         FROM product_apartments
-         WHERE product_code = ?"
-    );
-    $stmt2->execute([$row['product_code']]);
-    $row['apartments'] = $stmt2->fetchAll(PDO::FETCH_COLUMN);
 
     /* Variants (with container fields) */
     $stmt3 = $pdo->prepare(

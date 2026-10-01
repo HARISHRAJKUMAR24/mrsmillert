@@ -1,12 +1,11 @@
 <?php
 /* =========================================================
    MRS MILL@ — AJAX: UPDATE PRODUCT
-   File: ./ajax/product-update.php
+   File: ./ajax/update-product.php
 
    - Saves product_name, category_id, product_image, status
    - Rebuilds variants (delete + re-insert)
      with OPTIONAL container (container_enabled + container_price)
-   - Rebuilds apartment links
    ========================================================= */
 
 ini_set('display_errors', 0);
@@ -48,11 +47,9 @@ try {
     $categoryId  = (int) ($_POST['category_id'] ?? 0);
     $statusRaw   = $_POST['product_status'] ?? '1';
     $removeImage = (int) ($_POST['remove_image'] ?? 0);
-    $aptIdsRaw   = $_POST['apartment_ids'] ?? '[]';
     $variantsRaw = $_POST['variants'] ?? '[]';
 
-    $apartmentIds = json_decode($aptIdsRaw, true);
-    $variants     = json_decode($variantsRaw, true);
+    $variants = json_decode($variantsRaw, true);
 
     $status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
@@ -61,17 +58,6 @@ try {
     if ($id <= 0)         jsonResponse(false, 'Invalid product ID.');
     if ($name === '')     jsonResponse(false, 'Product name is required.');
     if ($categoryId <= 0) jsonResponse(false, 'Please choose a category.');
-
-    if (!is_array($apartmentIds) || count($apartmentIds) === 0) {
-        jsonResponse(false, 'Please select at least one apartment.');
-    }
-
-    $apartmentIds = array_values(array_unique(array_map('intval', $apartmentIds)));
-    $apartmentIds = array_values(array_filter($apartmentIds, fn ($v) => $v > 0));
-
-    if (count($apartmentIds) === 0) {
-        jsonResponse(false, 'Please select at least one valid apartment.');
-    }
 
     if (!is_array($variants) || count($variants) === 0) {
         jsonResponse(false, 'Please add at least one quantity variant.');
@@ -138,21 +124,6 @@ try {
     $chk->execute([$categoryId]);
     if (!$chk->fetch()) {
         jsonResponse(false, 'Category not found.');
-    }
-
-    /* ---------------- APARTMENT CODES ---------------- */
-
-    $placeholders = implode(',', array_fill(0, count($apartmentIds), '?'));
-
-    $stmt = $pdo->prepare(
-        "SELECT apartment_code FROM apartments WHERE id IN ($placeholders)"
-    );
-    $stmt->execute($apartmentIds);
-
-    $apartmentCodes = $stmt->fetchAll(PDO::FETCH_COLUMN);
-
-    if (count($apartmentCodes) === 0) {
-        jsonResponse(false, 'No valid apartments found.');
     }
 
     /* ---------------- IMAGE HANDLING ---------------- */
@@ -271,18 +242,6 @@ try {
             $v['container_enabled'],
             $v['container_price']
         ]);
-    }
-
-    /* 3) Rebuild apartment links */
-    $delA = $pdo->prepare("DELETE FROM product_apartments WHERE product_code = ?");
-    $delA->execute([$existing['product_code']]);
-
-    $insA = $pdo->prepare(
-        "INSERT INTO product_apartments (product_code, apartment_code) VALUES (?, ?)"
-    );
-
-    foreach ($apartmentCodes as $code) {
-        $insA->execute([$existing['product_code'], $code]);
     }
 
     $pdo->commit();

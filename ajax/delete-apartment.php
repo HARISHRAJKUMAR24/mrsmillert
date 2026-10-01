@@ -2,7 +2,6 @@
 /* =========================================================
    MRS MILL@ — AJAX: DELETE APARTMENT
    File: ./ajax/delete.php
-   Also removes any product_apartments links for this apartment.
    Returns JSON: { success, message }
    ========================================================= */
 
@@ -22,31 +21,14 @@ if ($id <= 0) {
 
 try {
 
-    /* 1) Fetch apartment_code so we can clean up links */
-    $stmt = $pdo->prepare("SELECT apartment_code FROM apartments WHERE id = ? LIMIT 1");
-    $stmt->execute([$id]);
-    $row = $stmt->fetch();
-
-    if (!$row) {
-        jsonResponse(false, 'Apartment not found.');
-    }
-
-    $apartmentCode = $row['apartment_code'];
-
     $pdo->beginTransaction();
 
-    /* 2) Remove product links for this apartment */
-    $delLinks = $pdo->prepare(
-        "DELETE FROM product_apartments WHERE apartment_code = ?"
-    );
-    $delLinks->execute([$apartmentCode]);
-
-    /* 3) Delete the apartment itself */
+    /* Delete the apartment */
     $delApt = $pdo->prepare("DELETE FROM apartments WHERE id = ?");
     $delApt->execute([$id]);
 
     if ($delApt->rowCount() < 1) {
-        throw new PDOException('Apartment not found on delete.');
+        throw new PDOException('Apartment not found.');
     }
 
     $pdo->commit();

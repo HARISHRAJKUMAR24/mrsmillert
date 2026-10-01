@@ -4,7 +4,6 @@
    File: ./ajax/product-delete.php
    Deletes:
      - product_variants (by product_code)
-     - product_apartments (by product_code)
      - products row
      - product image file + empty folder
    ========================================================= */
@@ -43,17 +42,13 @@ try {
     $delVar = $pdo->prepare("DELETE FROM product_variants WHERE product_code = ?");
     $delVar->execute([$productCode]);
 
-    /* 2) delete apartment links */
-    $delApt = $pdo->prepare("DELETE FROM product_apartments WHERE product_code = ?");
-    $delApt->execute([$productCode]);
-
-    /* 3) delete product row */
+    /* 2) delete product row */
     $delProd = $pdo->prepare("DELETE FROM products WHERE id = ?");
     $delProd->execute([$id]);
 
     $pdo->commit();
 
-    /* 4) delete image file + empty folder */
+    /* 3) delete image file + empty folder */
     if (!empty($row['product_image']) && function_exists('deleteCategoryImage')) {
         deleteCategoryImage($row['product_image'], dirname(__DIR__));
     }
