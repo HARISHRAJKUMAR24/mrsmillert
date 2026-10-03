@@ -761,10 +761,12 @@ require_once './config/function.php';
                     <h1>Products</h1>
                     <p>Manage products, images, categories and delivery apartments.</p>
                 </div>
-                <a href="add-product.php" class="add-product-btn">
-                    <i class="bi bi-plus-lg"></i>
-                    Add Product
-                </a>
+                <?php if (isAdmin()): ?>
+                    <a href="add-product.php" class="add-product-btn">
+                        <i class="bi bi-plus-lg"></i>
+                        Add Product
+                    </a>
+                <?php endif; ?>
             </div>
 
 
@@ -862,7 +864,9 @@ require_once './config/function.php';
 
     <!-- TOAST -->
     <div class="mm-toast-container" id="mmToastContainer"></div>
-
+    <script>
+        window.ADMIN_ROLE = "<?= htmlspecialchars($_SESSION['admin_role'] ?? '', ENT_QUOTES); ?>";
+    </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>

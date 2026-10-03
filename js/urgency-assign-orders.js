@@ -1,6 +1,11 @@
 /* =========================================================
-   MRS MILL@ — ASSIGN ORDERS (multi-apartment, searchable DDs)
-   File: ./js/assign-orders.js
+   MRS MILL@ — REASSIGN ORDERS (Boy → Boy)
+   File: ./js/urgency-assign-orders.js
+   - Admin + Staff both allowed
+   - "From Boy" required (only lists delivery boys, no "any")
+   - "To Boy" is the new assignee
+   - Multi-apartment, searchable dropdowns
+   - Loads apartments AND orders filtered by from-boy
    ========================================================= */
 
 (function () {
@@ -13,8 +18,7 @@
     const MENUS = Array.isArray(window.MENUS) ? window.MENUS : [];
     const BOYS  = Array.isArray(window.DELIVERY_BOYS) ? window.DELIVERY_BOYS : [];
 
-    /* ---------- DOM ---------- */
-    /* Menu dropdown */
+    /* ---------- DOM: Menu dropdown ---------- */
     const menuWrap    = document.getElementById("menuDdWrap");
     const menuToggle  = document.getElementById("menuDdToggle");
     const menuLabel   = document.getElementById("menuDdLabel");
@@ -22,15 +26,23 @@
     const menuList    = document.getElementById("menuDdList");
     const menuInput   = document.getElementById("asMenu");
 
-    /* Boy dropdown */
-    const boyWrap     = document.getElementById("boyDdWrap");
-    const boyToggle   = document.getElementById("boyDdToggle");
-    const boyLabel    = document.getElementById("boyDdLabel");
-    const boySearch   = document.getElementById("boyDdSearch");
-    const boyList     = document.getElementById("boyDdList");
-    const boyInput    = document.getElementById("asBoy");
+    /* ---------- DOM: From Boy dropdown ---------- */
+    const fromBoyWrap   = document.getElementById("fromBoyDdWrap");
+    const fromBoyToggle = document.getElementById("fromBoyDdToggle");
+    const fromBoyLabel  = document.getElementById("fromBoyDdLabel");
+    const fromBoySearch = document.getElementById("fromBoyDdSearch");
+    const fromBoyList   = document.getElementById("fromBoyDdList");
+    const fromBoyInput  = document.getElementById("asFromBoy");
 
-    /* Other */
+    /* ---------- DOM: To Boy dropdown ---------- */
+    const boyWrap    = document.getElementById("boyDdWrap");
+    const boyToggle  = document.getElementById("boyDdToggle");
+    const boyLabel   = document.getElementById("boyDdLabel");
+    const boySearch  = document.getElementById("boyDdSearch");
+    const boyList    = document.getElementById("boyDdList");
+    const boyInput   = document.getElementById("asBoy");
+
+    /* ---------- DOM: Other ---------- */
     const aptList      = document.getElementById("asAptList");
     const aptCountEl   = document.getElementById("asAptCount");
     const selectAllBtn = document.getElementById("asSelectAll");
@@ -90,20 +102,20 @@
 
     function resetPreview() {
         currentOrders = [];
-        previewHead.style.display = "none";
+        if (previewHead) previewHead.style.display = "none";
         assignBtn.disabled = true;
         previewWrap.innerHTML = `
             <div class="as-empty">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
-                <h3>Pick a menu and apartments</h3>
-                <p>Pending orders will show up here for review before reassigning.</p>
+                <h3>Pick a menu, a from-boy and apartments</h3>
+                <p>This boy's pending orders will show up here for review before moving them.</p>
             </div>`;
     }
 
     /* =====================================================
-       SEARCHABLE DROPDOWN — MENU
+       MENU DROPDOWN
        ===================================================== */
     function renderMenuList(query) {
         if (!menuList) return;
@@ -139,6 +151,7 @@
 
     function openMenuDd() {
         menuWrap.classList.add("open");
+        closeFromBoyDd();
         closeBoyDd();
         if (menuSearch) {
             menuSearch.value = "";
@@ -178,11 +191,104 @@
         menuToggle.classList.add("has-value");
 
         closeMenuDd();
-        loadApartmentsForMenu();
+        maybeLoadApartments();
     });
 
     /* =====================================================
-       SEARCHABLE DROPDOWN — DELIVERY BOY
+       FROM BOY DROPDOWN — only delivery boys
+       ===================================================== */
+    function renderFromBoyList(query) {
+        if (!fromBoyList) return;
+
+        if (BOYS.length === 0) {
+            fromBoyList.innerHTML = `<div class="sd-empty">No delivery boys available.</div>`;
+            return;
+        }
+
+        const q = (query || "").trim().toLowerCase();
+        const list = q
+            ? BOYS.filter(b =>
+                (b.full_name || "").toLowerCase().includes(q) ||
+                (b.delivery_code || "").toLowerCase().includes(q) ||
+                (b.mobile_number || "").toLowerCase().includes(q))
+            : BOYS;
+
+        if (list.length === 0) {
+            fromBoyList.innerHTML = `<div class="sd-empty">No matches.</div>`;
+            return;
+        }
+
+        const currentVal = String(fromBoyInput.value || "");
+
+        fromBoyList.innerHTML = list.map(b => {
+            const selected = String(b.id) === currentVal;
+            return `
+                <div class="sd-option ${selected ? 'selected' : ''}" data-id="${b.id}">
+                    <i class="bi bi-person-dash"></i>
+                    <div class="name">${esc(b.full_name)}</div>
+                    <div class="meta">#${esc(b.delivery_code || '')} · ${esc(b.mobile_number || '')}</div>
+                </div>
+            `;
+        }).join("");
+    }
+
+    function openFromBoyDd() {
+        fromBoyWrap.classList.add("open");
+        closeMenuDd();
+        closeBoyDd();
+        if (fromBoySearch) {
+            fromBoySearch.value = "";
+            setTimeout(() => fromBoySearch.focus(), 60);
+        }
+        renderFromBoyList("");
+    }
+
+    function closeFromBoyDd() {
+        if (fromBoyWrap) fromBoyWrap.classList.remove("open");
+    }
+
+    fromBoyToggle?.addEventListener("click", function (e) {
+        e.stopPropagation();
+        if (fromBoyWrap.classList.contains("open")) closeFromBoyDd();
+        else openFromBoyDd();
+    });
+
+    fromBoySearch?.addEventListener("input", function () {
+        renderFromBoyList(this.value);
+    });
+
+    fromBoyList?.addEventListener("click", function (e) {
+        const opt = e.target.closest(".sd-option");
+        if (!opt) return;
+
+        const id = Number(opt.dataset.id);
+        const boy = BOYS.find(b => Number(b.id) === id);
+        if (!boy) return;
+
+        fromBoyInput.value = String(id);
+        fromBoyLabel.textContent = boy.full_name + " (#" + (boy.delivery_code || "") + ")";
+        fromBoyLabel.classList.remove("placeholder");
+        fromBoyToggle.classList.add("has-value");
+
+        closeFromBoyDd();
+
+        /* Reset apartment + order state — filter changed */
+        selectedApts.clear();
+        apartmentsCache = [];
+        updateAptCount();
+        resetPreview();
+
+        aptList.innerHTML = `
+            <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
+                <h3 style="font-size:14px;">Loading apartments…</h3>
+                <p style="font-size:11.5px;">Please wait.</p>
+            </div>`;
+
+        maybeLoadApartments();
+    });
+
+    /* =====================================================
+       TO BOY DROPDOWN
        ===================================================== */
     function renderBoyList(query) {
         if (!boyList) return;
@@ -205,13 +311,20 @@
             return;
         }
 
+        const fromId = Number(fromBoyInput.value || 0);
+
         boyList.innerHTML = list.map(b => {
             const selected = Number(b.id) === Number(boyInput.value || 0);
+            const isSameAsFrom = fromId > 0 && Number(b.id) === fromId;
             return `
                 <div class="sd-option ${selected ? 'selected' : ''}" data-id="${b.id}">
                     <i class="bi bi-person-badge"></i>
                     <div class="name">${esc(b.full_name)}</div>
-                    <div class="meta">#${esc(b.delivery_code || '')} · ${esc(b.mobile_number || '')}</div>
+                    <div class="meta">
+                        ${isSameAsFrom
+                            ? '<span style="color:#b51f2c;">same as from</span>'
+                            : '#' + esc(b.delivery_code || '') + ' · ' + esc(b.mobile_number || '')}
+                    </div>
                 </div>
             `;
         }).join("");
@@ -220,6 +333,7 @@
     function openBoyDd() {
         boyWrap.classList.add("open");
         closeMenuDd();
+        closeFromBoyDd();
         if (boySearch) {
             boySearch.value = "";
             setTimeout(() => boySearch.focus(), 60);
@@ -260,19 +374,28 @@
 
     /* ---------- Close on outside click ---------- */
     document.addEventListener("click", function (e) {
-        if (!e.target.closest("#menuDdWrap")) closeMenuDd();
-        if (!e.target.closest("#boyDdWrap"))  closeBoyDd();
+        if (!e.target.closest("#menuDdWrap"))    closeMenuDd();
+        if (!e.target.closest("#fromBoyDdWrap")) closeFromBoyDd();
+        if (!e.target.closest("#boyDdWrap"))     closeBoyDd();
     });
 
-    /* ---------- Render initial option lists (in case opened before) ---------- */
+    /* ---------- Initial render ---------- */
     renderMenuList("");
+    renderFromBoyList("");
     renderBoyList("");
 
     /* =====================================================
-       LOAD APARTMENTS FOR MENU
+       LOAD APARTMENTS (needs MENU + FROM-BOY)
        ===================================================== */
+    function maybeLoadApartments() {
+        if (!selectedMenuId) return;
+        const fromBoyId = Number(fromBoyInput.value || 0);
+        if (fromBoyId <= 0) return;
+
+        loadApartmentsForMenu();
+    }
+
     function loadApartmentsForMenu() {
-        /* Reset apartment + preview */
         selectedApts.clear();
         apartmentsCache = [];
         updateAptCount();
@@ -280,13 +403,20 @@
 
         if (!selectedMenuId) return;
 
+        const fromBoyId = Number(fromBoyInput.value || 0);
+        if (fromBoyId <= 0) return;
+
         aptList.innerHTML = `
             <div style="text-align:center;padding:30px 20px;color:#948c82;font-size:12px;">
                 <span class="btn-spinner" style="border-color:#ece5da;border-top-color:#b51f2c;"></span>
                 Loading apartments…
             </div>`;
 
-        fetch(BASE_URL + "ajax/get-menu-apartments.php?menu_id=" + encodeURIComponent(selectedMenuId), {
+        const params = new URLSearchParams();
+        params.set("menu_id", selectedMenuId);
+        params.set("from_boy_id", fromBoyId);
+
+        fetch(BASE_URL + "ajax/get-menu-apartments.php?" + params.toString(), {
             credentials: "same-origin"
         })
             .then(r => r.json().catch(() => null))
@@ -295,7 +425,7 @@
                     aptList.innerHTML = `
                         <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
                             <h3 style="font-size:14px;color:#b51f2c;">Failed to load apartments</h3>
-                            <p style="font-size:11.5px;">Please try again.</p>
+                            <p style="font-size:11.5px;">${esc((res && res.message) || "Please try again.")}</p>
                         </div>`;
                     return;
                 }
@@ -320,7 +450,7 @@
             aptList.innerHTML = `
                 <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
                     <h3 style="font-size:14px;">No pending orders</h3>
-                    <p style="font-size:11.5px;">No apartments have pending orders in this menu.</p>
+                    <p style="font-size:11.5px;">This delivery boy has no pending orders in this menu.</p>
                 </div>`;
             return;
         }
@@ -389,6 +519,12 @@
             return;
         }
 
+        const fromBoyId = Number(fromBoyInput.value || 0);
+        if (fromBoyId <= 0) {
+            resetPreview();
+            return;
+        }
+
         previewHead.style.display = "flex";
         previewSub.textContent = `Loading ${selectedApts.size} apartment(s)…`;
         countBadge.textContent = "…";
@@ -402,6 +538,7 @@
         const params = new URLSearchParams();
         params.set("menu_id", selectedMenuId);
         params.set("apartment_codes", JSON.stringify([...selectedApts]));
+        params.set("from_boy_id", String(fromBoyId));
 
         fetch(BASE_URL + "ajax/get-orders-for-menu-apartment.php?" + params.toString(), {
             credentials: "same-origin"
@@ -433,13 +570,17 @@
     function renderPreview() {
         const count = currentOrders.length;
         countBadge.textContent = count + (count === 1 ? " order" : " orders");
-        previewSub.textContent = `${selectedApts.size} apartment${selectedApts.size === 1 ? "" : "s"} · ${count} pending order${count === 1 ? "" : "s"}`;
+
+        const fromBoy = BOYS.find(b => String(b.id) === String(fromBoyInput.value));
+        const fromName = fromBoy ? fromBoy.full_name : "this boy";
+
+        previewSub.textContent = `${selectedApts.size} apartment${selectedApts.size === 1 ? "" : "s"} · ${count} pending order${count === 1 ? "" : "s"} from ${fromName}`;
 
         if (count === 0) {
             previewWrap.innerHTML = `
                 <div class="as-empty">
                     <h3>No pending orders</h3>
-                    <p>All orders in the selected apartments are already delivered or cancelled.</p>
+                    <p>${esc(fromName)} has no pending orders in the selected apartments.</p>
                 </div>`;
             assignBtn.disabled = true;
             return;
@@ -459,7 +600,6 @@
                     </thead>
                     <tbody>
                         ${currentOrders.map(o => {
-                            const hasBoy = o.delivery_boy_id && o.delivery_boy_id > 0;
                             return `
                                 <tr>
                                     <td>
@@ -475,13 +615,9 @@
                                         <span class="as-mobile">Div ${esc(o.division || "—")}</span>
                                     </td>
                                     <td>
-                                        ${hasBoy
-                                            ? `<span class="as-boy has">
-                                                   <i class="bi bi-person-fill"></i> ${esc(o.boy_name || "Assigned")}
-                                               </span>`
-                                            : `<span class="as-boy none">
-                                                   <i class="bi bi-x-circle-fill"></i> Unassigned
-                                               </span>`}
+                                        <span class="as-boy has">
+                                            <i class="bi bi-person-fill"></i> ${esc(o.boy_name || "Assigned")}
+                                        </span>
                                     </td>
                                     <td><span class="as-amount">${money(o.total_amount)}</span></td>
                                 </tr>`;
@@ -493,16 +629,22 @@
         updateAssignButton();
     }
 
-    /* ---------- ENABLE ASSIGN ONLY WHEN BOY CHOSEN ---------- */
+    /* ---------- ENABLE ASSIGN ONLY WHEN BOTH BOYS CHOSEN ---------- */
     function updateAssignButton() {
-        const hasBoy   = (boyInput.value || "") !== "";
+        const fromId = Number(fromBoyInput.value || 0);
+        const toId   = Number(boyInput.value || 0);
         const hasOrder = currentOrders.length > 0;
 
-        if (hasBoy && hasOrder) {
+        if (fromId > 0 && toId > 0 && hasOrder) {
+            if (fromId === toId) {
+                assignBtn.disabled = true;
+                assignText.textContent = "From and To boy are same";
+                return;
+            }
             assignBtn.disabled = false;
-            const boy = BOYS.find(b => String(b.id) === String(boyInput.value));
+            const boy = BOYS.find(b => Number(b.id) === toId);
             const clean = boy ? boy.full_name : "boy";
-            assignText.textContent = `Assign ${currentOrders.length} order${currentOrders.length === 1 ? "" : "s"} to ${clean}`;
+            assignText.textContent = `Move ${currentOrders.length} order${currentOrders.length === 1 ? "" : "s"} to ${clean}`;
         } else {
             assignBtn.disabled = true;
             assignText.textContent = "Assign Orders";
@@ -519,9 +661,17 @@
         menuLabel.classList.add("placeholder");
         menuToggle.classList.remove("has-value");
 
-        /* Boy */
+        /* From Boy */
+        if (fromBoyInput) fromBoyInput.value = "";
+        if (fromBoyLabel) {
+            fromBoyLabel.textContent = "— Select current boy —";
+            fromBoyLabel.classList.add("placeholder");
+        }
+        if (fromBoyToggle) fromBoyToggle.classList.remove("has-value");
+
+        /* To Boy */
         boyInput.value = "";
-        boyLabel.textContent = "— Select delivery boy —";
+        boyLabel.textContent = "— Select new boy —";
         boyLabel.classList.add("placeholder");
         boyToggle.classList.remove("has-value");
 
@@ -531,20 +681,31 @@
         updateAptCount();
         aptList.innerHTML = `
             <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
-                <h3 style="font-size:14px;">Select a menu first</h3>
-                <p style="font-size:11.5px;">Apartments with pending orders will appear here.</p>
+                <h3 style="font-size:14px;">Select a menu and from-boy first</h3>
+                <p style="font-size:11.5px;">Apartments with this boy's pending orders will appear here.</p>
             </div>`;
 
         resetPreview();
         renderMenuList("");
+        renderFromBoyList("");
         renderBoyList("");
     });
 
-    /* ---------- ASSIGN ---------- */
+    /* ---------- ASSIGN / REASSIGN ---------- */
     assignBtn?.addEventListener("click", () => {
-        const boyId = Number(boyInput.value || 0);
-        if (boyId <= 0) {
-            showToast("Please select a delivery boy.", "error");
+        const fromId = Number(fromBoyInput.value || 0);
+        const toId   = Number(boyInput.value || 0);
+
+        if (fromId <= 0) {
+            showToast("Please select a current delivery boy.", "error");
+            return;
+        }
+        if (toId <= 0) {
+            showToast("Please select a new delivery boy.", "error");
+            return;
+        }
+        if (fromId === toId) {
+            showToast("From and To boy cannot be the same.", "error");
             return;
         }
         if (currentOrders.length === 0) {
@@ -556,7 +717,8 @@
         assignText.innerHTML = '<span class="btn-spinner"></span> Assigning…';
 
         const fd = new FormData();
-        fd.append("delivery_boy_id", boyId);
+        fd.append("delivery_boy_id", toId);
+        fd.append("from_boy_id", fromId);
         fd.append("menu_id", selectedMenuId);
         fd.append("apartment_codes", JSON.stringify([...selectedApts]));
         fd.append("order_ids", JSON.stringify(currentOrders.map(o => o.id)));
@@ -575,7 +737,7 @@
                     return;
                 }
 
-                showToast(res.message || "Orders assigned successfully.");
+                showToast(res.message || "Orders reassigned successfully.");
                 loadOrdersForSelectedApts();
             })
             .catch(() => {

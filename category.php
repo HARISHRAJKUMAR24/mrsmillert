@@ -703,11 +703,12 @@ require_once './config/function.php';
                     <h1>Categories</h1>
                     <p>Manage product categories and their images.</p>
                 </div>
-
-                <a href="add-category.php" class="add-category-btn">
-                    <i class="bi bi-plus-lg"></i>
-                    Add Category
-                </a>
+                <?php if (isAdmin()): ?>
+                    <a href="add-category.php" class="add-category-btn">
+                        <i class="bi bi-plus-lg"></i>
+                        Add Category
+                    </a>
+                <?php endif; ?>
             </div>
 
 
@@ -809,6 +810,9 @@ require_once './config/function.php';
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>
+    <script>
+        window.ADMIN_ROLE = "<?= htmlspecialchars($_SESSION['admin_role'] ?? '', ENT_QUOTES); ?>";
+    </script>
     <script src="<?= ADMIN_URL; ?>js/category-list.js"></script>
 
 </body>

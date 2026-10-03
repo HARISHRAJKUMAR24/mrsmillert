@@ -8,6 +8,9 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     exit;
 }
 
+/* ADMIN ONLY */
+requireAdmin();
+
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 

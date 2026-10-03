@@ -5,6 +5,9 @@ $sidebarLogo = getData('logo_image', 'settings', 'id = 1');
 $sidebarLogoUrl = $sidebarLogo
     ? ADMIN_URL . $sidebarLogo
     : '';
+
+/* Check if current user is admin */
+$isAdminUser = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin');
 ?>
 <aside class="sidebar" id="sidebar">
 
@@ -77,9 +80,16 @@ $sidebarLogoUrl = $sidebarLogo
             Customers
         </a>
 
-        <a href="reports.php">
-            <i class="bi bi-bar-chart"></i>
-            Reports
+        <?php if ($isAdminUser): ?>
+            <a href="reports.php">
+                <i class="bi bi-bar-chart"></i>
+                Reports
+            </a>
+        <?php endif; ?>
+
+        <a href="manual-order-taken.php">
+            <i class="bi bi-cart-plus"></i>
+            Manual Order Taken
         </a>
 
         <a href="urgency-assign-orders.php">
@@ -101,31 +111,39 @@ $sidebarLogoUrl = $sidebarLogo
             Delivery Boys
         </a>
 
-
         <a href="order-allocations.php">
             <i class="bi bi-person-check me-1"></i>
             Apartment Allocate
         </a>
 
-        <a href="discounts.php">
-            <i class="bi bi-percent"></i>
-            Discounts
-        </a>
+        <?php if ($isAdminUser): ?>
+            <a href="discounts.php">
+                <i class="bi bi-percent"></i>
+                Discounts
+            </a>
+        <?php endif; ?>
 
         <a href="#">
             <i class="bi bi-truck"></i>
             Delivery
         </a>
 
-        <a href="payment-settings.php">
-            <i class="bi bi-credit-card"></i>
-            Payments
-        </a>
+        <?php if ($isAdminUser): ?>
+            <a href="payment-settings.php">
+                <i class="bi bi-credit-card"></i>
+                Payments
+            </a>
 
-        <a href="settings.php">
-            <i class="bi bi-gear"></i>
-            Settings
-        </a>
+            <a href="staff.php">
+                <i class="bi bi-person-vcard"></i>
+                Staff
+            </a>
+
+            <a href="settings.php">
+                <i class="bi bi-gear"></i>
+                Settings
+            </a>
+        <?php endif; ?>
 
     </nav>
 

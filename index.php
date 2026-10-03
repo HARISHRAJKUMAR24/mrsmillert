@@ -50,7 +50,8 @@ try {
 
     $kpi['products']  = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE status = 1")->fetchColumn();
     $kpi['customers'] = (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE status = 1")->fetchColumn();
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 /* =========================================================
    MONTHLY REVENUE for the chosen year (12 months)
@@ -77,7 +78,8 @@ try {
             'revenue' => $byMonth[$m] ?? 0,
         ];
     }
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 $maxRevenue = 1;
 foreach ($monthlyRevenue as $m) {
@@ -107,7 +109,8 @@ try {
             $orderStatus['processing'] += (int)$r['cnt'];
         }
     }
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 $totalOrdersAll = array_sum($orderStatus);
 if ($totalOrdersAll < 1) $totalOrdersAll = 1;
@@ -132,7 +135,8 @@ try {
          LIMIT 4"
     );
     $recentOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 /* =========================================================
    TOP SELLING PRODUCTS
@@ -167,7 +171,8 @@ try {
 
     uasort($agg, fn($a, $b) => $b['qty'] <=> $a['qty']);
     $bestProducts = array_slice($agg, 0, 4, true);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 /* =========================================================
    STOCK PRODUCTS (with image)
@@ -184,16 +189,19 @@ try {
          LIMIT 4"
     );
     $stockProducts = $stmt->fetchAll(PDO::FETCH_ASSOC);
-} catch (PDOException $e) {}
+} catch (PDOException $e) {
+}
 
 /* =========================================================
    HELPERS
    ========================================================= */
-function rupees($n) {
+function rupees($n)
+{
     return '₹' . number_format((int)round($n));
 }
 
-function initials($name) {
+function initials($name)
+{
     $name = trim((string)$name);
     if ($name === '') return '?';
     $parts = preg_split('/\s+/', $name);
@@ -203,14 +211,16 @@ function initials($name) {
     return strtoupper(substr($name, 0, 2));
 }
 
-function greeting() {
+function greeting()
+{
     $h = (int)date('G');
     if ($h < 12) return 'Good Morning';
     if ($h < 17) return 'Good Afternoon';
     return 'Good Evening';
 }
 
-function firstProductSummary($json) {
+function firstProductSummary($json)
+{
     $items = json_decode($json ?? '[]', true);
     if (!is_array($items) || count($items) === 0) return '—';
     $p     = $items[0];
@@ -220,18 +230,25 @@ function firstProductSummary($json) {
     return $name . ' × ' . $qty . $extra;
 }
 
-function statusClass($status) {
+function statusClass($status)
+{
     switch (strtolower($status)) {
-        case 'delivered':  return 'status-completed';
+        case 'delivered':
+            return 'status-completed';
         case 'processing':
-        case 'confirmed':  return 'status-processing';
-        case 'pending':    return 'status-pending';
-        case 'cancelled':  return 'status-cancelled';
-        default:           return 'status-pending';
+        case 'confirmed':
+            return 'status-processing';
+        case 'pending':
+            return 'status-pending';
+        case 'cancelled':
+            return 'status-cancelled';
+        default:
+            return 'status-pending';
     }
 }
 
-function productImg($img) {
+function productImg($img)
+{
     if (empty($img)) return '';
     return ADMIN_URL . $img;
 }
@@ -249,6 +266,7 @@ function productImg($img) {
             overflow: hidden;
             padding: 0 !important;
         }
+
         .product-image img,
         .best-image img {
             width: 100%;
@@ -257,6 +275,7 @@ function productImg($img) {
             display: block;
             border-radius: inherit;
         }
+
         .product-image .no-img,
         .best-image .no-img {
             width: 100%;
@@ -305,9 +324,28 @@ function productImg($img) {
 
         <div class="content">
 
+            <?php
+            /* Session values set at login */
+            $displayName = $_SESSION['admin_name'] ?? 'User';
+
+            /* Role label */
+            $roleLabel = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin')
+                ? 'Admin'
+                : 'Staff';
+
+            /* Extract first name */
+            $firstName = explode(' ', trim($displayName))[0];
+            ?>
+
             <div class="page-heading">
-                <h1><?= greeting() ?>, Admin 👋</h1>
-                <p>Here's what's happening with your fresh products today.</p>
+                <h1><?= htmlspecialchars(greeting()) ?>, <?= htmlspecialchars($firstName) ?> 👋</h1>
+                <p>
+                    <?php if ($roleLabel === 'Admin'): ?>
+                        Here's what's happening with your fresh products today.
+                    <?php else: ?>
+                        Here's your work overview for today.
+                    <?php endif; ?>
+                </p>
             </div>
 
 
@@ -414,8 +452,8 @@ function productImg($img) {
 
                             <form method="GET" id="yearForm" style="margin:0;">
                                 <select name="year" class="form-select form-select-sm"
-                                        style="width:100px;font-size:10px;"
-                                        onchange="document.getElementById('yearForm').submit();">
+                                    style="width:100px;font-size:10px;"
+                                    onchange="document.getElementById('yearForm').submit();">
                                     <?php foreach ($yearOptions as $y): ?>
                                         <option value="<?= $y ?>" <?= $y === $chartYear ? 'selected' : '' ?>>
                                             <?= $y ?>
@@ -461,17 +499,17 @@ function productImg($img) {
                         <div class="status-layout">
 
                             <?php
-                                /* Donut conic-gradient */
-                                $d1 = $donutDelivered;
-                                $d2 = $d1 + $donutProcessing;
-                                $d3 = $d2 + $donutPending;
+                            /* Donut conic-gradient */
+                            $d1 = $donutDelivered;
+                            $d2 = $d1 + $donutProcessing;
+                            $d3 = $d2 + $donutPending;
 
-                                $donutStyle =
-                                    "background: conic-gradient(" .
-                                    "#2e7d32 0% {$d1}%, " .              /* Delivered */
-                                    "#1565c0 {$d1}% {$d2}%, " .          /* Processing */
-                                    "#b8893c {$d2}% {$d3}%, " .          /* Pending */
-                                    "#c8bfb4 {$d3}% 100%);";             /* Cancelled */
+                            $donutStyle =
+                                "background: conic-gradient(" .
+                                "#2e7d32 0% {$d1}%, " .              /* Delivered */
+                                "#1565c0 {$d1}% {$d2}%, " .          /* Processing */
+                                "#b8893c {$d2}% {$d3}%, " .          /* Pending */
+                                "#c8bfb4 {$d3}% 100%);";             /* Cancelled */
                             ?>
 
                             <div class="donut" style="<?= $donutStyle ?>">
@@ -542,7 +580,7 @@ function productImg($img) {
                                     <div class="product-image">
                                         <?php if ($img): ?>
                                             <img src="<?= htmlspecialchars($img) ?>" alt=""
-                                                 onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
+                                                onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
                                         <?php else: ?>
                                             <div class="no-img"><i class="bi bi-image"></i></div>
                                         <?php endif; ?>
@@ -579,7 +617,8 @@ function productImg($img) {
                                 No sales data yet.
                             </div>
                         <?php else: ?>
-                            <?php $rank = 1; foreach ($bestProducts as $name => $bp):
+                            <?php $rank = 1;
+                            foreach ($bestProducts as $name => $bp):
                                 $bImg = !empty($bp['image']) ? $bp['image'] : '';
                             ?>
                                 <div class="best-product">
@@ -589,7 +628,7 @@ function productImg($img) {
                                     <div class="best-image">
                                         <?php if ($bImg): ?>
                                             <img src="<?= htmlspecialchars($bImg) ?>" alt=""
-                                                 onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
+                                                onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
                                         <?php else: ?>
                                             <div class="no-img"><i class="bi bi-image"></i></div>
                                         <?php endif; ?>
@@ -603,7 +642,8 @@ function productImg($img) {
                                     <div class="best-sales"><?= rupees($bp['revenue']) ?></div>
 
                                 </div>
-                            <?php $rank++; endforeach; ?>
+                            <?php $rank++;
+                            endforeach; ?>
                         <?php endif; ?>
                     </div>
                 </div>

@@ -3,6 +3,7 @@
    File: ./js/product-list.js
    Client-side search + pagination + per-page + delete.
    Remembers last page via URL (?page=&perPage=&q=)
+   Role-aware: only admins see Edit / Delete actions.
    ========================================================= */
 
 (function () {
@@ -11,6 +12,11 @@
     const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
         ? window.ADMIN_URL
         : "./";
+
+    /* Role provided by PHP via window.ADMIN_ROLE */
+    const IS_ADMIN = (typeof window.ADMIN_ROLE === "string")
+        ? window.ADMIN_ROLE === "admin"
+        : false;
 
     const tbody  = document.getElementById("productTbody");
     const search = document.getElementById("productSearch");
@@ -41,8 +47,6 @@
 
     /* =========================================
        URL STATE HELPERS
-       Keeps ?page=2&perPage=25&q=rice in the URL
-       so that Edit → Back returns to the same view.
     ========================================= */
 
     function readUrlState() {
@@ -116,10 +120,11 @@
     }
 
     /* =========================================
-       MODAL
+       MODAL (only wired for admins)
     ========================================= */
 
     function openModal(id, name) {
+        if (!IS_ADMIN) return;
         if (!modalOverlay) return;
         pendingDeleteId = id;
         if (modalText) {
@@ -153,7 +158,7 @@
         });
     }
 
-    if (modalConfirm) {
+    if (modalConfirm && IS_ADMIN) {
         modalConfirm.addEventListener("click", () => {
             const id = pendingDeleteId;
             if (!id) return;
@@ -231,7 +236,7 @@
     }
 
     /* =========================================
-       RENDER ROW
+       RENDER ROW  —  role-aware actions
     ========================================= */
 
     function renderRow(p) {
@@ -245,6 +250,26 @@
         const editHref =
             BASE_URL + "edit-product.php?id=" + encodeURIComponent(p.id) +
             "&back=" + encodeURIComponent(window.location.pathname + window.location.search);
+
+        /* Only admins get edit + delete buttons */
+        const editBtn = IS_ADMIN
+            ? `<a class="table-action" title="Edit" href="${editHref}">
+                   <i class="bi bi-pencil"></i>
+               </a>`
+            : "";
+
+        const deleteBtn = IS_ADMIN
+            ? `<button class="table-action delete"
+                       title="Delete"
+                       data-id="${p.id}"
+                       data-name="${escapeHtml(p.product_name)}">
+                   <i class="bi bi-trash"></i>
+               </button>`
+            : "";
+
+        const actionsHtml = (editBtn || deleteBtn)
+            ? `<div class="action-buttons">${editBtn}${deleteBtn}</div>`
+            : `<span style="color:#b5aca2;font-size:10px;">—</span>`;
 
         return `
             <tr data-id="${p.id}">
@@ -268,20 +293,7 @@
                         ${active ? "Active" : "Inactive"}
                     </span>
                 </td>
-                <td>
-                    <div class="action-buttons">
-                        <a class="table-action" title="Edit"
-                           href="${editHref}">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <button class="table-action delete"
-                                title="Delete"
-                                data-id="${p.id}"
-                                data-name="${escapeHtml(p.product_name)}">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </td>
+                <td>${actionsHtml}</td>
             </tr>
         `;
     }
@@ -328,8 +340,6 @@
         renderPaginationControls(totalPages);
         if (paginationWrap) paginationWrap.style.display = "flex";
 
-        /* Keep URL in sync — replaceState so pagination clicks
-           don't spam browser history */
         writeUrlState(true);
     }
 
@@ -490,14 +500,12 @@
 
                 allRows = Array.isArray(data.data) ? data.data : [];
 
-                /* Restore URL state once, after data is loaded */
                 if (isFirstLoad) {
                     const urlState = readUrlState();
                     pageSize = urlState.perPage;
                     if (perPageSelect) perPageSelect.value = String(pageSize);
                     if (search && urlState.q) search.value = urlState.q;
 
-                    /* Build filtered set first so page clamp is correct */
                     const q = (search ? search.value : "").trim().toLowerCase();
                     if (!q) {
                         filteredRows = allRows.slice();
@@ -549,10 +557,10 @@
     }
 
     /* =========================================
-       DELETE TRIGGER
+       DELETE TRIGGER (admins only)
     ========================================= */
 
-    if (tbody) {
+    if (tbody && IS_ADMIN) {
         tbody.addEventListener("click", e => {
             const btn = e.target.closest(".table-action.delete");
             if (!btn) return;
@@ -567,7 +575,6 @@
 
     /* =========================================
        BROWSER BACK / FORWARD
-       If user clicks Back, restore the page.
     ========================================= */
 
     window.addEventListener("popstate", function () {

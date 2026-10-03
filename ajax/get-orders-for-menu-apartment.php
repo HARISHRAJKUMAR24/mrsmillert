@@ -11,7 +11,11 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
 $menuId = (int)($_GET['menu_id'] ?? 0);
 if ($menuId <= 0) jsonResponse(false, 'Invalid menu.');
 
-/* Accept either a single apartment_code OR a JSON array (apartment_codes) */
+/* From boy is now REQUIRED */
+$fromBoyId = (int)($_GET['from_boy_id'] ?? 0);
+if ($fromBoyId <= 0) jsonResponse(false, 'Please select a current delivery boy.');
+
+/* Apartment codes (single or JSON array) */
 $apartmentCode  = trim($_GET['apartment_code'] ?? '');
 $apartmentCodes = [];
 
@@ -44,23 +48,26 @@ try {
     $menu = $mStmt->fetch(PDO::FETCH_ASSOC);
     if (!$menu) jsonResponse(false, 'Menu not found.');
 
-    /* IN clause for multiple apartments */
     $placeholders = implode(',', array_fill(0, count($apartmentCodes), '?'));
 
     $sql = "SELECT o.id, o.order_code, o.customer_name, o.customer_mobile,
                    o.apartment_code, o.apartment_name, o.division,
                    o.delivery_boy_id, o.total_amount, o.status,
                    o.delivery_status, o.payment_status, o.created_at,
-                   b.full_name AS boy_name
+                   b.full_name AS boy_name, b.delivery_code AS boy_code
             FROM orders o
             LEFT JOIN delivery_boys b ON b.id = o.delivery_boy_id
             WHERE o.apartment_code IN ($placeholders)
+              AND o.delivery_boy_id = ?
               AND o.status <> 'cancelled'
-              AND o.delivery_status = 'disabled'
+              AND o.status <> 'delivered'
               AND o.created_at BETWEEN ? AND ?
             ORDER BY o.apartment_name ASC, o.id DESC";
 
-    $params = array_merge($apartmentCodes, [$menu['start_at'], $menu['end_at']]);
+    $params = array_merge(
+        $apartmentCodes,
+        [$fromBoyId, $menu['start_at'], $menu['end_at']]
+    );
 
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
@@ -77,6 +84,7 @@ try {
             'division'        => $r['division'],
             'delivery_boy_id' => (int)$r['delivery_boy_id'],
             'boy_name'        => $r['boy_name'] ?: '',
+            'boy_code'        => $r['boy_code'] ?: '',
             'total_amount'    => (float)$r['total_amount'],
             'status'          => $r['status'],
             'delivery_status' => $r['delivery_status'],

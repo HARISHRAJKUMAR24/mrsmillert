@@ -2,6 +2,10 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
+/* ADMIN ONLY */
+requireAdmin();
+
+
 $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
 
 if ($id <= 0) {

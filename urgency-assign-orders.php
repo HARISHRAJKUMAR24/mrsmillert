@@ -2,7 +2,7 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
-/* ---------------- AUTH ---------------- */
+/* ---------------- AUTH (admin + staff allowed) ---------------- */
 if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     header('Location: login.php');
     exit;
@@ -84,7 +84,7 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
 
         .as-row {
             display: grid;
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: 1fr 1fr 1fr;
             gap: 16px;
             margin-bottom: 16px;
         }
@@ -303,18 +303,6 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             color: #948c82;
             font-weight: 600;
             white-space: nowrap;
-        }
-
-        .sd-option .right-info {
-            display: flex;
-            flex-direction: column;
-            align-items: flex-end;
-            flex-shrink: 0;
-        }
-
-        .sd-option .right-info .name {
-            font-size: 12.5px;
-            font-weight: 700;
         }
 
         .sd-empty {
@@ -782,13 +770,15 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             background: #b51f2c;
         }
 
+        @media (max-width: 992px) {
+            .as-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
         @media (max-width: 768px) {
             .as-page {
                 padding: 20px 15px 40px;
-            }
-
-            .as-row {
-                grid-template-columns: 1fr;
             }
 
             .as-card {
@@ -846,8 +836,8 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
         <div class="as-page">
 
             <div class="as-header">
-                <h1>Reassign Orders</h1>
-                <p>Pick a menu, select one or more apartments, then assign their pending orders to a delivery boy.</p>
+                <h1>Reassign Orders — Boy to Boy</h1>
+                <p>Pick a menu and the current delivery boy, select apartments, then move his orders to another boy.</p>
             </div>
 
 
@@ -881,14 +871,37 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                     </div>
 
 
-                    <!-- ============== DELIVERY BOY — SEARCHABLE ============== -->
+                    <!-- ============== FROM BOY — SEARCHABLE ============== -->
                     <div class="as-field">
-                        <label>Assign to <span class="req">*</span></label>
+                        <label>From Delivery Boy <span class="req">*</span></label>
+
+                        <div class="sd-wrap" id="fromBoyDdWrap">
+                            <button type="button" class="sd-toggle" id="fromBoyDdToggle">
+                                <i class="bi bi-person-dash lead"></i>
+                                <span class="placeholder" id="fromBoyDdLabel">— Select current boy —</span>
+                                <i class="bi bi-chevron-down caret"></i>
+                            </button>
+
+                            <div class="sd-menu">
+                                <div class="sd-search">
+                                    <i class="bi bi-search"></i>
+                                    <input type="text" id="fromBoyDdSearch" placeholder="Search current boy..." autocomplete="off">
+                                </div>
+                                <div class="sd-list" id="fromBoyDdList"></div>
+                            </div>
+                        </div>
+                        <input type="hidden" id="asFromBoy" value="">
+                    </div>
+
+
+                    <!-- ============== TO BOY — SEARCHABLE ============== -->
+                    <div class="as-field">
+                        <label>Assign To <span class="req">*</span></label>
 
                         <div class="sd-wrap" id="boyDdWrap">
                             <button type="button" class="sd-toggle" id="boyDdToggle">
                                 <i class="bi bi-person-badge lead"></i>
-                                <span class="placeholder" id="boyDdLabel">— Select delivery boy —</span>
+                                <span class="placeholder" id="boyDdLabel">— Select new boy —</span>
                                 <i class="bi bi-chevron-down caret"></i>
                             </button>
 
@@ -947,8 +960,8 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
 
                 <div class="as-apt-list" id="asAptList">
                     <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
-                        <h3 style="font-size:14px;">Select a menu first</h3>
-                        <p style="font-size:11.5px;">Apartments with pending orders will appear here.</p>
+                        <h3 style="font-size:14px;">Select a menu and from-boy first</h3>
+                        <p style="font-size:11.5px;">Apartments with this boy's pending orders will appear here.</p>
                     </div>
                 </div>
 
@@ -969,8 +982,8 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M4 6h16M4 12h16M4 18h16" />
                     </svg>
-                    <h3>Pick a menu and apartments</h3>
-                    <p>Pending orders will show up here for review before reassigning.</p>
+                    <h3>Pick a menu, a from-boy and apartments</h3>
+                    <p>This boy's pending orders will show up here for review before moving them.</p>
                 </div>
             </div>
 

@@ -2,6 +2,7 @@
    MRS MILL@ — CATEGORY LIST UX
    File: ./js/category-list.js
    Client-side search + pagination + per-page + delete.
+   Role-aware: only admins see Edit / Delete actions.
    ========================================================= */
 
 (function () {
@@ -11,6 +12,11 @@
         (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
             ? window.ADMIN_URL
             : "./";
+
+    /* Role provided by PHP via window.ADMIN_ROLE */
+    const IS_ADMIN = (typeof window.ADMIN_ROLE === "string")
+        ? window.ADMIN_ROLE === "admin"
+        : false;
 
     const tbody  = document.getElementById("categoryTbody");
     const search = document.getElementById("categorySearch");
@@ -33,8 +39,8 @@
     const DEFAULT_PAGE_SIZE = 10;
 
     let pageSize        = DEFAULT_PAGE_SIZE;
-    let allRows         = [];        // full list from server
-    let filteredRows    = [];        // after search
+    let allRows         = [];
+    let filteredRows    = [];
     let currentPage     = 1;
     let pendingDeleteId = null;
 
@@ -82,10 +88,11 @@
     }
 
     /* =========================================
-       MODAL
+       MODAL (admin-only delete flow)
     ========================================= */
 
     function openModal(id, name) {
+        if (!IS_ADMIN) return;
         if (!modalOverlay) return;
         pendingDeleteId = id;
         if (modalText) {
@@ -119,7 +126,7 @@
         });
     }
 
-    if (modalConfirm) {
+    if (modalConfirm && IS_ADMIN) {
         modalConfirm.addEventListener("click", function () {
 
             const id = pendingDeleteId;
@@ -145,7 +152,6 @@
                     closeModal();
                     showToast("success", data.message || "Category deleted.");
 
-                    /* Remove locally, keep current page if possible */
                     allRows = allRows.filter(r => String(r.id) !== String(id));
 
                     const q = (search ? search.value : "").trim().toLowerCase();
@@ -178,7 +184,7 @@
     }
 
     /* =========================================
-       RENDER ROW
+       RENDER ROW  —  role-aware actions
     ========================================= */
 
     function renderRow(c) {
@@ -188,6 +194,27 @@
         const img = c.image_url
             ? `<img src="${escapeHtml(c.image_url)}" alt="" class="cat-thumb" onerror="this.style.display='none'">`
             : `<div class="cat-thumb" style="display:flex;align-items:center;justify-content:center;color:#ccc;"><i class="bi bi-image"></i></div>`;
+
+        /* Only admins get edit + delete buttons */
+        const editBtn = IS_ADMIN
+            ? `<a class="table-action" title="Edit"
+                   href="${BASE_URL}edit-category.php?id=${c.id}">
+                   <i class="bi bi-pencil"></i>
+               </a>`
+            : "";
+
+        const deleteBtn = IS_ADMIN
+            ? `<button class="table-action delete"
+                       title="Delete"
+                       data-id="${c.id}"
+                       data-name="${escapeHtml(c.category_name)}">
+                   <i class="bi bi-trash"></i>
+               </button>`
+            : "";
+
+        const actionsHtml = (editBtn || deleteBtn)
+            ? `<div class="action-buttons">${editBtn}${deleteBtn}</div>`
+            : `<span style="color:#b5aca2;font-size:10px;">—</span>`;
 
         return `
             <tr data-id="${c.id}">
@@ -201,20 +228,7 @@
                         ${active ? "Active" : "Inactive"}
                     </span>
                 </td>
-                <td>
-                    <div class="action-buttons">
-                        <a class="table-action" title="Edit"
-                           href="${BASE_URL}edit-category.php?id=${c.id}">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <button class="table-action delete"
-                                title="Delete"
-                                data-id="${c.id}"
-                                data-name="${escapeHtml(c.category_name)}">
-                            <i class="bi bi-trash"></i>
-                        </button>
-                    </div>
-                </td>
+                <td>${actionsHtml}</td>
             </tr>
         `;
     }
@@ -446,10 +460,10 @@
     }
 
     /* =========================================
-       DELETE TRIGGER
+       DELETE TRIGGER (admins only)
     ========================================= */
 
-    if (tbody) {
+    if (tbody && IS_ADMIN) {
         tbody.addEventListener("click", function (e) {
             const btn = e.target.closest(".table-action.delete");
             if (!btn) return;

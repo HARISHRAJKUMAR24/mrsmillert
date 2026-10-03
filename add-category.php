@@ -1,6 +1,10 @@
 <?php
 require_once './config/config.php';
 require_once './config/function.php';
+
+/* ADMIN ONLY */
+requireAdmin();
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
