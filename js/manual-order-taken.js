@@ -1,6 +1,7 @@
 /* =========================================================
    MRS MILL@ — MANUAL ORDER (admin panel)
    File: ./js/manual-order-taken.js
+   All amounts rounded to whole rupees (no decimals).
    ========================================================= */
 
 (function () {
@@ -20,14 +21,12 @@
     const pickupBlock = document.getElementById("moPickupBlock");
     const branchSelect = document.getElementById("moBranch");
 
-    /* Payment method */
     const payModeRadios = document.querySelectorAll('input[name="moPayMode"]');
     const walletPanel = document.getElementById("moWalletPanel");
     const walletBalance = document.getElementById("moWalletBalance");
     const walletCust = document.getElementById("moWalletCust");
     const walletStatus = document.getElementById("moWalletStatus");
 
-    /* Apartment */
     const aptDdWrap = document.getElementById("moAptDdWrap");
     const aptDdToggle = document.getElementById("moAptDdToggle");
     const aptDdLabel = document.getElementById("moAptDdLabel");
@@ -36,7 +35,6 @@
     const aptIdInput = document.getElementById("moApartmentId");
     const aptCodeInput = document.getElementById("moApartmentCode");
 
-    /* Division */
     const divDdWrap = document.getElementById("moDivDdWrap");
     const divDdToggle = document.getElementById("moDivDdToggle");
     const divDdLabel = document.getElementById("moDivDdLabel");
@@ -59,7 +57,10 @@
     const placeBtn = document.getElementById("moPlaceBtn");
     const resetBtn = document.getElementById("moResetBtn");
 
-    /* Variant modal */
+    const taxRow = document.getElementById("moTaxRow");
+    const taxEl = document.getElementById("moTax");
+    const taxLabelEl = document.getElementById("moTaxLabel");
+
     const varOverlay = document.getElementById("moVarOverlay");
     const varThumb = document.getElementById("moVarThumb");
     const varName = document.getElementById("moVarName");
@@ -68,7 +69,6 @@
     const varCancel = document.getElementById("moVarCancel");
     const varAdd = document.getElementById("moVarAdd");
 
-    /* Popup */
     const popupOverlay = document.getElementById("moPopupOverlay");
     const popupIcon = document.getElementById("moPopupIcon");
     const popupTitle = document.getElementById("moPopupTitle");
@@ -76,7 +76,6 @@
     const popupCode = document.getElementById("moPopupCode");
     const popupClose = document.getElementById("moPopupClose");
 
-    /* QR popup */
     const qrOverlay = document.getElementById("moQrOverlay");
     const qrCodeLabel = document.getElementById("moQrCode");
     const qrAmount = document.getElementById("moQrAmount");
@@ -98,22 +97,30 @@
     let currentWallet = 0;
     let walletCustomer = null;
 
-    /* Remember customer's address so we can restore after pickup→delivery */
     let savedCustomerAddress = null;
 
-    /* QR state */
     let pendingQrOrderId = 0;
     let pendingQrOrderCode = "";
     let qrInstance = null;
 
-    /* Mobile lookup state */
     let lookupTimer = null;
     let lookupAbort = null;
     let lookupReqId = 0;
     let lastMobile = "";
 
+    /* ---------- TAX SETTINGS ---------- */
+    const TAX = (window.TAX_SETTINGS && typeof window.TAX_SETTINGS === "object")
+        ? {
+            status: Number(window.TAX_SETTINGS.status) || 0,
+            rate: Number(window.TAX_SETTINGS.rate) || 0,
+            type: (window.TAX_SETTINGS.type === "inclusive") ? "inclusive" : "exclusive"
+        }
+        : { status: 0, rate: 0, type: "exclusive" };
+
     /* ---------- Helpers ---------- */
-    function money(n) { return "₹" + Math.round(Number(n) || 0); }
+    function money(n) {
+        return "₹" + Math.round(Number(n) || 0);
+    }
 
     function esc(s) {
         return String(s == null ? "" : s)
@@ -122,14 +129,29 @@
     }
 
     /* =====================================================
-       RESET CUSTOMER-RELATED FIELDS
-       Used whenever mobile changes or lookup fails.
+       TAX — rounds to nearest whole rupee
+    ===================================================== */
+    function calcTax(subtotal) {
+        if (!TAX || Number(TAX.status) !== 1 || Number(TAX.rate) <= 0) {
+            return { amount: 0, rate: 0, type: "exclusive", active: false };
+        }
+        const rate = Number(TAX.rate);
+        const type = (TAX.type === "inclusive") ? "inclusive" : "exclusive";
+        let amount = 0;
+        if (type === "inclusive") {
+            amount = subtotal - (subtotal / (1 + (rate / 100)));
+        } else {
+            amount = subtotal * (rate / 100);
+        }
+        return { amount: Math.round(amount), rate: rate, type: type, active: true };
+    }
+
+    /* =====================================================
+       RESET CUSTOMER DATA
     ===================================================== */
     function clearCustomerData() {
-        /* Name is cleared so a new lookup can overwrite it */
         nameInput.value = "";
 
-        /* Wallet */
         currentWallet = 0;
         walletCustomer = null;
 
@@ -139,10 +161,8 @@
             updateWalletStatus();
         }
 
-        /* Saved address */
         savedCustomerAddress = null;
 
-        /* Apartment */
         aptIdInput.value = "";
         aptCodeInput.value = "";
         if (aptDdLabel) {
@@ -151,7 +171,6 @@
             aptDdToggle.classList.remove("has-value");
         }
 
-        /* Division */
         divInput.value = "";
         divChargeInput.value = 0;
         divisionsCache = [];
@@ -162,7 +181,6 @@
         divDdList.innerHTML = "";
         divHint.textContent = "";
 
-        /* Hint */
         mobileHint.textContent = "Type a mobile to auto-fill the customer.";
         mobileHint.classList.remove("success");
 
@@ -177,9 +195,8 @@
         if (m === lastMobile) return;
         lastMobile = m;
 
-        /* Cancel any in-flight request */
         if (lookupAbort) {
-            try { lookupAbort.abort(); } catch (e) {}
+            try { lookupAbort.abort(); } catch (e) { }
             lookupAbort = null;
         }
 
@@ -193,11 +210,9 @@
         })
             .then(r => r.json().catch(() => null))
             .then(res => {
-                /* ---------- HARD GUARDS ---------- */
                 if (reqId !== lookupReqId) return;
                 if (mobileInput.value.trim() !== m) return;
 
-                /* ---------- NOT FOUND ---------- */
                 if (!res || !res.success || !res.data || !res.data.found) {
                     nameInput.value = "";
                     mobileHint.textContent = "New customer — enter name manually.";
@@ -213,7 +228,6 @@
                         updateWalletStatus();
                     }
 
-                    /* Clear apartment/division too */
                     aptIdInput.value = "";
                     aptCodeInput.value = "";
                     if (aptDdLabel) {
@@ -236,8 +250,6 @@
                     return;
                 }
 
-                /* ---------- FOUND ---------- */
-                /* Always overwrite name — no "only if empty" guard */
                 if (res.data.name) {
                     nameInput.value = res.data.name;
                 }
@@ -300,7 +312,6 @@
 
     /* =====================================================
        MOBILE INPUT LISTENERS
-       Every change resets everything tied to old customer.
     ===================================================== */
     mobileInput?.addEventListener("input", function () {
         this.value = this.value.replace(/[^0-9]/g, "").slice(0, 15);
@@ -308,13 +319,12 @@
         clearTimeout(lookupTimer);
 
         if (lookupAbort) {
-            try { lookupAbort.abort(); } catch (e) {}
+            try { lookupAbort.abort(); } catch (e) { }
             lookupAbort = null;
         }
         lookupReqId++;
         lastMobile = "";
 
-        /* Wipe old customer data immediately */
         clearCustomerData();
 
         const m = this.value.trim();
@@ -331,7 +341,7 @@
             clearTimeout(lookupTimer);
 
             if (lookupAbort) {
-                try { lookupAbort.abort(); } catch (e) {}
+                try { lookupAbort.abort(); } catch (e) { }
                 lookupAbort = null;
             }
             lookupReqId++;
@@ -356,7 +366,7 @@
 
     /* =====================================================
        MODE TOGGLE
-       ===================================================== */
+    ===================================================== */
     function setMode(mode) {
         currentMode = mode;
 
@@ -436,7 +446,7 @@
 
     /* =====================================================
        PAYMENT MODE
-       ===================================================== */
+    ===================================================== */
     function setPayMode(mode) {
         currentPayMode = mode;
 
@@ -461,7 +471,7 @@
 
     /* =====================================================
        WALLET STATUS
-       ===================================================== */
+    ===================================================== */
     function updateWalletStatus() {
         if (!walletStatus) return;
 
@@ -478,7 +488,10 @@
 
         const subtotal = cart.reduce((s, c) => s + (c.price * c.qty), 0);
         const charge = currentMode === "delivery" ? Number(divChargeInput.value || 0) : 0;
-        const total = subtotal + charge;
+        const tax = calcTax(subtotal);
+        const total = (tax.type === "inclusive" && tax.active)
+            ? subtotal + charge
+            : subtotal + charge + tax.amount;
 
         if (currentWallet <= 0) {
             walletStatus.className = "mo-wallet-status error";
@@ -499,8 +512,8 @@
     }
 
     /* =====================================================
-       APARTMENTS — LOAD
-       ===================================================== */
+       APARTMENTS
+    ===================================================== */
     function loadApartments() {
         fetch(BASE_URL + "ajax/manual-get-apartments.php", { credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
@@ -520,9 +533,6 @@
     }
     loadApartments();
 
-    /* =====================================================
-       APARTMENTS — SEARCHABLE DROPDOWN
-       ===================================================== */
     function renderAptOptions(query) {
         if (!aptDdList) return;
 
@@ -600,8 +610,8 @@
     });
 
     /* =====================================================
-       DIVISIONS — SEARCHABLE DROPDOWN
-       ===================================================== */
+       DIVISIONS
+    ===================================================== */
     function populateDivisions(apt, preselect) {
         if (!apt || !Array.isArray(apt.divisions) || !apt.divisions.length) {
             divisionsCache = [];
@@ -727,7 +737,7 @@
 
     /* =====================================================
        PRODUCTS
-       ===================================================== */
+    ===================================================== */
     function loadProducts(tab) {
         productGrid.innerHTML = `<div class="mo-prod-empty"><i class="bi bi-hourglass-split"></i>Loading products...</div>`;
 
@@ -803,7 +813,7 @@
 
     /* =====================================================
        VARIANT PICKER
-       ===================================================== */
+    ===================================================== */
     function openVariantPicker(product) {
         currentProduct = product;
         selectedVariant = null;
@@ -913,7 +923,6 @@
                 price: Number(selectedVariant.price),
                 qty: 1,
 
-                /* Container info captured from variant */
                 container_enabled: Number(selectedVariant.container_enabled || 0),
                 container_price: Number(selectedVariant.container_price || 0),
             });
@@ -927,7 +936,7 @@
 
     /* =====================================================
        CART
-       ===================================================== */
+    ===================================================== */
     function renderCart() {
         const count = cart.reduce((s, c) => s + c.qty, 0);
         cartCount.textContent = count;
@@ -999,7 +1008,8 @@
 
     /* =====================================================
        TOTALS
-       ===================================================== */
+       - Container deposit shown separately, NOT added to total
+    ===================================================== */
     function updateTotals() {
         const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
         let charge = 0;
@@ -1012,13 +1022,34 @@
             chargeLabel.textContent = "Pickup charge";
         }
 
-        const total = subtotal + charge;
+        const tax = calcTax(subtotal);
+
+        let total = 0;
+        if (tax.active) {
+            if (tax.type === "inclusive") {
+                total = subtotal + charge;
+            } else {
+                total = subtotal + charge + tax.amount;
+            }
+        } else {
+            total = subtotal + charge;
+        }
 
         subtotalEl.textContent = money(subtotal);
         chargeEl.textContent = money(charge);
         totalEl.textContent = money(total);
 
-        /* Container summary row */
+        if (taxRow && taxEl && taxLabelEl) {
+            if (tax.active) {
+                taxLabelEl.textContent = "Tax (" + tax.rate + "%)" +
+                    (tax.type === "inclusive" ? " · incl." : "");
+                taxEl.textContent = money(tax.amount);
+                taxRow.style.display = "flex";
+            } else {
+                taxRow.style.display = "none";
+            }
+        }
+
         const containerTotalAmount = cart.reduce((s, c) => {
             if (c.container_enabled && c.container_price > 0) {
                 return s + (c.container_price * c.qty);
@@ -1051,7 +1082,6 @@
             containerEl.style.display = "none";
         }
 
-        /* Can we place? */
         let canPlace = cart.length > 0;
 
         if (currentPayMode === "wallet") {
@@ -1069,7 +1099,7 @@
 
     /* =====================================================
        PLACE ORDER
-       ===================================================== */
+    ===================================================== */
     placeBtn?.addEventListener("click", function () {
         const name = nameInput.value.trim();
         const mobile = mobileInput.value.trim();
@@ -1095,7 +1125,10 @@
 
             const subtotal = cart.reduce((s, c) => s + (c.price * c.qty), 0);
             const charge = mode === "delivery" ? Number(divChargeInput.value || 0) : 0;
-            const total = subtotal + charge;
+            const tax = calcTax(subtotal);
+            const total = tax.active && tax.type === "inclusive"
+                ? subtotal + charge
+                : subtotal + charge + tax.amount;
 
             if (currentWallet < total) {
                 showPopup("error", "Insufficient Balance",
@@ -1122,7 +1155,6 @@
         fd.append("pickup_branch_id", branchSelect.value || 0);
         fd.append("payment_method", currentPayMode);
 
-        /* ✅ Send container fields too */
         fd.append("products", JSON.stringify(cart.map(c => ({
             product_id: c.product_id,
             code: c.code,
@@ -1179,8 +1211,8 @@
     });
 
     /* =====================================================
-       RESET — FULL
-       ===================================================== */
+       RESET
+    ===================================================== */
     resetBtn?.addEventListener("click", resetForm);
 
     function resetForm() {
@@ -1232,9 +1264,6 @@
         lookupReqId++;
     }
 
-    /* =====================================================
-       RESET — fields only (keep QR open)
-       ===================================================== */
     function resetFormFieldsOnly() {
         mobileInput.value = "";
         nameInput.value = "";
@@ -1285,8 +1314,8 @@
     }
 
     /* =====================================================
-       POPUP (success / error)
-       ===================================================== */
+       POPUP
+    ===================================================== */
     function showPopup(type, title, text, code) {
         popupIcon.classList.toggle("error", type === "error");
         popupIcon.innerHTML = type === "error"
@@ -1315,14 +1344,14 @@
     });
 
     /* =====================================================
-       QR POPUP
-       ===================================================== */
+       QR POPUP — amount in whole rupees
+    ===================================================== */
     function openQrPopup(orderId, orderCode, total, upiString) {
         pendingQrOrderId = orderId;
         pendingQrOrderCode = orderCode;
 
         if (qrCodeLabel) qrCodeLabel.textContent = orderCode;
-        if (qrAmount) qrAmount.textContent = "₹" + Number(total).toFixed(2);
+        if (qrAmount) qrAmount.textContent = "₹" + Math.round(Number(total) || 0);
 
         if (qrBox) {
             const logoUrl = window.QR_LOGO_URL || "";
@@ -1415,7 +1444,7 @@
 
     /* =====================================================
        INIT
-       ===================================================== */
+    ===================================================== */
     setMode("delivery");
     setPayMode("qr");
     loadProducts("menu");

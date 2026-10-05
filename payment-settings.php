@@ -60,6 +60,10 @@ require_once './config/function.php';
         }
 
         .required { color: #b51f2c; }
+        .optional-tag {
+            color: #948c82; font-weight: 600; font-size: 10px;
+            margin-left: 4px;
+        }
 
         .ps-input {
             width: 100%; height: 45px;
@@ -121,8 +125,55 @@ require_once './config/function.php';
             text-decoration: underline;
         }
 
-        /* ---------- TAX TOGGLE ---------- */
+        /* =====================================================
+           GST VALIDATION STATE
+        ===================================================== */
+        .gst-input {
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+            font-family: "DM Sans", sans-serif;
+        }
 
+        .gst-input.is-valid {
+            border-color: #2e7d32 !important;
+            background: #f6fbf7 !important;
+            box-shadow: 0 0 0 3px rgba(46, 125, 50, .08) !important;
+        }
+
+        .gst-input.is-invalid {
+            border-color: #d98a91 !important;
+            background: #fff7f8 !important;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .08) !important;
+        }
+
+        /* Required when tax enabled */
+        .gst-input.is-required-empty {
+            border-color: #f0b840 !important;
+            background: #fffdf4 !important;
+            box-shadow: 0 0 0 3px rgba(240, 184, 64, .12) !important;
+        }
+
+        .gst-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 9.5px;
+            font-weight: 800;
+            padding: 2px 8px;
+            border-radius: 6px;
+            margin-left: 6px;
+            letter-spacing: .3px;
+            vertical-align: middle;
+        }
+
+        .gst-badge.valid   { background: #e8f6ea; color: #2e7d32; }
+        .gst-badge.invalid { background: #fde6e6; color: #b51f2c; }
+        .gst-badge.required { background: #fff7e0; color: #b8893c; }
+
+        /* =====================================================
+           TAX TOGGLE
+        ===================================================== */
         .tax-toggle-row {
             display: flex; align-items: center; justify-content: space-between;
             gap: 14px;
@@ -131,6 +182,12 @@ require_once './config/function.php';
             border: 1px solid #e8e1d8;
             border-radius: 12px;
             margin-bottom: 18px;
+            transition: .25s ease;
+        }
+
+        .tax-toggle-row.is-enabled {
+            background: linear-gradient(135deg, #f0fbf2 0%, #f7fdf8 100%);
+            border-color: #c8e6c9;
         }
 
         .tax-toggle-info { display: flex; align-items: center; gap: 12px; }
@@ -166,8 +223,28 @@ require_once './config/function.php';
         .mm-switch input:checked + .mm-switch-slider { background: #2e7d32; }
         .mm-switch input:checked + .mm-switch-slider::before { transform: translateX(20px); }
 
-        /* ---------- TAX TYPE OPTIONS ---------- */
+        /* =====================================================
+           TAX FIELDS WRAPPER
+        ===================================================== */
+        .tax-fields-wrap {
+            overflow: hidden;
+            max-height: 0;
+            opacity: 0;
+            transition: max-height .4s cubic-bezier(.2, .9, .3, 1),
+                        opacity .25s ease,
+                        margin-top .25s ease;
+            margin-top: 0;
+        }
 
+        .tax-fields-wrap.is-open {
+            max-height: 900px;
+            opacity: 1;
+            margin-top: 4px;
+        }
+
+        /* =====================================================
+           TAX TYPE OPTIONS
+        ===================================================== */
         .tax-options { display: flex; gap: 12px; margin-bottom: 18px; }
 
         .tax-option {
@@ -205,17 +282,9 @@ require_once './config/function.php';
 
         .tax-option input:checked + .tax-option-box .tax-opt-head i { color: #b51f2c; }
 
-        /* ---------- DISABLED STATE ---------- */
-
-        .tax-fields.is-disabled {
-            opacity: .5;
-            pointer-events: none;
-            filter: grayscale(.4);
-            transition: .25s;
-        }
-
-        /* ---------- ACTIONS ---------- */
-
+        /* =====================================================
+           ACTIONS
+        ===================================================== */
         .form-actions {
             display: flex; justify-content: flex-end; gap: 10px;
             margin-top: 22px; padding-top: 20px; border-top: 1px solid #f0ebe4;
@@ -257,8 +326,9 @@ require_once './config/function.php';
             display: inline-block; margin-bottom: 10px;
         }
 
-        /* MODALS */
-
+        /* =====================================================
+           MODALS
+        ===================================================== */
         .mm-modal-overlay {
             position: fixed; inset: 0;
             background: rgba(30, 25, 22, .55);
@@ -351,7 +421,7 @@ require_once './config/function.php';
             <div class="ps-header">
                 <div class="ps-title">
                     <h1>Payment Settings</h1>
-                    <p>Configure Razorpay keys, UPI ID and Tax settings for online payments.</p>
+                    <p>Configure Razorpay keys, UPI ID, GST and Tax settings for online payments.</p>
                 </div>
             </div>
 
@@ -363,7 +433,7 @@ require_once './config/function.php';
                         <i class="bi bi-credit-card-2-front"></i>
                     </div>
                     <div>
-                        <h3>Payment & Tax Configuration</h3>
+                        <h3>Payment &amp; Tax Configuration</h3>
                         <span>All fields are required to enable online payments.</span>
                     </div>
                 </div>
@@ -474,65 +544,92 @@ require_once './config/function.php';
                         </label>
                     </div>
 
-                    <!-- Tax Type + Rate (disabled when toggle is off) -->
-                    <div class="tax-fields is-disabled" id="taxFields">
+                    <!-- Tax Type + Rate + GST — slide open when enabled -->
+                    <div class="tax-fields-wrap" id="taxFieldsWrap">
+                        <div style="padding: 4px 2px 4px;">
 
-                        <div style="margin-bottom:18px;">
-                            <label>Tax Type <span class="required">*</span></label>
-                            <div class="tax-options">
+                            <!-- Tax Type -->
+                            <div style="margin-bottom:18px;">
+                                <label>Tax Type <span class="required">*</span></label>
+                                <div class="tax-options">
 
-                                <label class="tax-option" for="tax_type_exclusive">
-                                    <input type="radio"
-                                           id="tax_type_exclusive"
-                                           name="tax_type"
-                                           value="exclusive">
-                                    <div class="tax-option-box">
-                                        <div class="tax-opt-head">
-                                            <i class="bi bi-plus-circle-fill"></i>
-                                            Exclusive
+                                    <label class="tax-option" for="tax_type_exclusive">
+                                        <input type="radio"
+                                               id="tax_type_exclusive"
+                                               name="tax_type"
+                                               value="exclusive">
+                                        <div class="tax-option-box">
+                                            <div class="tax-opt-head">
+                                                <i class="bi bi-plus-circle-fill"></i>
+                                                Exclusive
+                                            </div>
+                                            <p>Tax is added on top of the product price at checkout.</p>
                                         </div>
-                                        <p>Tax is added on top of the product price at checkout.</p>
-                                    </div>
-                                </label>
+                                    </label>
 
-                                <label class="tax-option" for="tax_type_inclusive">
-                                    <input type="radio"
-                                           id="tax_type_inclusive"
-                                           name="tax_type"
-                                           value="inclusive">
-                                    <div class="tax-option-box">
-                                        <div class="tax-opt-head">
-                                            <i class="bi bi-check-circle-fill"></i>
-                                            Inclusive
+                                    <label class="tax-option" for="tax_type_inclusive">
+                                        <input type="radio"
+                                               id="tax_type_inclusive"
+                                               name="tax_type"
+                                               value="inclusive">
+                                        <div class="tax-option-box">
+                                            <div class="tax-opt-head">
+                                                <i class="bi bi-check-circle-fill"></i>
+                                                Inclusive
+                                            </div>
+                                            <p>Tax is already included inside the product price.</p>
                                         </div>
-                                        <p>Tax is already included inside the product price.</p>
-                                    </div>
+                                    </label>
+
+                                </div>
+                                <div class="field-help">
+                                    Choose how tax should be calculated for your products.
+                                </div>
+                            </div>
+
+                            <!-- Tax Rate -->
+                            <div style="margin-bottom:18px;">
+                                <label>Tax Rate (%) <span class="required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-percent"></i>
+                                    <input type="number"
+                                           id="tax_rate"
+                                           class="ps-input"
+                                           placeholder="5"
+                                           min="0"
+                                           max="100"
+                                           step="0.01"
+                                           inputmode="decimal">
+                                </div>
+                                <div class="field-help">
+                                    Enter a value between <strong>0</strong> and <strong>100</strong>. Example: <strong>5</strong>, <strong>12</strong>, <strong>18</strong>.
+                                </div>
+                            </div>
+
+                            <!-- GST Number — required only when tax enabled -->
+                            <div style="margin-bottom:18px;">
+                                <label>
+                                    GST Number
+                                    <span class="required" id="gstRequiredMark" style="display:none;">*</span>
+                                    <span class="optional-tag" id="gstOptionalTag">(optional)</span>
+                                    <span class="gst-badge" id="gstBadge" style="display:none;"></span>
                                 </label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-receipt-cutoff"></i>
+                                    <input type="text"
+                                           id="gst_number"
+                                           class="ps-input gst-input"
+                                           placeholder="22AAAAA0000A1Z5"
+                                           maxlength="15"
+                                           autocomplete="off"
+                                           spellcheck="false">
+                                </div>
+                                <div class="field-help" id="gstHelp">
+                                    15-character GST Identification Number (GSTIN). Example: <strong>22AAAAA0000A1Z5</strong>
+                                </div>
+                            </div>
 
-                            </div>
-                            <div class="field-help">
-                                Choose how tax should be calculated for your products.
-                            </div>
                         </div>
-
-                        <div style="margin-bottom:18px;">
-                            <label>Tax Rate (%) <span class="required">*</span></label>
-                            <div class="input-icon-wrap">
-                                <i class="bi bi-percent"></i>
-                                <input type="number"
-                                       id="tax_rate"
-                                       class="ps-input"
-                                       placeholder="5"
-                                       min="0"
-                                       max="100"
-                                       step="0.01"
-                                       inputmode="decimal">
-                            </div>
-                            <div class="field-help">
-                                Enter a value between <strong>0</strong> and <strong>100</strong>. Example: <strong>5</strong>, <strong>12</strong>, <strong>18</strong>.
-                            </div>
-                        </div>
-
                     </div>
 
                     <!-- ==================== SINGLE SAVE BUTTON ==================== -->

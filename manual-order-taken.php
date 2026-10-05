@@ -12,7 +12,6 @@ $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 $QRlogoUrl = !empty($settings['favicon_image']) ? ADMIN_URL . $settings['favicon_image'] : '';
 
-
 /* ---------------- BRANCHES ---------------- */
 $branches = [];
 try {
@@ -23,6 +22,11 @@ try {
 }
 
 $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP);
+
+/* Tax settings to expose to JS */
+$taxStatus = (int)($settings['tax_status'] ?? 0);
+$taxRate   = (float)($settings['tax_rate'] ?? 0);
+$taxType   = $settings['tax_type'] ?? 'exclusive';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -72,9 +76,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             }
         }
 
-        /* =====================================================
-           CARDS
-           ===================================================== */
+        /* CARDS */
         .mo-card {
             background: #fff;
             border: 1.5px solid #ece5da;
@@ -106,9 +108,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             font-size: 14px;
         }
 
-        /* =====================================================
-           FORM FIELDS
-           ===================================================== */
+        /* FORM FIELDS */
         .mo-grid-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -208,9 +208,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             color: #1b5e20;
         }
 
-        /* =====================================================
-           SEARCHABLE DROPDOWN
-           ===================================================== */
+        /* SEARCHABLE DROPDOWN */
         .sd-wrap {
             position: relative;
         }
@@ -419,9 +417,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             color: #948c82;
         }
 
-        /* =====================================================
-           MODE TOGGLE
-           ===================================================== */
+        /* MODE TOGGLE */
         .mo-mode-wrap {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -507,9 +503,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             flex-shrink: 0;
         }
 
-        /* =====================================================
-           PRODUCT PICKER
-           ===================================================== */
+        /* PRODUCT PICKER */
         .mo-tabs {
             display: flex;
             background: #fdfaf4;
@@ -689,9 +683,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             margin-bottom: 8px;
         }
 
-        /* =====================================================
-           CART
-           ===================================================== */
+        /* CART */
         .mo-cart {
             background: #fff;
             border: 1.5px solid #ece5da;
@@ -959,9 +951,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             color: #302923;
         }
 
-        /* =====================================================
-           VARIANT MODAL
-           ===================================================== */
+        /* MODALS */
         .mo-modal-overlay {
             position: fixed;
             inset: 0;
@@ -1164,9 +1154,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             color: #302923;
         }
 
-        /* =====================================================
-           POPUP (success / error / QR)
-           ===================================================== */
+        /* POPUP */
         .mo-popup-overlay {
             position: fixed;
             inset: 0;
@@ -1274,9 +1262,7 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             gap: 10px;
         }
 
-        /* =====================================================
-           WALLET PANEL
-           ===================================================== */
+        /* WALLET PANEL */
         .mo-wallet-box {
             background: #fdfaf4;
             border: 1.5px solid #ece5da;
@@ -1346,9 +1332,11 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
             display: flex;
         }
 
-        /* =====================================================
-           RESPONSIVE
-           ===================================================== */
+        /* TAX ROW */
+        .mo-totals-row.tax-row strong {
+            color: #b8893c;
+        }
+
         @media (max-width: 640px) {
             .mo-page {
                 padding: 18px 14px 40px;
@@ -1659,6 +1647,13 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
                             <span id="moChargeLabel">Delivery charge</span>
                             <strong id="moCharge">₹0</strong>
                         </div>
+
+                        <!-- Tax row (only shown when tax enabled) -->
+                        <div class="mo-totals-row tax-row" id="moTaxRow" style="display:none;">
+                            <span id="moTaxLabel">Tax</span>
+                            <strong id="moTax">₹0</strong>
+                        </div>
+
                         <div class="mo-totals-row grand">
                             <span>Total</span>
                             <strong id="moTotal">₹0</strong>
@@ -1780,13 +1775,20 @@ $branchesJson = json_encode($branches, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | J
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
         window.BRANCHES = <?= $branchesJson ?>;
         window.QR_LOGO_URL = "<?= htmlspecialchars($QRlogoUrl, ENT_QUOTES) ?>";
+        window.TAX_SETTINGS = {
+            status: <?= (int)$taxStatus ?>,
+            rate: <?= (float)$taxRate ?>,
+            type: "<?= htmlspecialchars($taxType) ?>"
+        };
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/manual-order-taken.js"></script>
-
+<script>
+    
+    </script>
 </body>
 
 </html>

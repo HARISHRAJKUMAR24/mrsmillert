@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: GET PAYMENT SETTINGS
    File: ./ajax/payment-settings-get.php
    Returns: razorpay_key_id, razorpay_key_secret, upi_id,
-            tax_status, tax_type, tax_rate
+            gst_number, tax_status, tax_type, tax_rate
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -27,6 +27,7 @@ try {
         'razorpay_key_id'     => $settings['razorpay_key_id'] ?? '',
         'razorpay_key_secret' => $settings['razorpay_key_secret'] ?? '',
         'upi_id'              => $settings['upi_id'] ?? '',
+        'gst_number'          => $settings['gst_number'] ?? '',
         'tax_status'          => isset($settings['tax_status']) ? (int)$settings['tax_status'] : 0,
         'tax_type'            => $settings['tax_type'] ?? 'exclusive',
         'tax_rate'            => isset($settings['tax_rate']) ? (float)$settings['tax_rate'] : 0

@@ -2,8 +2,7 @@
 /* =========================================================
    MRS MILL@ — AJAX: UPDATE PAYMENT SETTINGS
    File: ./ajax/update-payment-settings.php
-   Saves Razorpay Key ID + Key Secret + UPI ID + Tax fields
-   into settings row (id = 1) in ONE query
+   Saves Razorpay + UPI + GST + Tax into settings (id = 1)
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -18,6 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 $keyId     = trim($_POST['razorpay_key_id'] ?? '');
 $keySecret = trim($_POST['razorpay_key_secret'] ?? '');
 $upiId     = trim($_POST['upi_id'] ?? '');
+$gstNumber = strtoupper(trim($_POST['gst_number'] ?? ''));
 
 /* ---- Tax ---- */
 $taxStatusRaw = $_POST['tax_status'] ?? '0';
@@ -61,6 +61,28 @@ if (!preg_match('/^[a-zA-Z0-9._-]{2,}@[a-zA-Z]{2,}$/', $upiId)) {
     jsonResponse(false, 'UPI ID looks invalid. Example: yourname@okhdfcbank');
 }
 
+/* GST Number — optional, but if provided must be valid */
+if ($gstNumber !== '') {
+
+    /* Standard Indian GSTIN format:
+       2 digits (state code) + 10 chars PAN + 1 entity code + Z + 1 check digit = 15 chars
+       Example: 22AAAAA0000A1Z5
+    */
+    if (strlen($gstNumber) !== 15) {
+        jsonResponse(false, 'GST Number must be exactly 15 characters.');
+    }
+
+    if (!preg_match('/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/', $gstNumber)) {
+        jsonResponse(false, 'GST Number is invalid. Example: 22AAAAA0000A1Z5');
+    }
+
+    /* Verify state code (01–37 valid) */
+    $stateCode = (int)substr($gstNumber, 0, 2);
+    if ($stateCode < 1 || $stateCode > 37) {
+        jsonResponse(false, 'GST Number has an invalid state code (01–37).');
+    }
+}
+
 /* Tax — only enforce when enabled */
 if ($taxStatus === 1) {
 
@@ -83,7 +105,6 @@ if ($taxStatus === 1) {
 
 try {
 
-    /* Ensure row exists */
     $settings = getSettings($pdo);
     if (!$settings) {
         jsonResponse(false, 'Settings row not found.');
@@ -94,6 +115,7 @@ try {
          SET razorpay_key_id     = ?,
              razorpay_key_secret = ?,
              upi_id              = ?,
+             gst_number          = ?,
              tax_status          = ?,
              tax_type            = ?,
              tax_rate            = ?
@@ -104,6 +126,7 @@ try {
         $keyId,
         $keySecret,
         $upiId,
+        $gstNumber !== '' ? $gstNumber : null,
         $taxStatus,
         $taxType,
         $taxRate

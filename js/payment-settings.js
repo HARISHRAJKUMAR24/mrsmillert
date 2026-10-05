@@ -1,8 +1,8 @@
 /* =========================================================
    MRS MILL@ — PAYMENT SETTINGS UX
    File: ./js/payment-settings.js
-   Load + save Razorpay Key ID, Key Secret, UPI ID & Tax
-   in ONE submit
+   Load + save Razorpay, UPI, GST & Tax in ONE submit
+   GST is optional when tax disabled; required when tax enabled
    ========================================================= */
 
 (function () {
@@ -22,19 +22,24 @@
     const keyIdInput     = document.getElementById("razorpay_key_id");
     const keySecretInput = document.getElementById("razorpay_key_secret");
     const upiIdInput     = document.getElementById("upi_id");
+    const gstNumberInput = document.getElementById("gst_number");
+    const gstHelp        = document.getElementById("gstHelp");
+    const gstBadge       = document.getElementById("gstBadge");
+    const gstRequiredMark = document.getElementById("gstRequiredMark");
+    const gstOptionalTag  = document.getElementById("gstOptionalTag");
 
     const toggleSecret = document.getElementById("toggleSecret");
     const eyeIcon      = document.getElementById("eyeIcon");
 
     /* ---- Tax ---- */
-    const taxStatusInput    = document.getElementById("tax_status");
-    const taxToggleRow      = document.getElementById("taxToggleRow");
-    const taxToggleTitle    = document.getElementById("taxToggleTitle");
-    const taxToggleDesc     = document.getElementById("taxToggleDesc");
-    const taxFields         = document.getElementById("taxFields");
-    const taxTypeExclusive  = document.getElementById("tax_type_exclusive");
-    const taxTypeInclusive  = document.getElementById("tax_type_inclusive");
-    const taxRateInput      = document.getElementById("tax_rate");
+    const taxStatusInput   = document.getElementById("tax_status");
+    const taxToggleRow     = document.getElementById("taxToggleRow");
+    const taxToggleTitle   = document.getElementById("taxToggleTitle");
+    const taxToggleDesc    = document.getElementById("taxToggleDesc");
+    const taxFieldsWrap    = document.getElementById("taxFieldsWrap");
+    const taxTypeExclusive = document.getElementById("tax_type_exclusive");
+    const taxTypeInclusive = document.getElementById("tax_type_inclusive");
+    const taxRateInput     = document.getElementById("tax_rate");
 
     /* ---- Modals ---- */
     const errorOverlay = document.getElementById("errorOverlay");
@@ -47,6 +52,109 @@
     const successOkBtn   = document.getElementById("successOkBtn");
 
     if (!form) return;
+
+    /* =====================================================
+       GST VALIDATION
+    ===================================================== */
+    function validateGST(gst) {
+        gst = (gst || "").toUpperCase().trim();
+
+        if (gst === "") {
+            return { valid: true, empty: true, message: "" };
+        }
+
+        if (gst.length !== 15) {
+            return {
+                valid: false,
+                message: "GST Number must be exactly 15 characters (currently " + gst.length + ")."
+            };
+        }
+
+        const re = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+        if (!re.test(gst)) {
+            return {
+                valid: false,
+                message: "Invalid GST format. Example: 22AAAAA0000A1Z5"
+            };
+        }
+
+        const stateCode = parseInt(gst.substring(0, 2), 10);
+        if (isNaN(stateCode) || stateCode < 1 || stateCode > 37) {
+            return {
+                valid: false,
+                message: "Invalid state code in GST (must be 01–37)."
+            };
+        }
+
+        return { valid: true, empty: false, message: "" };
+    }
+
+    function paintGstHint(result) {
+        if (!gstHelp || !gstNumberInput) return;
+
+        const taxEnabled = taxStatusInput ? taxStatusInput.checked : false;
+        const baseText = '15-character GST Identification Number (GSTIN). Example: <strong>22AAAAA0000A1Z5</strong>';
+
+        gstNumberInput.classList.remove("is-valid", "is-invalid", "is-required-empty");
+        if (gstBadge) gstBadge.style.display = "none";
+
+        /* Empty */
+        if (result.empty) {
+            if (taxEnabled) {
+                /* Required when tax enabled */
+                gstHelp.innerHTML = '<i class="bi bi-exclamation-circle-fill" style="color:#b8893c;"></i> GST Number is required when Tax is enabled.';
+                gstHelp.style.color = "#b8893c";
+                gstNumberInput.classList.add("is-required-empty");
+                if (gstBadge) {
+                    gstBadge.className = "gst-badge required";
+                    gstBadge.innerHTML = '<i class="bi bi-exclamation-circle-fill"></i> REQUIRED';
+                    gstBadge.style.display = "inline-flex";
+                }
+            } else {
+                gstHelp.innerHTML = baseText;
+                gstHelp.style.color = "#948c82";
+            }
+            return;
+        }
+
+        /* Valid */
+        if (result.valid) {
+            gstHelp.innerHTML = '<i class="bi bi-check-circle-fill" style="color:#2e7d32;"></i> Valid GST Number';
+            gstHelp.style.color = "#2e7d32";
+            gstNumberInput.classList.add("is-valid");
+
+            if (gstBadge) {
+                gstBadge.className = "gst-badge valid";
+                gstBadge.innerHTML = '<i class="bi bi-check-circle-fill"></i> VALID';
+                gstBadge.style.display = "inline-flex";
+            }
+            return;
+        }
+
+        /* Invalid */
+        gstHelp.innerHTML = '<i class="bi bi-exclamation-circle-fill" style="color:#b51f2c;"></i> ' + result.message;
+        gstHelp.style.color = "#b51f2c";
+        gstNumberInput.classList.add("is-invalid");
+
+        if (gstBadge) {
+            gstBadge.className = "gst-badge invalid";
+            gstBadge.innerHTML = '<i class="bi bi-x-circle-fill"></i> INVALID';
+            gstBadge.style.display = "inline-flex";
+        }
+    }
+
+    if (gstNumberInput) {
+        gstNumberInput.addEventListener("input", function () {
+            const cleaned = this.value.toUpperCase().replace(/[^0-9A-Z]/g, "").slice(0, 15);
+            if (cleaned !== this.value) this.value = cleaned;
+
+            paintGstHint(validateGST(this.value));
+        });
+
+        gstNumberInput.addEventListener("blur", function () {
+            paintGstHint(validateGST(this.value));
+        });
+    }
 
     /* ---------------- ERROR / SUCCESS ---------------- */
 
@@ -112,38 +220,46 @@
         });
     }
 
-    /* ---------------- TAX: ENABLE / DISABLE ---------------- */
-
+    /* =====================================================
+       TAX: ENABLE / DISABLE — slide fields in/out
+    ===================================================== */
     function applyTaxUIState() {
         if (!taxStatusInput) return;
 
         const enabled = taxStatusInput.checked;
 
-        /* Toggle row visual */
         if (taxToggleRow) {
             taxToggleRow.classList.toggle("is-enabled", enabled);
         }
 
-        /* Title + description */
         if (taxToggleTitle) {
             taxToggleTitle.textContent = enabled ? "Tax Enabled" : "Tax Disabled";
         }
         if (taxToggleDesc) {
             taxToggleDesc.textContent = enabled
-                ? "Tax will be calculated on all orders."
+                ? "Tax will be calculated on all orders. GST Number is required."
                 : "Tax will not be applied to any order.";
         }
 
-        /* Fields enable/disable */
-        if (taxFields) {
-            taxFields.classList.toggle("is-disabled", !enabled);
+        /* Slide open/close the fields wrapper */
+        if (taxFieldsWrap) {
+            taxFieldsWrap.classList.toggle("is-open", enabled);
         }
 
-        /* When disabled → force rate to 0 and uncheck types */
+        /* GST required marker + optional tag */
+        if (gstRequiredMark) gstRequiredMark.style.display = enabled ? "inline" : "none";
+        if (gstOptionalTag)  gstOptionalTag.style.display  = enabled ? "none"   : "inline";
+
+        /* When disabled → reset tax fields */
         if (!enabled) {
             if (taxRateInput) taxRateInput.value = "0";
             if (taxTypeExclusive) taxTypeExclusive.checked = false;
             if (taxTypeInclusive) taxTypeInclusive.checked = false;
+        }
+
+        /* Re-paint GST hint to reflect required/optional state */
+        if (gstNumberInput) {
+            paintGstHint(validateGST(gstNumberInput.value));
         }
     }
 
@@ -181,6 +297,11 @@
             /* UPI */
             if (upiIdInput) upiIdInput.value = data.data.upi_id || "";
 
+            /* GST */
+            if (gstNumberInput) {
+                gstNumberInput.value = (data.data.gst_number || "").toUpperCase();
+            }
+
             /* Tax */
             const taxEnabled = String(data.data.tax_status) === "1";
             if (taxStatusInput) taxStatusInput.checked = taxEnabled;
@@ -197,7 +318,7 @@
                 taxRateInput.value = isNaN(rate) ? "0" : String(rate);
             }
 
-            /* Apply UI state after populating */
+            /* Apply UI state (this also repaints GST hint) */
             applyTaxUIState();
 
             if (formLoading) formLoading.style.display = "none";
@@ -212,7 +333,7 @@
         });
     }
 
-    /* ---------------- SUBMIT (SINGLE SAVE) ---------------- */
+    /* ---------------- SUBMIT ---------------- */
 
     form.addEventListener("submit", function (e) {
 
@@ -221,6 +342,7 @@
         const keyId     = keyIdInput.value.trim();
         const keySecret = keySecretInput.value.trim();
         const upiId     = upiIdInput ? upiIdInput.value.trim() : "";
+        const gstNumber = gstNumberInput ? gstNumberInput.value.trim().toUpperCase() : "";
 
         /* ---- Razorpay Key ID ---- */
         if (!keyId) {
@@ -259,7 +381,6 @@
 
         if (taxEnabled) {
 
-            /* Tax type required when enabled */
             if (taxTypeInclusive && taxTypeInclusive.checked) {
                 taxType = "inclusive";
             } else if (taxTypeExclusive && taxTypeExclusive.checked) {
@@ -271,7 +392,6 @@
                 );
             }
 
-            /* Tax rate required + valid when enabled */
             const rateStr = taxRateInput ? taxRateInput.value.trim() : "";
             const rateNum = parseFloat(rateStr);
 
@@ -284,10 +404,24 @@
 
             taxRate = String(rateNum);
 
+            /* ---- GST REQUIRED when tax enabled ---- */
+            if (!gstNumber) {
+                paintGstHint({ valid: true, empty: true, message: "" });
+                return showError("GST Number is required when Tax is enabled.", "GST Required");
+            }
+
         } else {
-            /* Disabled → force 0 */
             taxType = "";
             taxRate = "0";
+        }
+
+        /* ---- GST format validation (only if filled) ---- */
+        if (gstNumber !== "") {
+            const gstResult = validateGST(gstNumber);
+            if (!gstResult.valid) {
+                paintGstHint(gstResult);
+                return showError(gstResult.message, "Invalid GST Number");
+            }
         }
 
         setLoading(true);
@@ -296,6 +430,7 @@
         formData.append("razorpay_key_id", keyId);
         formData.append("razorpay_key_secret", keySecret);
         formData.append("upi_id", upiId);
+        formData.append("gst_number", gstNumber);
         formData.append("tax_status", taxEnabled ? "1" : "0");
         formData.append("tax_type", taxType);
         formData.append("tax_rate", taxRate);

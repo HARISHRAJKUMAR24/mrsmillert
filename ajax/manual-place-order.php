@@ -186,8 +186,44 @@ try {
         ];
     }
 
-    /* Container deposit NOT added to total */
-    $total = $subtotal + ($mode === 'delivery' ? $divisionCharge : 0);
+    /* =====================================================
+       APPLY TAX (from settings) — ROUNDED TO WHOLE RUPEE
+       - Exclusive : tax = subtotal × rate%   (added on top)
+       - Inclusive : tax is inside subtotal   (back-calculated)
+       - Delivery charge is NOT taxed
+       - Container deposit is NOT taxed
+       - Everything rounded to nearest rupee (no decimals)
+    ===================================================== */
+    $settings   = getSettings($pdo);
+    $taxStatus  = (int)($settings['tax_status'] ?? 0);
+    $taxRate    = (float)($settings['tax_rate'] ?? 0);
+    $taxType    = strtolower($settings['tax_type'] ?? 'exclusive');
+
+    if (!in_array($taxType, ['inclusive', 'exclusive'], true)) {
+        $taxType = 'exclusive';
+    }
+
+    $taxAmount           = 0.0;
+    $deliveryChargeToAdd = ($mode === 'delivery' ? $divisionCharge : 0);
+
+    if ($taxStatus === 1 && $taxRate > 0) {
+        if ($taxType === 'inclusive') {
+            $rawTax    = $subtotal - ($subtotal / (1 + ($taxRate / 100)));
+            $taxAmount = round($rawTax);
+            $total     = $subtotal + $deliveryChargeToAdd;
+        } else {
+            $rawTax    = $subtotal * ($taxRate / 100);
+            $taxAmount = round($rawTax);
+            $total     = $subtotal + $deliveryChargeToAdd + $taxAmount;
+        }
+    } else {
+        $taxRate   = 0.0;
+        $taxAmount = 0.0;
+        $total     = $subtotal + $deliveryChargeToAdd;
+    }
+
+    /* Round the total to a whole rupee (drives QR + wallet + DB) */
+    $total = round($total);
 
     /* ---------- Order code ---------- */
     $last = $pdo->query("SELECT order_code FROM orders ORDER BY id DESC LIMIT 1")->fetchColumn();
@@ -229,8 +265,8 @@ try {
                 $pdo->rollBack();
                 jsonResponse(
                     false,
-                    'Insufficient wallet balance. Available: ₹' . number_format($walletBalance, 2) .
-                        ' · Required: ₹' . number_format($total, 2)
+                    'Insufficient wallet balance. Available: ₹' . number_format($walletBalance, 0) .
+                        ' · Required: ₹' . number_format($total, 0)
                 );
             }
 
@@ -281,8 +317,7 @@ try {
             jsonResponse(false, 'Wallet deduction failed.');
         }
     } else {
-        /* QR — build UPI string */
-        $settings = getSettings($pdo);
+        /* QR — build UPI string with WHOLE-RUPEE amount */
         $upiId    = trim($settings['upi_id'] ?? '');
         $siteName = trim($settings['username'] ?? 'Mrs Mill@');
 
@@ -293,7 +328,7 @@ try {
         $upiParams = [
             'pa' => $upiId,
             'pn' => $siteName,
-            'am' => number_format($total, 2, '.', ''),
+            'am' => (string)round($total),   // ← whole rupee (no ".00")
             'cu' => 'INR',
             'tn' => 'Order ' . $orderCode
         ];
@@ -305,14 +340,18 @@ try {
         "INSERT INTO orders
             (order_code, delivery_boy_id, customer_name, customer_mobile,
              apartment_id, apartment_code, apartment_name,
-             division, division_charge, delivery_mode,
+             division, division_charge,
+             tax_amount, tax_rate, tax_type,
+             delivery_mode,
              pickup_branch_id, pickup_branch_name,
              subtotal, total_amount, products_json,
              status, delivery_status, payment_status, payment_upi_string, paid_at, created_at)
          VALUES
             (?, ?, ?, ?,
              ?, ?, ?,
+             ?, ?,
              ?, ?, ?,
+             ?,
              ?, ?,
              ?, ?, ?,
              'pending', 'disabled', ?, ?, ?, NOW())"
@@ -328,6 +367,9 @@ try {
         $apartmentName,
         $division,
         $divisionCharge,
+        $taxAmount,
+        $taxRate,
+        $taxType,
         $mode,
         $branchId > 0 ? $branchId : null,
         $branchName !== '' ? $branchName : null,
@@ -341,7 +383,7 @@ try {
 
     $orderId = (int)$pdo->lastInsertId();
 
-    /* ---------- Insert container row (only 4 fields) ---------- */
+    /* ---------- Insert container row ---------- */
     if ($totalContainers > 0) {
         try {
             $cIns = $pdo->prepare(
@@ -355,8 +397,7 @@ try {
                 $totalContainers,
                 $containerAmount,
             ]);
-        } catch (PDOException $e) {
-            /* ignore — order still succeeds */
+        } catch (PDOException $e) { /* ignore */
         }
     }
 
@@ -367,6 +408,11 @@ try {
     jsonResponse(true, 'Order placed.', [
         'order_id'         => $orderId,
         'order_code'       => $orderCode,
+        'subtotal'         => $subtotal,
+        'tax_amount'       => $taxAmount,
+        'tax_rate'         => $taxRate,
+        'tax_type'         => $taxType,
+        'tax_status'       => $taxStatus,
         'total'            => $total,
         'mode'             => $mode,
         'payment_method'   => $paymentMethod,
