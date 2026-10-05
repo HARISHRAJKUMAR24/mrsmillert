@@ -8,6 +8,9 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     exit;
 }
 
+/* ---------------- ROLE ---------------- */
+$isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin');
+
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 
@@ -54,36 +57,39 @@ try {
 }
 
 /* =========================================================
-   MONTHLY REVENUE for the chosen year (12 months)
+   MONTHLY REVENUE (only needed for admin chart)
    ========================================================= */
 $monthlyRevenue = [];
-try {
-    $stmt = $pdo->prepare(
-        "SELECT MONTH(created_at) AS m,
-                COALESCE(SUM(total_amount),0) AS revenue
-         FROM orders
-         WHERE status <> 'cancelled'
-           AND YEAR(created_at) = ?
-         GROUP BY MONTH(created_at)"
-    );
-    $stmt->execute([$chartYear]);
-    $byMonth = [];
-    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $byMonth[(int)$r['m']] = (float)$r['revenue'];
+$maxRevenue     = 1;
+
+if ($isAdmin) {
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT MONTH(created_at) AS m,
+                    COALESCE(SUM(total_amount),0) AS revenue
+             FROM orders
+             WHERE status <> 'cancelled'
+               AND YEAR(created_at) = ?
+             GROUP BY MONTH(created_at)"
+        );
+        $stmt->execute([$chartYear]);
+        $byMonth = [];
+        while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $byMonth[(int)$r['m']] = (float)$r['revenue'];
+        }
+
+        for ($m = 1; $m <= 12; $m++) {
+            $monthlyRevenue[] = [
+                'mon'     => date('M', mktime(0, 0, 0, $m, 1)),
+                'revenue' => $byMonth[$m] ?? 0,
+            ];
+        }
+    } catch (PDOException $e) {
     }
 
-    for ($m = 1; $m <= 12; $m++) {
-        $monthlyRevenue[] = [
-            'mon'     => date('M', mktime(0, 0, 0, $m, 1)),
-            'revenue' => $byMonth[$m] ?? 0,
-        ];
+    foreach ($monthlyRevenue as $m) {
+        if ($m['revenue'] > $maxRevenue) $maxRevenue = $m['revenue'];
     }
-} catch (PDOException $e) {
-}
-
-$maxRevenue = 1;
-foreach ($monthlyRevenue as $m) {
-    if ($m['revenue'] > $maxRevenue) $maxRevenue = $m['revenue'];
 }
 
 /* =========================================================
@@ -139,39 +145,41 @@ try {
 }
 
 /* =========================================================
-   TOP SELLING PRODUCTS
+   TOP SELLING PRODUCTS (admin only)
    ========================================================= */
 $bestProducts = [];
-try {
-    $rows = $pdo->query(
-        "SELECT products_json FROM orders WHERE status <> 'cancelled'"
-    )->fetchAll(PDO::FETCH_ASSOC);
+if ($isAdmin) {
+    try {
+        $rows = $pdo->query(
+            "SELECT products_json FROM orders WHERE status <> 'cancelled'"
+        )->fetchAll(PDO::FETCH_ASSOC);
 
-    $agg = [];
-    foreach ($rows as $r) {
-        $items = json_decode($r['products_json'] ?? '[]', true);
-        if (!is_array($items)) continue;
-        foreach ($items as $p) {
-            $name = $p['name'] ?? '';
-            if ($name === '') continue;
-            $qty   = (int)($p['qty'] ?? 0);
-            $total = (float)($p['line_total'] ?? (($p['price'] ?? 0) * $qty));
-            $image = $p['image'] ?? '';
+        $agg = [];
+        foreach ($rows as $r) {
+            $items = json_decode($r['products_json'] ?? '[]', true);
+            if (!is_array($items)) continue;
+            foreach ($items as $p) {
+                $name = $p['name'] ?? '';
+                if ($name === '') continue;
+                $qty   = (int)($p['qty'] ?? 0);
+                $total = (float)($p['line_total'] ?? (($p['price'] ?? 0) * $qty));
+                $image = $p['image'] ?? '';
 
-            if (!isset($agg[$name])) {
-                $agg[$name] = ['qty' => 0, 'revenue' => 0, 'image' => $image];
-            }
-            $agg[$name]['qty']     += $qty;
-            $agg[$name]['revenue'] += $total;
-            if ($agg[$name]['image'] === '' && $image !== '') {
-                $agg[$name]['image'] = $image;
+                if (!isset($agg[$name])) {
+                    $agg[$name] = ['qty' => 0, 'revenue' => 0, 'image' => $image];
+                }
+                $agg[$name]['qty']     += $qty;
+                $agg[$name]['revenue'] += $total;
+                if ($agg[$name]['image'] === '' && $image !== '') {
+                    $agg[$name]['image'] = $image;
+                }
             }
         }
-    }
 
-    uasort($agg, fn($a, $b) => $b['qty'] <=> $a['qty']);
-    $bestProducts = array_slice($agg, 0, 4, true);
-} catch (PDOException $e) {
+        uasort($agg, fn($a, $b) => $b['qty'] <=> $a['qty']);
+        $bestProducts = array_slice($agg, 0, 4, true);
+    } catch (PDOException $e) {
+    }
 }
 
 /* =========================================================
@@ -312,10 +320,10 @@ function productImg($img)
                 </button>
 
                 <div class="admin-profile">
-                    <div class="admin-avatar">A</div>
+                    <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
                     <div>
-                        <div class="admin-name">Admin</div>
-                        <div class="admin-role">Store Manager</div>
+                        <div class="admin-name"><?= htmlspecialchars($_SESSION['admin_name'] ?? 'User') ?></div>
+                        <div class="admin-role"><?= $isAdmin ? 'Admin' : 'Staff' ?></div>
                     </div>
                 </div>
             </div>
@@ -325,22 +333,15 @@ function productImg($img)
         <div class="content">
 
             <?php
-            /* Session values set at login */
             $displayName = $_SESSION['admin_name'] ?? 'User';
-
-            /* Role label */
-            $roleLabel = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin')
-                ? 'Admin'
-                : 'Staff';
-
-            /* Extract first name */
-            $firstName = explode(' ', trim($displayName))[0];
+            $roleLabel   = $isAdmin ? 'Admin' : 'Staff';
+            $firstName   = explode(' ', trim($displayName))[0];
             ?>
 
             <div class="page-heading">
                 <h1><?= htmlspecialchars(greeting()) ?>, <?= htmlspecialchars($firstName) ?> 👋</h1>
                 <p>
-                    <?php if ($roleLabel === 'Admin'): ?>
+                    <?php if ($isAdmin): ?>
                         Here's what's happening with your fresh products today.
                     <?php else: ?>
                         Here's your work overview for today.
@@ -361,9 +362,14 @@ function productImg($img)
                         Happy customers.
                     </h2>
                     <p>
-                        Your store is growing beautifully.
-                        Keep your products fresh, your customers happy
-                        and your orders moving.
+                        <?php if ($isAdmin): ?>
+                            Your store is growing beautifully.
+                            Keep your products fresh, your customers happy
+                            and your orders moving.
+                        <?php else: ?>
+                            Keep orders moving and customers happy.
+                            Every delivery you handle matters.
+                        <?php endif; ?>
                     </p>
 
                     <div class="hero-stats">
@@ -376,11 +382,6 @@ function productImg($img)
                             <strong><?= $kpi['today_ord'] ?></strong>
                             <span>Orders Today</span>
                         </div>
-                        <div class="hero-divider"></div>
-                        <div class="hero-stat">
-                            <strong>94%</strong>
-                            <span>Fresh Stock</span>
-                        </div>
                     </div>
                 </div>
 
@@ -392,17 +393,21 @@ function productImg($img)
             <!-- KPI CARDS -->
             <div class="row g-3 mb-4">
 
-                <div class="col-12 col-sm-6 col-xl-3">
-                    <div class="kpi-card">
-                        <div class="kpi-top">
-                            <div class="kpi-icon red"><i class="bi bi-currency-rupee"></i></div>
-                            <span class="trend up"><i class="bi bi-arrow-up"></i> 12.5%</span>
+                <?php if ($isAdmin): ?>
+                    <!-- Total Revenue — ADMIN ONLY -->
+                    <div class="col-12 col-sm-6 col-xl-3">
+                        <div class="kpi-card">
+                            <div class="kpi-top">
+                                <div class="kpi-icon red"><i class="bi bi-currency-rupee"></i></div>
+                                <span class="trend up"><i class="bi bi-arrow-up"></i> 12.5%</span>
+                            </div>
+                            <div class="kpi-label">Total Revenue</div>
+                            <div class="kpi-value"><?= rupees($kpi['revenue']) ?></div>
                         </div>
-                        <div class="kpi-label">Total Revenue</div>
-                        <div class="kpi-value"><?= rupees($kpi['revenue']) ?></div>
                     </div>
-                </div>
+                <?php endif; ?>
 
+                <!-- Total Orders — everyone -->
                 <div class="col-12 col-sm-6 col-xl-3">
                     <div class="kpi-card">
                         <div class="kpi-top">
@@ -414,6 +419,7 @@ function productImg($img)
                     </div>
                 </div>
 
+                <!-- Products — everyone -->
                 <div class="col-12 col-sm-6 col-xl-3">
                     <div class="kpi-card">
                         <div class="kpi-top">
@@ -425,6 +431,7 @@ function productImg($img)
                     </div>
                 </div>
 
+                <!-- Customers — everyone -->
                 <div class="col-12 col-sm-6 col-xl-3">
                     <div class="kpi-card">
                         <div class="kpi-top">
@@ -442,51 +449,55 @@ function productImg($img)
             <!-- REVENUE + ORDER STATUS -->
             <div class="row g-3 mb-4">
 
-                <div class="col-12 col-xl-8">
-                    <div class="section-card">
-                        <div class="section-title">
-                            <div>
-                                <h3>Revenue Overview</h3>
-                                <span>Monthly sales performance</span>
-                            </div>
-
-                            <form method="GET" id="yearForm" style="margin:0;">
-                                <select name="year" class="form-select form-select-sm"
-                                    style="width:100px;font-size:10px;"
-                                    onchange="document.getElementById('yearForm').submit();">
-                                    <?php foreach ($yearOptions as $y): ?>
-                                        <option value="<?= $y ?>" <?= $y === $chartYear ? 'selected' : '' ?>>
-                                            <?= $y ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </form>
-                        </div>
-
-                        <div class="chart-area">
-                            <div class="chart-grid">
-                                <div class="chart-grid-line"></div>
-                                <div class="chart-grid-line"></div>
-                                <div class="chart-grid-line"></div>
-                                <div class="chart-grid-line"></div>
-                                <div class="chart-grid-line"></div>
-                            </div>
-
-                            <?php foreach ($monthlyRevenue as $m):
-                                $h = $maxRevenue > 0 ? round(($m['revenue'] / $maxRevenue) * 100) : 0;
-                                if ($h < 3) $h = 3;
-                            ?>
-                                <div class="bar-wrap">
-                                    <div class="bar" style="height:<?= $h ?>%;" title="<?= rupees($m['revenue']) ?>"></div>
-                                    <div class="bar-label"><?= htmlspecialchars($m['mon']) ?></div>
+                <?php if ($isAdmin): ?>
+                    <!-- Revenue Overview chart — ADMIN ONLY -->
+                    <div class="col-12 col-xl-8">
+                        <div class="section-card">
+                            <div class="section-title">
+                                <div>
+                                    <h3>Revenue Overview</h3>
+                                    <span>Monthly sales performance</span>
                                 </div>
-                            <?php endforeach; ?>
+
+                                <form method="GET" id="yearForm" style="margin:0;">
+                                    <select name="year" class="form-select form-select-sm"
+                                        style="width:100px;font-size:10px;"
+                                        onchange="document.getElementById('yearForm').submit();">
+                                        <?php foreach ($yearOptions as $y): ?>
+                                            <option value="<?= $y ?>" <?= $y === $chartYear ? 'selected' : '' ?>>
+                                                <?= $y ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </form>
+                            </div>
+
+                            <div class="chart-area">
+                                <div class="chart-grid">
+                                    <div class="chart-grid-line"></div>
+                                    <div class="chart-grid-line"></div>
+                                    <div class="chart-grid-line"></div>
+                                    <div class="chart-grid-line"></div>
+                                    <div class="chart-grid-line"></div>
+                                </div>
+
+                                <?php foreach ($monthlyRevenue as $m):
+                                    $h = $maxRevenue > 0 ? round(($m['revenue'] / $maxRevenue) * 100) : 0;
+                                    if ($h < 3) $h = 3;
+                                ?>
+                                    <div class="bar-wrap">
+                                        <div class="bar" style="height:<?= $h ?>%;" title="<?= rupees($m['revenue']) ?>"></div>
+                                        <div class="bar-label"><?= htmlspecialchars($m['mon']) ?></div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
 
-                <div class="col-12 col-xl-4">
+                <!-- Order Status — everyone. Wider if chart hidden -->
+                <div class="col-12 <?= $isAdmin ? 'col-xl-4' : 'col-xl-12' ?>">
                     <div class="section-card">
                         <div class="section-title">
                             <div>
@@ -499,17 +510,16 @@ function productImg($img)
                         <div class="status-layout">
 
                             <?php
-                            /* Donut conic-gradient */
                             $d1 = $donutDelivered;
                             $d2 = $d1 + $donutProcessing;
                             $d3 = $d2 + $donutPending;
 
                             $donutStyle =
                                 "background: conic-gradient(" .
-                                "#2e7d32 0% {$d1}%, " .              /* Delivered */
-                                "#1565c0 {$d1}% {$d2}%, " .          /* Processing */
-                                "#b8893c {$d2}% {$d3}%, " .          /* Pending */
-                                "#c8bfb4 {$d3}% 100%);";             /* Cancelled */
+                                "#2e7d32 0% {$d1}%, " .
+                                "#1565c0 {$d1}% {$d2}%, " .
+                                "#b8893c {$d2}% {$d3}%, " .
+                                "#c8bfb4 {$d3}% 100%);";
                             ?>
 
                             <div class="donut" style="<?= $donutStyle ?>">
@@ -554,7 +564,8 @@ function productImg($img)
             <!-- STOCK + BEST SELLERS -->
             <div class="row g-3 mb-4">
 
-                <div class="col-12 col-xl-6">
+                <!-- Freshness & Stock — everyone. Wider when best sellers hidden -->
+                <div class="col-12 <?= $isAdmin ? 'col-xl-6' : 'col-xl-12' ?>">
                     <div class="section-card">
                         <div class="section-title">
                             <div>
@@ -602,51 +613,54 @@ function productImg($img)
                 </div>
 
 
-                <div class="col-12 col-xl-6">
-                    <div class="section-card">
-                        <div class="section-title">
-                            <div>
-                                <h3>Best Selling Products</h3>
-                                <span>Top performing products</span>
-                            </div>
-                            <a href="<?= ADMIN_URL ?>products.php" class="view-link">View Products</a>
-                        </div>
-
-                        <?php if (empty($bestProducts)): ?>
-                            <div style="padding:30px 20px;text-align:center;color:#948c82;font-size:12px;">
-                                No sales data yet.
-                            </div>
-                        <?php else: ?>
-                            <?php $rank = 1;
-                            foreach ($bestProducts as $name => $bp):
-                                $bImg = !empty($bp['image']) ? $bp['image'] : '';
-                            ?>
-                                <div class="best-product">
-
-                                    <div class="rank"><?= str_pad((string)$rank, 2, '0', STR_PAD_LEFT) ?></div>
-
-                                    <div class="best-image">
-                                        <?php if ($bImg): ?>
-                                            <img src="<?= htmlspecialchars($bImg) ?>" alt=""
-                                                onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
-                                        <?php else: ?>
-                                            <div class="no-img"><i class="bi bi-image"></i></div>
-                                        <?php endif; ?>
-                                    </div>
-
-                                    <div class="best-info">
-                                        <strong><?= htmlspecialchars($name) ?></strong>
-                                        <span><?= (int)$bp['qty'] ?> orders</span>
-                                    </div>
-
-                                    <div class="best-sales"><?= rupees($bp['revenue']) ?></div>
-
+                <?php if ($isAdmin): ?>
+                    <!-- Best Selling Products — ADMIN ONLY -->
+                    <div class="col-12 col-xl-6">
+                        <div class="section-card">
+                            <div class="section-title">
+                                <div>
+                                    <h3>Best Selling Products</h3>
+                                    <span>Top performing products</span>
                                 </div>
-                            <?php $rank++;
-                            endforeach; ?>
-                        <?php endif; ?>
+                                <a href="<?= ADMIN_URL ?>products.php" class="view-link">View Products</a>
+                            </div>
+
+                            <?php if (empty($bestProducts)): ?>
+                                <div style="padding:30px 20px;text-align:center;color:#948c82;font-size:12px;">
+                                    No sales data yet.
+                                </div>
+                            <?php else: ?>
+                                <?php $rank = 1;
+                                foreach ($bestProducts as $name => $bp):
+                                    $bImg = !empty($bp['image']) ? $bp['image'] : '';
+                                ?>
+                                    <div class="best-product">
+
+                                        <div class="rank"><?= str_pad((string)$rank, 2, '0', STR_PAD_LEFT) ?></div>
+
+                                        <div class="best-image">
+                                            <?php if ($bImg): ?>
+                                                <img src="<?= htmlspecialchars($bImg) ?>" alt=""
+                                                    onerror="this.style.display='none';this.parentElement.innerHTML='<div class=\'no-img\'><i class=\'bi bi-image\'></i></div>';">
+                                            <?php else: ?>
+                                                <div class="no-img"><i class="bi bi-image"></i></div>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <div class="best-info">
+                                            <strong><?= htmlspecialchars($name) ?></strong>
+                                            <span><?= (int)$bp['qty'] ?> orders</span>
+                                        </div>
+
+                                        <div class="best-sales"><?= rupees($bp['revenue']) ?></div>
+
+                                    </div>
+                                <?php $rank++;
+                                endforeach; ?>
+                            <?php endif; ?>
+                        </div>
                     </div>
-                </div>
+                <?php endif; ?>
 
             </div>
 
@@ -723,15 +737,19 @@ function productImg($img)
                             </div>
                         </div>
 
-                        <a href="<?= ADMIN_URL ?>add-product.php" class="quick-action">
-                            <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
-                            <div>
-                                <strong>Add Product</strong>
-                                <span>Create new product</span>
-                            </div>
-                        </a>
+                        <?php if ($isAdmin): ?>
+                            <!-- Add Product — ADMIN ONLY -->
+                            <a href="<?= ADMIN_URL ?>add-product.php" class="quick-action">
+                                <div class="quick-icon"><i class="bi bi-plus-lg"></i></div>
+                                <div>
+                                    <strong>Add Product</strong>
+                                    <span>Create new product</span>
+                                </div>
+                            </a>
+                        <?php endif; ?>
 
-                        <a href="<?= ADMIN_URL ?>take-order.php" class="quick-action">
+                        <!-- New Order — everyone (staff helps take orders) -->
+                        <a href="<?= ADMIN_URL ?>manual-order-taken.php" class="quick-action">
                             <div class="quick-icon"><i class="bi bi-bag-plus"></i></div>
                             <div>
                                 <strong>New Order</strong>
@@ -739,29 +757,35 @@ function productImg($img)
                             </div>
                         </a>
 
-                        <a href="<?= ADMIN_URL ?>discounts.php" class="quick-action">
-                            <div class="quick-icon"><i class="bi bi-tag"></i></div>
-                            <div>
-                                <strong>Create Offer</strong>
-                                <span>Promote your products</span>
-                            </div>
-                        </a>
+                        <?php if ($isAdmin): ?>
+                            <!-- Create Offer — ADMIN ONLY -->
+                            <a href="<?= ADMIN_URL ?>discounts.php" class="quick-action">
+                                <div class="quick-icon"><i class="bi bi-tag"></i></div>
+                                <div>
+                                    <strong>Create Offer</strong>
+                                    <span>Promote your products</span>
+                                </div>
+                            </a>
 
-                        <a href="<?= ADMIN_URL ?>report.php" class="quick-action">
-                            <div class="quick-icon"><i class="bi bi-bar-chart-line"></i></div>
-                            <div>
-                                <strong>View Reports</strong>
-                                <span>Check sales performance</span>
-                            </div>
-                        </a>
+                            <!-- Reports — ADMIN ONLY -->
+                            <a href="<?= ADMIN_URL ?>report.php" class="quick-action">
+                                <div class="quick-icon"><i class="bi bi-bar-chart-line"></i></div>
+                                <div>
+                                    <strong>View Reports</strong>
+                                    <span>Check sales performance</span>
+                                </div>
+                            </a>
 
-                        <a href="<?= ADMIN_URL ?>settings.php" class="quick-action">
-                            <div class="quick-icon"><i class="bi bi-gear"></i></div>
-                            <div>
-                                <strong>Store Settings</strong>
-                                <span>Manage your store</span>
-                            </div>
-                        </a>
+                            <!-- Store Settings — ADMIN ONLY -->
+                            <a href="<?= ADMIN_URL ?>settings.php" class="quick-action">
+                                <div class="quick-icon"><i class="bi bi-gear"></i></div>
+                                <div>
+                                    <strong>Store Settings</strong>
+                                    <span>Manage your store</span>
+                                </div>
+                            </a>
+                        <?php endif; ?>
+
                     </div>
                 </div>
 

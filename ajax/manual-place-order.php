@@ -7,7 +7,6 @@ header('Content-Type: application/json; charset=utf-8');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     jsonResponse(false, 'Method not allowed.');
 }
-
 if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     jsonResponse(false, 'Not logged in.');
 }
@@ -21,8 +20,12 @@ $divisionCharge = (float)($_POST['division_charge'] ?? 0);
 $branchId       = (int)($_POST['pickup_branch_id'] ?? 0);
 $productsJson   = $_POST['products'] ?? '[]';
 $products       = json_decode($productsJson, true);
+$paymentMethod  = trim($_POST['payment_method'] ?? 'qr');
 
-/* ---------- Validation ---------- */
+if (!in_array($paymentMethod, ['qr', 'wallet'], true)) {
+    $paymentMethod = 'qr';
+}
+
 if ($name === '' || mb_strlen($name) < 2) {
     jsonResponse(false, 'Customer name is required.');
 }
@@ -37,6 +40,29 @@ if (!is_array($products) || count($products) === 0) {
 }
 
 try {
+    /* Ensure wallet column exists */
+    try {
+        $pdo->exec("ALTER TABLE customers ADD COLUMN wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER division_charge");
+    } catch (PDOException $e) { /* ignore */
+    }
+
+    /* Ensure simplified container table exists */
+    try {
+        $pdo->exec("CREATE TABLE IF NOT EXISTS order_containers (
+            id INT(11) NOT NULL AUTO_INCREMENT,
+            order_id INT(11) NOT NULL,
+            customer_id INT(11) DEFAULT NULL,
+            total_containers INT(11) NOT NULL DEFAULT 0,
+            container_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
+            PRIMARY KEY (id),
+            UNIQUE KEY order_unique (order_id),
+            KEY customer_id (customer_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
+    } catch (PDOException $e) { /* ignore */
+    }
+
     $apartmentCode = '';
     $apartmentName = '';
     $branchName    = '';
@@ -59,7 +85,6 @@ try {
         $apartmentCode = $apt['apartment_code'];
         $apartmentName = $apt['apartment_name'];
 
-        /* Validate division + get its charge */
         $divs = json_decode($apt['divisions'] ?? '[]', true);
         $matched = null;
         if (is_array($divs)) {
@@ -74,9 +99,7 @@ try {
             jsonResponse(false, 'Division is not valid for this apartment.');
         }
         $divisionCharge = $matched;
-
     } else {
-        /* Store pickup */
         $apartmentId    = 0;
         $apartmentCode  = '';
         $apartmentName  = '';
@@ -94,7 +117,7 @@ try {
         }
     }
 
-    /* Auto-assign delivery boy for delivery orders */
+    /* Auto-assign delivery boy */
     $deliveryBoyId = null;
     if ($mode === 'delivery' && $apartmentCode !== '') {
         try {
@@ -109,12 +132,26 @@ try {
             $dBoyStmt->execute([$apartmentCode]);
             $row = $dBoyStmt->fetch(PDO::FETCH_ASSOC);
             if ($row) $deliveryBoyId = (int)$row['delivery_boy_id'];
-        } catch (PDOException $e) {}
+        } catch (PDOException $e) {
+        }
+    }
+
+    /* Find customer id (for container mapping) */
+    $customerId = null;
+    try {
+        $ccStmt = $pdo->prepare("SELECT id FROM customers WHERE mobile_number = ? LIMIT 1");
+        $ccStmt->execute([$mobile]);
+        $cid = $ccStmt->fetchColumn();
+        if ($cid) $customerId = (int)$cid;
+    } catch (PDOException $e) {
     }
 
     /* ---------- Build items ---------- */
     $items = [];
     $subtotal = 0;
+
+    $totalContainers = 0;
+    $containerAmount = 0;
 
     foreach ($products as $p) {
         $qty   = max(1, (int)($p['qty'] ?? 1));
@@ -122,20 +159,34 @@ try {
         $line  = $price * $qty;
         $subtotal += $line;
 
+        $containerEnabled = (int)($p['container_enabled'] ?? 0) === 1 ? 1 : 0;
+        $containerPrice   = (float)($p['container_price'] ?? 0);
+
+        $lineContainerAmount = 0;
+        if ($containerEnabled && $containerPrice > 0) {
+            $lineContainerAmount = $containerPrice * $qty;
+            $totalContainers    += $qty;
+            $containerAmount    += $lineContainerAmount;
+        }
+
         $items[] = [
-            'product_id'   => (int)($p['product_id'] ?? 0),
-            'code'         => $p['code'] ?? '',
-            'name'         => $p['name'] ?? '',
-            'image'        => $p['image'] ?? '',
-            'variant_id'   => (int)($p['variant_id'] ?? 0),
-            'variant_name' => $p['variant_name'] ?? '',
-            'variant_qty'  => $p['variant_qty'] ?? '',
-            'price'        => $price,
-            'qty'          => $qty,
-            'line_total'   => $line,
+            'product_id'           => (int)($p['product_id'] ?? 0),
+            'code'                 => $p['code'] ?? '',
+            'name'                 => $p['name'] ?? '',
+            'image'                => $p['image'] ?? '',
+            'variant_id'           => (int)($p['variant_id'] ?? 0),
+            'variant_name'         => $p['variant_name'] ?? '',
+            'variant_qty'          => $p['variant_qty'] ?? '',
+            'price'                => $price,
+            'qty'                  => $qty,
+            'line_total'           => $line,
+            'container_enabled'    => $containerEnabled,
+            'container_price'      => $containerEnabled ? $containerPrice : 0,
+            'container_line_total' => $lineContainerAmount,
         ];
     }
 
+    /* Container deposit NOT added to total */
     $total = $subtotal + ($mode === 'delivery' ? $divisionCharge : 0);
 
     /* ---------- Order code ---------- */
@@ -146,7 +197,110 @@ try {
     }
     $orderCode = 'ORD' . str_pad((string)$nextNum, 6, '0', STR_PAD_LEFT);
 
-    /* ---------- Insert ---------- */
+    /* ---------- Wallet or QR ---------- */
+    $paymentStatus = 'unpaid';
+    $paidAt        = null;
+    $walletInfo    = null;
+    $upiString     = '';
+
+    if ($paymentMethod === 'wallet') {
+
+        $pdo->beginTransaction();
+
+        try {
+            $cStmt = $pdo->prepare(
+                "SELECT id, full_name, wallet_balance
+                 FROM customers
+                 WHERE mobile_number = ?
+                 LIMIT 1
+                 FOR UPDATE"
+            );
+            $cStmt->execute([$mobile]);
+            $cust = $cStmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$cust) {
+                $pdo->rollBack();
+                jsonResponse(false, 'No wallet account found for this mobile. Please use QR payment.');
+            }
+
+            $walletBalance = (float)$cust['wallet_balance'];
+
+            if ($walletBalance < $total) {
+                $pdo->rollBack();
+                jsonResponse(
+                    false,
+                    'Insufficient wallet balance. Available: ₹' . number_format($walletBalance, 2) .
+                        ' · Required: ₹' . number_format($total, 2)
+                );
+            }
+
+            $newBalance = $walletBalance - $total;
+
+            $upd = $pdo->prepare(
+                "UPDATE customers
+                 SET wallet_balance = ?, updated_at = NOW()
+                 WHERE id = ?"
+            );
+            $upd->execute([$newBalance, (int)$cust['id']]);
+
+            try {
+                $txnCode = 'TXN' . date('ymd') . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
+
+                $log = $pdo->prepare(
+                    "INSERT INTO customer_wallet_transactions
+                        (customer_id, customer_name, customer_mobile, txn_code,
+                         txn_type, amount, balance_before, balance_after,
+                         source, note, created_by_id, created_by_name, created_at)
+                     VALUES (?, ?, ?, ?, 'debit', ?, ?, ?, 'admin', ?, ?, ?, NOW())"
+                );
+                $log->execute([
+                    (int)$cust['id'],
+                    $name,
+                    $mobile,
+                    $txnCode,
+                    $total,
+                    $walletBalance,
+                    $newBalance,
+                    'Manual order ' . $orderCode,
+                    (int)$_SESSION['admin_id'],
+                    $_SESSION['admin_name'] ?? 'Admin'
+                ]);
+            } catch (PDOException $e) { /* ignore */
+            }
+
+            $paymentStatus = 'paid';
+            $paidAt        = date('Y-m-d H:i:s');
+            $customerId    = (int)$cust['id'];
+            $walletInfo = [
+                'balance_before' => $walletBalance,
+                'balance_after'  => $newBalance,
+                'amount_paid'    => $total,
+            ];
+        } catch (PDOException $e) {
+            if ($pdo->inTransaction()) $pdo->rollBack();
+            jsonResponse(false, 'Wallet deduction failed.');
+        }
+    } else {
+        /* QR — build UPI string */
+        $settings = getSettings($pdo);
+        $upiId    = trim($settings['upi_id'] ?? '');
+        $siteName = trim($settings['username'] ?? 'Mrs Mill@');
+
+        if ($upiId === '') {
+            jsonResponse(false, 'UPI ID is not configured. Please contact admin.');
+        }
+
+        $upiParams = [
+            'pa' => $upiId,
+            'pn' => $siteName,
+            'am' => number_format($total, 2, '.', ''),
+            'cu' => 'INR',
+            'tn' => 'Order ' . $orderCode
+        ];
+        $upiString = 'upi://pay?' . http_build_query($upiParams);
+    }
+
+    /* ---------- Insert order ---------- */
     $ins = $pdo->prepare(
         "INSERT INTO orders
             (order_code, delivery_boy_id, customer_name, customer_mobile,
@@ -154,14 +308,14 @@ try {
              division, division_charge, delivery_mode,
              pickup_branch_id, pickup_branch_name,
              subtotal, total_amount, products_json,
-             status, delivery_status, payment_status, created_at)
+             status, delivery_status, payment_status, payment_upi_string, paid_at, created_at)
          VALUES
             (?, ?, ?, ?,
              ?, ?, ?,
              ?, ?, ?,
              ?, ?,
              ?, ?, ?,
-             'pending', 'disabled', 'unpaid', NOW())"
+             'pending', 'disabled', ?, ?, ?, NOW())"
     );
 
     $ins->execute([
@@ -180,17 +334,50 @@ try {
         $subtotal,
         $total,
         json_encode($items, JSON_UNESCAPED_UNICODE),
+        $paymentStatus,
+        $upiString !== '' ? $upiString : null,
+        $paidAt,
     ]);
 
     $orderId = (int)$pdo->lastInsertId();
 
-    jsonResponse(true, 'Order placed.', [
-        'order_id'   => $orderId,
-        'order_code' => $orderCode,
-        'total'      => $total,
-        'mode'       => $mode,
-    ]);
+    /* ---------- Insert container row (only 4 fields) ---------- */
+    if ($totalContainers > 0) {
+        try {
+            $cIns = $pdo->prepare(
+                "INSERT INTO order_containers
+                    (order_id, customer_id, total_containers, container_amount, created_at)
+                 VALUES (?, ?, ?, ?, NOW())"
+            );
+            $cIns->execute([
+                $orderId,
+                $customerId,
+                $totalContainers,
+                $containerAmount,
+            ]);
+        } catch (PDOException $e) {
+            /* ignore — order still succeeds */
+        }
+    }
 
+    if ($pdo->inTransaction()) {
+        $pdo->commit();
+    }
+
+    jsonResponse(true, 'Order placed.', [
+        'order_id'         => $orderId,
+        'order_code'       => $orderCode,
+        'total'            => $total,
+        'mode'             => $mode,
+        'payment_method'   => $paymentMethod,
+        'payment_status'   => $paymentStatus,
+        'upi_string'       => $upiString,
+        'wallet'           => $walletInfo,
+        'total_containers' => $totalContainers,
+        'container_amount' => $containerAmount,
+        'has_containers'   => $totalContainers > 0,
+    ]);
 } catch (PDOException $e) {
+    if ($pdo->inTransaction()) $pdo->rollBack();
     jsonResponse(false, 'Server error placing order.');
 }

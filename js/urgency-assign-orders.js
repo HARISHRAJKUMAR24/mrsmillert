@@ -1,11 +1,6 @@
 /* =========================================================
    MRS MILL@ — REASSIGN ORDERS (Boy → Boy)
    File: ./js/urgency-assign-orders.js
-   - Admin + Staff both allowed
-   - "From Boy" required (only lists delivery boys, no "any")
-   - "To Boy" is the new assignee
-   - Multi-apartment, searchable dropdowns
-   - Loads apartments AND orders filtered by from-boy
    ========================================================= */
 
 (function () {
@@ -16,65 +11,58 @@
         : "./";
 
     const MENUS = Array.isArray(window.MENUS) ? window.MENUS : [];
-    const BOYS  = Array.isArray(window.DELIVERY_BOYS) ? window.DELIVERY_BOYS : [];
+    const BOYS = Array.isArray(window.DELIVERY_BOYS) ? window.DELIVERY_BOYS : [];
 
-    /* ---------- DOM: Menu dropdown ---------- */
-    const menuWrap    = document.getElementById("menuDdWrap");
-    const menuToggle  = document.getElementById("menuDdToggle");
-    const menuLabel   = document.getElementById("menuDdLabel");
-    const menuSearch  = document.getElementById("menuDdSearch");
-    const menuList    = document.getElementById("menuDdList");
-    const menuInput   = document.getElementById("asMenu");
+    /* ---------- DOM: Menu ---------- */
+    const menuWrap = document.getElementById("menuDdWrap");
+    const menuToggle = document.getElementById("menuDdToggle");
+    const menuLabel = document.getElementById("menuDdLabel");
+    const menuSearch = document.getElementById("menuDdSearch");
+    const menuList = document.getElementById("menuDdList");
+    const menuInput = document.getElementById("asMenu");
 
-    /* ---------- DOM: From Boy dropdown ---------- */
-    const fromBoyWrap   = document.getElementById("fromBoyDdWrap");
+    /* ---------- DOM: From Boy ---------- */
+    const fromBoyWrap = document.getElementById("fromBoyDdWrap");
     const fromBoyToggle = document.getElementById("fromBoyDdToggle");
-    const fromBoyLabel  = document.getElementById("fromBoyDdLabel");
+    const fromBoyLabel = document.getElementById("fromBoyDdLabel");
     const fromBoySearch = document.getElementById("fromBoyDdSearch");
-    const fromBoyList   = document.getElementById("fromBoyDdList");
-    const fromBoyInput  = document.getElementById("asFromBoy");
+    const fromBoyList = document.getElementById("fromBoyDdList");
+    const fromBoyInput = document.getElementById("asFromBoy");
 
-    /* ---------- DOM: To Boy dropdown ---------- */
-    const boyWrap    = document.getElementById("boyDdWrap");
-    const boyToggle  = document.getElementById("boyDdToggle");
-    const boyLabel   = document.getElementById("boyDdLabel");
-    const boySearch  = document.getElementById("boyDdSearch");
-    const boyList    = document.getElementById("boyDdList");
-    const boyInput   = document.getElementById("asBoy");
+    /* ---------- DOM: To Boy ---------- */
+    const boyWrap = document.getElementById("boyDdWrap");
+    const boyToggle = document.getElementById("boyDdToggle");
+    const boyLabel = document.getElementById("boyDdLabel");
+    const boySearch = document.getElementById("boyDdSearch");
+    const boyList = document.getElementById("boyDdList");
+    const boyInput = document.getElementById("asBoy");
 
     /* ---------- DOM: Other ---------- */
-    const aptList      = document.getElementById("asAptList");
-    const aptCountEl   = document.getElementById("asAptCount");
+    const aptList = document.getElementById("asAptList");
+    const aptCountEl = document.getElementById("asAptCount");
     const selectAllBtn = document.getElementById("asSelectAll");
-    const clearAllBtn  = document.getElementById("asClearAll");
+    const clearAllBtn = document.getElementById("asClearAll");
 
-    const previewHead  = document.getElementById("asPreviewHead");
-    const previewSub   = document.getElementById("asPreviewSub");
-    const countBadge   = document.getElementById("asCountBadge");
-    const previewWrap  = document.getElementById("asPreviewWrap");
+    const previewHead = document.getElementById("asPreviewHead");
+    const previewSub = document.getElementById("asPreviewSub");
+    const countBadge = document.getElementById("asCountBadge");
+    const previewWrap = document.getElementById("asPreviewWrap");
 
-    const resetBtn     = document.getElementById("asReset");
-    const assignBtn    = document.getElementById("asAssign");
-    const assignText   = document.getElementById("asAssignText");
+    const resetBtn = document.getElementById("asReset");
+    const assignBtn = document.getElementById("asAssign");
+    const assignText = document.getElementById("asAssignText");
 
-    const toast        = document.getElementById("asToast");
+    const toastWrap = document.getElementById("asToastWrap");
 
     /* ---------- STATE ---------- */
-    let currentOrders    = [];
-    let selectedMenuId   = 0;
+    let currentOrders = [];
+    let selectedMenuId = 0;
     let selectedMenuCode = "";
-    let selectedApts     = new Set();
-    let apartmentsCache  = [];
+    let selectedApts = new Set();
+    let apartmentsCache = [];
+    let isAssigning = false;
 
     /* ---------- Helpers ---------- */
-    function showToast(msg, type) {
-        if (!toast) return;
-        toast.textContent = msg;
-        toast.className = "as-toast show" + (type === "error" ? " error" : "");
-        clearTimeout(toast._t);
-        toast._t = setTimeout(() => (toast.className = "as-toast"), 2600);
-    }
-
     function esc(s) {
         return String(s == null ? "" : s)
             .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -95,6 +83,56 @@
         } catch (e) { return s; }
     }
 
+    /* =====================================================
+       ADMIN PANEL TOAST
+       ===================================================== */
+    function showToast(type, message, timeout) {
+        if (!toastWrap) return;
+
+        const icons = {
+            success: "bi-check-lg",
+            error: "bi-x-lg",
+            info: "bi-info-lg"
+        };
+
+        const el = document.createElement("div");
+        el.className = "as-toast " + type;
+        el.innerHTML = `
+            <div class="as-toast-icon"><i class="bi ${icons[type] || icons.info}"></i></div>
+            <div class="as-toast-body">${esc(message)}</div>
+            <button type="button" class="as-toast-close" aria-label="Close">
+                <i class="bi bi-x"></i>
+            </button>
+        `;
+
+        toastWrap.appendChild(el);
+        requestAnimationFrame(() => el.classList.add("show"));
+
+        const close = () => {
+            el.classList.remove("show");
+            setTimeout(() => el.remove(), 300);
+        };
+
+        el.querySelector(".as-toast-close").addEventListener("click", close);
+        setTimeout(close, timeout || 3200);
+    }
+
+    /* =====================================================
+       ASSIGN BUTTON LOADING
+       ===================================================== */
+    function setAssignLoading(isLoading) {
+        isAssigning = !!isLoading;
+        if (!assignBtn) return;
+
+        assignBtn.disabled = isLoading;
+
+        if (isLoading) {
+            assignText.innerHTML = '<span class="btn-spinner"></span> Assigning…';
+        } else {
+            updateAssignButton();
+        }
+    }
+
     function updateAptCount() {
         if (!aptCountEl) return;
         aptCountEl.textContent = selectedApts.size + " selected";
@@ -103,7 +141,7 @@
     function resetPreview() {
         currentOrders = [];
         if (previewHead) previewHead.style.display = "none";
-        assignBtn.disabled = true;
+        if (assignBtn) assignBtn.disabled = true;
         previewWrap.innerHTML = `
             <div class="as-empty">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -182,7 +220,7 @@
         const menu = MENUS.find(m => Number(m.id) === id);
         if (!menu) return;
 
-        selectedMenuId   = id;
+        selectedMenuId = id;
         selectedMenuCode = menu.menu_code || "";
 
         menuInput.value = String(id);
@@ -195,7 +233,7 @@
     });
 
     /* =====================================================
-       FROM BOY DROPDOWN — only delivery boys
+       FROM BOY DROPDOWN
        ===================================================== */
     function renderFromBoyList(query) {
         if (!fromBoyList) return;
@@ -272,7 +310,6 @@
 
         closeFromBoyDd();
 
-        /* Reset apartment + order state — filter changed */
         selectedApts.clear();
         apartmentsCache = [];
         updateAptCount();
@@ -322,8 +359,8 @@
                     <div class="name">${esc(b.full_name)}</div>
                     <div class="meta">
                         ${isSameAsFrom
-                            ? '<span style="color:#b51f2c;">same as from</span>'
-                            : '#' + esc(b.delivery_code || '') + ' · ' + esc(b.mobile_number || '')}
+                    ? '<span style="color:#b51f2c;">same as from</span>'
+                    : '#' + esc(b.delivery_code || '') + ' · ' + esc(b.mobile_number || '')}
                     </div>
                 </div>
             `;
@@ -372,20 +409,18 @@
         updateAssignButton();
     });
 
-    /* ---------- Close on outside click ---------- */
     document.addEventListener("click", function (e) {
-        if (!e.target.closest("#menuDdWrap"))    closeMenuDd();
+        if (!e.target.closest("#menuDdWrap")) closeMenuDd();
         if (!e.target.closest("#fromBoyDdWrap")) closeFromBoyDd();
-        if (!e.target.closest("#boyDdWrap"))     closeBoyDd();
+        if (!e.target.closest("#boyDdWrap")) closeBoyDd();
     });
 
-    /* ---------- Initial render ---------- */
     renderMenuList("");
     renderFromBoyList("");
     renderBoyList("");
 
     /* =====================================================
-       LOAD APARTMENTS (needs MENU + FROM-BOY)
+       LOAD APARTMENTS
        ===================================================== */
     function maybeLoadApartments() {
         if (!selectedMenuId) return;
@@ -442,7 +477,6 @@
             });
     }
 
-    /* ---------- RENDER APARTMENT LIST ---------- */
     function renderApartmentList() {
         if (!aptList) return;
 
@@ -477,7 +511,6 @@
         updateAptCount();
     }
 
-    /* ---------- APARTMENT TOGGLE ---------- */
     aptList?.addEventListener("click", function (e) {
         const item = e.target.closest(".as-apt-item");
         if (!item) return;
@@ -497,7 +530,6 @@
         loadOrdersForSelectedApts();
     });
 
-    /* ---------- SELECT ALL / CLEAR ---------- */
     selectAllBtn?.addEventListener("click", () => {
         apartmentsCache.forEach(a => selectedApts.add(a.apartment_code));
         aptList.querySelectorAll(".as-apt-item").forEach(el => el.classList.add("is-checked"));
@@ -512,7 +544,9 @@
         resetPreview();
     });
 
-    /* ---------- LOAD ORDERS FOR SELECTED APARTMENTS ---------- */
+    /* =====================================================
+       LOAD ORDERS
+       ===================================================== */
     function loadOrdersForSelectedApts() {
         if (selectedApts.size === 0 || !selectedMenuId) {
             resetPreview();
@@ -566,7 +600,6 @@
             });
     }
 
-    /* ---------- RENDER PREVIEW ---------- */
     function renderPreview() {
         const count = currentOrders.length;
         countBadge.textContent = count + (count === 1 ? " order" : " orders");
@@ -600,7 +633,7 @@
                     </thead>
                     <tbody>
                         ${currentOrders.map(o => {
-                            return `
+            return `
                                 <tr>
                                     <td>
                                         <span class="as-code">#${esc(o.order_code)}</span>
@@ -621,7 +654,7 @@
                                     </td>
                                     <td><span class="as-amount">${money(o.total_amount)}</span></td>
                                 </tr>`;
-                        }).join("")}
+        }).join("")}
                     </tbody>
                 </table>
             </div>`;
@@ -629,10 +662,11 @@
         updateAssignButton();
     }
 
-    /* ---------- ENABLE ASSIGN ONLY WHEN BOTH BOYS CHOSEN ---------- */
     function updateAssignButton() {
+        if (isAssigning) return;
+
         const fromId = Number(fromBoyInput.value || 0);
-        const toId   = Number(boyInput.value || 0);
+        const toId = Number(boyInput.value || 0);
         const hasOrder = currentOrders.length > 0;
 
         if (fromId > 0 && toId > 0 && hasOrder) {
@@ -651,17 +685,17 @@
         }
     }
 
-    /* ---------- RESET ---------- */
+    /* =====================================================
+       RESET
+       ===================================================== */
     resetBtn?.addEventListener("click", () => {
-        /* Menu */
-        selectedMenuId   = 0;
+        selectedMenuId = 0;
         selectedMenuCode = "";
-        menuInput.value  = "";
+        menuInput.value = "";
         menuLabel.textContent = "— Select menu —";
         menuLabel.classList.add("placeholder");
         menuToggle.classList.remove("has-value");
 
-        /* From Boy */
         if (fromBoyInput) fromBoyInput.value = "";
         if (fromBoyLabel) {
             fromBoyLabel.textContent = "— Select current boy —";
@@ -669,13 +703,11 @@
         }
         if (fromBoyToggle) fromBoyToggle.classList.remove("has-value");
 
-        /* To Boy */
         boyInput.value = "";
         boyLabel.textContent = "— Select new boy —";
         boyLabel.classList.add("placeholder");
         boyToggle.classList.remove("has-value");
 
-        /* Apartments */
         selectedApts.clear();
         apartmentsCache = [];
         updateAptCount();
@@ -691,30 +723,33 @@
         renderBoyList("");
     });
 
-    /* ---------- ASSIGN / REASSIGN ---------- */
+    /* =====================================================
+       ASSIGN / REASSIGN
+       ===================================================== */
     assignBtn?.addEventListener("click", () => {
+        if (isAssigning) return;
+
         const fromId = Number(fromBoyInput.value || 0);
-        const toId   = Number(boyInput.value || 0);
+        const toId = Number(boyInput.value || 0);
 
         if (fromId <= 0) {
-            showToast("Please select a current delivery boy.", "error");
+            showToast("error", "Please select a current delivery boy.");
             return;
         }
         if (toId <= 0) {
-            showToast("Please select a new delivery boy.", "error");
+            showToast("error", "Please select a new delivery boy.");
             return;
         }
         if (fromId === toId) {
-            showToast("From and To boy cannot be the same.", "error");
+            showToast("error", "From and To boy cannot be the same.");
             return;
         }
         if (currentOrders.length === 0) {
-            showToast("No orders to assign.", "error");
+            showToast("error", "No orders to assign.");
             return;
         }
 
-        assignBtn.disabled = true;
-        assignText.innerHTML = '<span class="btn-spinner"></span> Assigning…';
+        setAssignLoading(true);
 
         const fd = new FormData();
         fd.append("delivery_boy_id", toId);
@@ -730,20 +765,22 @@
         })
             .then(r => r.json().catch(() => null))
             .then(res => {
+                /* ALWAYS reset loading — even on success */
+                setAssignLoading(false);
+
                 if (!res || !res.success) {
-                    showToast((res && res.message) || "Failed to reassign.", "error");
-                    assignBtn.disabled = false;
-                    updateAssignButton();
+                    showToast("error", (res && res.message) || "Failed to reassign.");
                     return;
                 }
 
-                showToast(res.message || "Orders reassigned successfully.");
-                loadOrdersForSelectedApts();
+                showToast("success", res.message || "Orders reassigned successfully.");
+
+                /* Reload apartments so the moved orders disappear */
+                loadApartmentsForMenu();
             })
             .catch(() => {
-                showToast("Unable to connect.", "error");
-                assignBtn.disabled = false;
-                updateAssignButton();
+                setAssignLoading(false);
+                showToast("error", "Unable to connect.");
             });
     });
 

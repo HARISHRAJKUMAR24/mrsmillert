@@ -9,54 +9,39 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
 }
 
 $mobile = trim($_GET['mobile'] ?? '');
-if (!preg_match('/^[0-9]{10,15}$/', $mobile)) {
-    jsonResponse(false, 'Invalid mobile.');
+if ($mobile === '') {
+    jsonResponse(false, 'Mobile number required.');
 }
 
 try {
-    /* Most recent order with an apartment */
     $stmt = $pdo->prepare(
-        "SELECT customer_name, apartment_id, apartment_code, apartment_name, division
-         FROM orders
-         WHERE customer_mobile = ?
-           AND apartment_id IS NOT NULL
-           AND apartment_id > 0
-         ORDER BY id DESC
+        "SELECT id, full_name, mobile_number,
+                apartment_id, apartment_code, apartment_name,
+                division, division_charge,
+                COALESCE(wallet_balance, 0) AS wallet_balance
+         FROM customers
+         WHERE mobile_number = ?
          LIMIT 1"
     );
     $stmt->execute([$mobile]);
-    $row = $stmt->fetch(PDO::FETCH_ASSOC);
+    $c = $stmt->fetch(PDO::FETCH_ASSOC);
 
-    if ($row) {
-        jsonResponse(true, 'Found in orders', [
-            'found'          => true,
-            'name'           => $row['customer_name'],
-            'apartment_id'   => (int)$row['apartment_id'],
-            'apartment_code' => $row['apartment_code'],
-            'apartment_name' => $row['apartment_name'],
-            'division'       => $row['division'],
-        ]);
+    if (!$c) {
+        jsonResponse(true, 'New customer.', ['found' => false]);
     }
 
-    /* Fallback: customers table */
-    $stmt2 = $pdo->prepare(
-        "SELECT full_name FROM customers WHERE mobile_number = ? AND status = 1 LIMIT 1"
-    );
-    $stmt2->execute([$mobile]);
-    $cust = $stmt2->fetch(PDO::FETCH_ASSOC);
-
-    if ($cust) {
-        jsonResponse(true, 'Found in customers', [
-            'found'          => true,
-            'name'           => $cust['full_name'],
-            'apartment_id'   => 0,
-            'apartment_code' => '',
-            'apartment_name' => '',
-            'division'       => '',
-        ]);
-    }
-
-    jsonResponse(true, 'No previous records', ['found' => false]);
+    jsonResponse(true, 'OK', [
+        'found'           => true,
+        'id'              => (int)$c['id'],
+        'name'            => $c['full_name'],
+        'mobile'          => $c['mobile_number'],
+        'apartment_id'    => (int)($c['apartment_id'] ?? 0),
+        'apartment_code'  => $c['apartment_code'] ?? '',
+        'apartment_name'  => $c['apartment_name'] ?? '',
+        'division'        => $c['division'] ?? '',
+        'division_charge' => (float)($c['division_charge'] ?? 0),
+        'wallet_balance'  => (float)$c['wallet_balance'],
+    ]);
 
 } catch (PDOException $e) {
     jsonResponse(false, 'Lookup failed.');

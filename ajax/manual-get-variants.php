@@ -40,8 +40,8 @@ try {
             'quantity_unit'     => $v['quantity_unit'],
             'quantity_name'     => $v['quantity_name'],
             'price'             => (float)$v['price'],
-            'container_enabled' => (int)$v['container_enabled'],
-            'container_price'   => (float)$v['container_price'],
+            'container_enabled' => (int)($v['container_enabled'] ?? 0),
+            'container_price'   => (float)($v['container_price'] ?? 0),
         ];
     }
 

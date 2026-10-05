@@ -741,35 +741,84 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             }
         }
 
-        /* Toast */
-        .as-toast {
+        /* =====================================================
+           TOAST — ADMIN PANEL STYLE
+           ===================================================== */
+        .as-toast-wrap {
             position: fixed;
-            top: 84px;
-            left: 50%;
-            transform: translateX(-50%) translateY(-10px);
-            padding: 10px 18px;
-            border-radius: 999px;
-            font-size: 12.5px;
-            font-weight: 700;
-            color: #fff;
-            background: #1f7a3d;
-            box-shadow: 0 10px 26px rgba(0, 0, 0, .18);
-            z-index: 99999;
-            opacity: 0;
+            top: 22px;
+            right: 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 10000;
             pointer-events: none;
-            transition: opacity .25s ease, transform .25s ease;
-            white-space: nowrap;
+        }
+
+        .as-toast {
+            min-width: 280px;
+            max-width: 380px;
+            background: #fff;
+            border-radius: 12px;
+            padding: 13px 15px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            font-size: 12.5px;
+            color: #302923;
+            border: 1px solid #eee7dc;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .14);
+            transform: translateX(120%);
+            opacity: 0;
+            transition: transform .3s cubic-bezier(.2, .9, .3, 1.2), opacity .3s ease;
+            pointer-events: auto;
         }
 
         .as-toast.show {
+            transform: translateX(0);
             opacity: 1;
-            transform: translateX(-50%) translateY(0);
         }
 
-        .as-toast.error {
-            background: #b51f2c;
+        .as-toast-icon {
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            flex-shrink: 0;
+            color: #fff;
         }
 
+        .as-toast.success .as-toast-icon { background: #4caf50; }
+        .as-toast.error   .as-toast-icon { background: #c62828; }
+        .as-toast.info    .as-toast-icon { background: #3b82f6; }
+
+        .as-toast-body {
+            flex: 1;
+            padding-top: 3px;
+            line-height: 1.5;
+            font-weight: 600;
+        }
+
+        .as-toast-close {
+            background: transparent;
+            border: 0;
+            color: #b5aca2;
+            cursor: pointer;
+            font-size: 14px;
+            padding: 0 2px;
+            line-height: 1;
+        }
+
+        .as-toast-close:hover {
+            color: #b51f2c;
+        }
+
+        /* =====================================================
+           RESPONSIVE
+           ===================================================== */
         @media (max-width: 992px) {
             .as-row {
                 grid-template-columns: 1fr;
@@ -795,6 +844,19 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
 
             .as-table-wrap {
                 overflow-x: auto;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .as-toast-wrap {
+                top: 14px;
+                right: 14px;
+                left: 14px;
+            }
+
+            .as-toast {
+                min-width: 0;
+                width: 100%;
             }
         }
     </style>
@@ -992,7 +1054,10 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
     </main>
 
 
-    <div class="as-toast" id="asToast"></div>
+    <!-- =========================================================
+         TOAST CONTAINER (admin panel style)
+         ========================================================= -->
+    <div class="as-toast-wrap" id="asToastWrap"></div>
 
 
     <!-- GLOBALS -->

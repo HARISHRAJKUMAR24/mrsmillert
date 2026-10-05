@@ -75,9 +75,14 @@ $isAdminUser = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'a
             Categories
         </a>
 
-        <a href="#">
+        <a href="customers.php">
             <i class="bi bi-people"></i>
             Customers
+        </a>
+
+        <a href="containers.php">
+            <i class="bi bi-boxes"></i>
+            Containers
         </a>
 
         <?php if ($isAdminUser): ?>
@@ -95,6 +100,11 @@ $isAdminUser = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'a
         <a href="urgency-assign-orders.php">
             <i class="bi bi-alarm-fill"></i>
             Urgency Swap Orders
+        </a>
+
+        <a href="address-requests-list.php">
+            <i class="bi bi-building-add"></i>
+            Apartment Requests
         </a>
 
         <div class="menu-title px-2 pt-4">
