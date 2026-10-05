@@ -14,6 +14,12 @@ requireAdmin();
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 
+/* GST settings for display */
+$gstNumber = trim($settings['gst_number'] ?? '');
+$taxStatus = (int)($settings['tax_status'] ?? 0);
+$taxRate   = (float)($settings['tax_rate'] ?? 0);
+$taxType   = $settings['tax_type'] ?? 'exclusive';
+
 /* ---------------- DATE RANGE ---------------- */
 $range  = $_GET['range']  ?? 'today';
 $from   = $_GET['from']   ?? '';
@@ -64,20 +70,27 @@ if ($dateTo !== null) {
 
 /* ---------------- MAIN STATS ---------------- */
 $stats = [
-    'revenue'   => 0,
-    'orders'    => 0,
-    'delivery'  => 0,
-    'pickup'    => 0,
-    'delivered' => 0,
-    'pending'   => 0,
-    'paid'      => 0,
-    'unpaid'    => 0,
+    'revenue'    => 0,
+    'orders'     => 0,
+    'delivery'   => 0,
+    'pickup'     => 0,
+    'delivered'  => 0,
+    'pending'    => 0,
+    'paid'       => 0,
+    'unpaid'     => 0,
+    /* Tax */
+    'tax_total'  => 0,
+    'net_sales'  => 0,
+    'tax_orders' => 0,
 ];
 
 try {
     $sql = "SELECT
                 COUNT(*) AS total_orders,
                 SUM(total_amount) AS revenue,
+                SUM(subtotal) AS subtotal_sum,
+                SUM(CASE WHEN tax_amount IS NULL OR tax_amount = 0 THEN 0 ELSE tax_amount END) AS tax_sum,
+                SUM(CASE WHEN tax_amount > 0 THEN 1 ELSE 0 END) AS tax_orders,
                 SUM(CASE WHEN delivery_mode = 'delivery' THEN 1 ELSE 0 END) AS delivery_count,
                 SUM(CASE WHEN delivery_mode = 'pickup'   THEN 1 ELSE 0 END) AS pickup_count,
                 SUM(CASE WHEN delivery_status = 'enabled' THEN 1 ELSE 0 END) AS delivered_count,
@@ -92,28 +105,36 @@ try {
     $row = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($row) {
-        $stats['revenue']   = (float)($row['revenue'] ?? 0);
-        $stats['orders']    = (int)($row['total_orders'] ?? 0);
-        $stats['delivery']  = (int)($row['delivery_count'] ?? 0);
-        $stats['pickup']    = (int)($row['pickup_count'] ?? 0);
-        $stats['delivered'] = (int)($row['delivered_count'] ?? 0);
-        $stats['pending']   = (int)($row['pending_count'] ?? 0);
-        $stats['paid']      = (int)($row['paid_count'] ?? 0);
-        $stats['unpaid']    = (int)($row['unpaid_count'] ?? 0);
+        $stats['revenue']    = (float)($row['revenue'] ?? 0);
+        $stats['orders']     = (int)($row['total_orders'] ?? 0);
+        $stats['delivery']   = (int)($row['delivery_count'] ?? 0);
+        $stats['pickup']     = (int)($row['pickup_count'] ?? 0);
+        $stats['delivered']  = (int)($row['delivered_count'] ?? 0);
+        $stats['pending']    = (int)($row['pending_count'] ?? 0);
+        $stats['paid']       = (int)($row['paid_count'] ?? 0);
+        $stats['unpaid']     = (int)($row['unpaid_count'] ?? 0);
+
+        $stats['tax_total']  = (float)($row['tax_sum'] ?? 0);
+        $stats['tax_orders'] = (int)($row['tax_orders'] ?? 0);
+
+        /* Net sales = revenue − tax (for inclusive tax, this equals subtotal;
+           for exclusive tax, subtotal is already without tax) */
+        $stats['net_sales']  = max(0, $stats['revenue'] - $stats['tax_total']);
     }
 } catch (PDOException $e) {
 }
 
 /* ---------------- MODE BREAKDOWN ---------------- */
 $modeStats = [
-    'delivery' => ['count' => 0, 'revenue' => 0],
-    'pickup'   => ['count' => 0, 'revenue' => 0],
+    'delivery' => ['count' => 0, 'revenue' => 0, 'tax' => 0],
+    'pickup'   => ['count' => 0, 'revenue' => 0, 'tax' => 0],
 ];
 
 try {
     $sql = "SELECT delivery_mode,
                 COUNT(*) AS cnt,
-                SUM(total_amount) AS rev
+                SUM(total_amount) AS rev,
+                SUM(CASE WHEN tax_amount IS NULL OR tax_amount = 0 THEN 0 ELSE tax_amount END) AS tax_sum
             FROM orders o
             WHERE o.status <> 'cancelled'
             $dateWhere
@@ -125,8 +146,55 @@ try {
         if (isset($modeStats[$m])) {
             $modeStats[$m]['count']   = (int)$r['cnt'];
             $modeStats[$m]['revenue'] = (float)$r['rev'];
+            $modeStats[$m]['tax']     = (float)$r['tax_sum'];
         }
     }
+} catch (PDOException $e) {
+}
+
+/* ---------------- TAX BREAKDOWN BY TYPE ---------------- */
+$taxBreakdown = [
+    'exclusive' => ['count' => 0, 'tax' => 0, 'revenue' => 0],
+    'inclusive' => ['count' => 0, 'tax' => 0, 'revenue' => 0],
+];
+
+try {
+    $sql = "SELECT tax_type,
+                COUNT(*) AS cnt,
+                SUM(CASE WHEN tax_amount IS NULL OR tax_amount = 0 THEN 0 ELSE tax_amount END) AS tax_sum,
+                SUM(total_amount) AS rev
+            FROM orders o
+            WHERE o.status <> 'cancelled'
+              AND tax_amount > 0
+            $dateWhere
+            GROUP BY tax_type";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($dateParams);
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $t = strtolower($r['tax_type'] ?? 'exclusive');
+        if (!isset($taxBreakdown[$t])) $t = 'exclusive';
+        $taxBreakdown[$t]['count']   = (int)$r['cnt'];
+        $taxBreakdown[$t]['tax']     = (float)$r['tax_sum'];
+        $taxBreakdown[$t]['revenue'] = (float)$r['rev'];
+    }
+} catch (PDOException $e) {
+}
+
+/* ---------------- RECENT TAXED ORDERS ---------------- */
+$taxedOrders = [];
+try {
+    $sql = "SELECT o.order_code, o.customer_name, o.customer_mobile,
+                o.subtotal, o.tax_amount, o.tax_rate, o.tax_type,
+                o.total_amount, o.created_at
+            FROM orders o
+            WHERE o.status <> 'cancelled'
+              AND o.tax_amount > 0
+            $dateWhere
+            ORDER BY o.created_at DESC
+            LIMIT 8";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($dateParams);
+    $taxedOrders = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 }
 
@@ -266,6 +334,39 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin: 0;
             color: #817a71;
             font-size: 13px;
+        }
+
+        .rp-header-right {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* GST badge in header */
+        .rp-gst-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: linear-gradient(135deg, #fff7e7 0%, #fdf1e2 100%);
+            border: 1.5px solid #f3dca5;
+            color: #8a6a1e;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .04em;
+        }
+
+        .rp-gst-badge i {
+            font-size: 13px;
+            color: #b8893c;
+        }
+
+        .rp-gst-badge strong {
+            color: #6f5a3f;
+            font-family: "DM Sans", monospace;
+            letter-spacing: 1.2px;
         }
 
         /* =====================================================
@@ -435,6 +536,11 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             color: #b51f2c;
         }
 
+        .rp-stat-icon.gold {
+            background: #fdf1e2;
+            color: #b8893c;
+        }
+
         .rp-stat-label {
             font-size: 10.5px;
             font-weight: 800;
@@ -445,7 +551,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
         }
 
         .rp-stat-value {
-           font-family: 'DM Sans', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             font-size: 26px;
             font-weight: 700;
             color: #302923;
@@ -520,8 +626,229 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             font-size: 14px;
         }
 
+        .rp-card-title.gold i {
+            background: #fdf1e2;
+            color: #b8893c;
+        }
+
+        .rp-card-title.green i {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
+
         /* =====================================================
-           BAR CHART — ORDER MODES
+           TAX KPI STRIP inside tax card
+           ===================================================== */
+        .rp-tax-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .rp-tax-kpi {
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fffaf0 0%, #fff5e3 100%);
+            border: 1.5px solid #f3dca5;
+        }
+
+        .rp-tax-kpi.green {
+            background: linear-gradient(135deg, #f6fbf7 0%, #eef8f0 100%);
+            border-color: #c8e6c9;
+        }
+
+        .rp-tax-kpi-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #948c82;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            margin-bottom: 4px;
+        }
+
+        .rp-tax-kpi-value {
+            font-family: "DM Sans", sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: #b8893c;
+            line-height: 1.15;
+        }
+
+        .rp-tax-kpi.green .rp-tax-kpi-value {
+            color: #1b5e20;
+        }
+
+        .rp-tax-kpi-sub {
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        /* Tax type rows */
+        .rp-tax-type-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .rp-tax-type-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 10px 12px;
+            border-radius: 10px;
+            background: #fffdf9;
+            border: 1px solid #f0ebe4;
+        }
+
+        .rp-tax-type-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: .04em;
+            padding: 3px 9px;
+            border-radius: 6px;
+        }
+
+        .rp-tax-type-pill.exclusive {
+            background: #fdeaea;
+            color: #b51f2c;
+        }
+
+        .rp-tax-type-pill.inclusive {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
+
+        .rp-tax-type-row .count {
+            font-size: 11px;
+            color: #948c82;
+            font-weight: 700;
+        }
+
+        .rp-tax-type-row .amt {
+            font-family: "DM Sans", sans-serif;
+            font-size: 14px;
+            font-weight: 800;
+            color: #b8893c;
+        }
+
+        /* Taxed orders list */
+        .rp-tax-order-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            max-height: 320px;
+            overflow-y: auto;
+            padding-right: 4px;
+        }
+
+        .rp-tax-order-list::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .rp-tax-order-list::-webkit-scrollbar-thumb {
+            background: #e0d8cd;
+            border-radius: 4px;
+        }
+
+        .rp-tax-order {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 12px;
+            border: 1px solid #f0ebe4;
+            border-radius: 11px;
+            background: #fffdf9;
+            transition: .15s ease;
+        }
+
+        .rp-tax-order:hover {
+            border-color: #d98a91;
+            background: #fff5f5;
+        }
+
+        .rp-tax-order-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            background: #fdf1e2;
+            color: #b8893c;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .rp-tax-order-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .rp-tax-order-code {
+            font-size: 12px;
+            font-weight: 800;
+            color: #302923;
+            margin: 0;
+            letter-spacing: .04em;
+        }
+
+        .rp-tax-order-meta {
+            font-size: 10.5px;
+            color: #948c82;
+            margin: 2px 0 0;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .rp-tax-order-right {
+            text-align: right;
+            flex-shrink: 0;
+        }
+
+        .rp-tax-order-tax {
+            font-family: "DM Sans", sans-serif;
+            font-size: 13px;
+            font-weight: 800;
+            color: #b8893c;
+            margin: 0;
+        }
+
+        .rp-tax-order-type {
+            font-size: 9.5px;
+            color: #948c82;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin: 2px 0 0;
+        }
+
+        /* Empty state */
+        .rp-empty {
+            padding: 40px 20px;
+            text-align: center;
+            color: #948c82;
+            font-size: 12.5px;
+        }
+
+        .rp-empty i {
+            font-size: 36px;
+            color: #ece5da;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        /* =====================================================
+           MODE CHART (existing)
            ===================================================== */
         .rp-chart {
             display: flex;
@@ -546,7 +873,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
         }
 
         .rp-chart-value {
-          font-family: 'DM Sans', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             font-size: 20px;
             font-weight: 700;
             color: #302923;
@@ -560,7 +887,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             position: relative;
             transition: height 1s cubic-bezier(.2, .8, .3, 1.1);
             height: 0;
-            /* animated via inline style / JS */
             min-height: 6px;
             box-shadow: 0 8px 20px rgba(48, 41, 35, .12);
         }
@@ -603,7 +929,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             letter-spacing: 0;
         }
 
-        /* Under chart summary */
         .rp-mode-foot {
             display: flex;
             gap: 10px;
@@ -628,7 +953,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
         }
 
         .rp-mode-foot-item .val {
-           font-family: 'DM Sans', sans-serif;
+            font-family: 'DM Sans', sans-serif;
             font-size: 16px;
             font-weight: 700;
             color: #302923;
@@ -697,9 +1022,11 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
         }
 
         /* =====================================================
-           TOP PRODUCTS
+           TOP PRODUCTS / BOYS / APARTMENTS (existing)
            ===================================================== */
-        .rp-prod-list {
+        .rp-prod-list,
+        .rp-boy-list,
+        .rp-apt-list {
             display: flex;
             flex-direction: column;
             gap: 10px;
@@ -716,7 +1043,9 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             transition: .15s ease;
         }
 
-        .rp-prod:hover {
+        .rp-prod:hover,
+        .rp-boy:hover,
+        .rp-apt:hover {
             border-color: #d98a91;
             background: #fff5f5;
         }
@@ -780,15 +1109,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             white-space: nowrap;
         }
 
-        /* =====================================================
-           TOP BOYS
-           ===================================================== */
-        .rp-boy-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
         .rp-boy {
             display: flex;
             align-items: center;
@@ -798,11 +1118,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             border-radius: 11px;
             background: #fffdf9;
             transition: .15s ease;
-        }
-
-        .rp-boy:hover {
-            border-color: #d98a91;
-            background: #fff5f5;
         }
 
         .rp-boy-avatar {
@@ -858,15 +1173,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin: 2px 0 0;
         }
 
-        /* =====================================================
-           TOP APARTMENTS
-           ===================================================== */
-        .rp-apt-list {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-
         .rp-apt {
             display: flex;
             align-items: center;
@@ -876,11 +1182,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             border-radius: 11px;
             background: #fffdf9;
             transition: .15s ease;
-        }
-
-        .rp-apt:hover {
-            border-color: #d98a91;
-            background: #fff5f5;
         }
 
         .rp-apt-icon {
@@ -937,20 +1238,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin: 2px 0 0;
         }
 
-        .rp-empty {
-            padding: 40px 20px;
-            text-align: center;
-            color: #948c82;
-            font-size: 12.5px;
-        }
-
-        .rp-empty i {
-            font-size: 36px;
-            color: #ece5da;
-            display: block;
-            margin-bottom: 10px;
-        }
-
         /* Responsive */
         @media (max-width: 1024px) {
             .rp-stats {
@@ -983,6 +1270,10 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             .rp-chart {
                 height: 180px;
                 gap: 12px;
+            }
+
+            .rp-tax-kpis {
+                grid-template-columns: 1fr;
             }
         }
     </style>
@@ -1026,12 +1317,22 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             <div class="rp-header">
                 <div>
                     <h1>Reports</h1>
-                    <p>Overview of orders, delivery, and revenue.</p>
+                    <p>Overview of orders, delivery, revenue and GST.</p>
                 </div>
-                <span class="rp-range-label">
-                    <i class="bi bi-calendar3"></i>
-                    <?= htmlspecialchars($activeLabel) ?>
-                </span>
+
+                <div class="rp-header-right">
+                    <?php if ($gstNumber !== ''): ?>
+                        <span class="rp-gst-badge">
+                            <i class="bi bi-receipt-cutoff"></i>
+                            GSTIN: <strong><?= htmlspecialchars($gstNumber) ?></strong>
+                        </span>
+                    <?php endif; ?>
+
+                    <span class="rp-range-label">
+                        <i class="bi bi-calendar3"></i>
+                        <?= htmlspecialchars($activeLabel) ?>
+                    </span>
+                </div>
             </div>
 
 
@@ -1070,6 +1371,18 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
                 <div class="rp-stat">
+                    <div class="rp-stat-icon gold">
+                        <i class="bi bi-receipt"></i>
+                    </div>
+                    <div class="rp-stat-label">GST Collected</div>
+                    <div class="rp-stat-value gold"><?= rupees($stats['tax_total']) ?></div>
+                    <div class="rp-stat-sub">
+                        <?= $stats['tax_orders'] ?> order<?= $stats['tax_orders'] === 1 ? '' : 's' ?>
+                        <?= $taxStatus === 1 ? ' · ' . (int)$taxRate . '% ' . htmlspecialchars($taxType) : ' · tax disabled' ?>
+                    </div>
+                </div>
+
+                <div class="rp-stat">
                     <div class="rp-stat-icon">
                         <i class="bi bi-bag-check"></i>
                     </div>
@@ -1082,22 +1395,125 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     <div class="rp-stat-icon blue">
                         <i class="bi bi-truck"></i>
                     </div>
-                    <div class="rp-stat-label">Delivery Orders</div>
-                    <div class="rp-stat-value"><?= $stats['delivery'] ?></div>
+                    <div class="rp-stat-label">Delivery / Pickup</div>
+                    <div class="rp-stat-value"><?= $stats['delivery'] ?> / <?= $stats['pickup'] ?></div>
                     <div class="rp-stat-sub">
-                        <?= rupees($modeStats['delivery']['revenue']) ?> revenue
+                        <?= rupees($modeStats['delivery']['revenue']) ?> · <?= rupees($modeStats['pickup']['revenue']) ?>
                     </div>
                 </div>
 
-                <div class="rp-stat">
-                    <div class="rp-stat-icon">
-                        <i class="bi bi-shop"></i>
+            </div>
+
+
+            <!-- ================= GST / TAX BREAKDOWN ================= -->
+            <div class="rp-grid">
+
+                <!-- Tax summary card -->
+                <div class="rp-card">
+                    <div class="rp-card-head">
+                        <h2 class="rp-card-title gold">
+                            <i class="bi bi-percent"></i>
+                            GST Summary
+                        </h2>
                     </div>
-                    <div class="rp-stat-label">Store Pickup</div>
-                    <div class="rp-stat-value gold"><?= $stats['pickup'] ?></div>
-                    <div class="rp-stat-sub">
-                        <?= rupees($modeStats['pickup']['revenue']) ?> revenue
+
+                    <div class="rp-tax-kpis">
+                        <div class="rp-tax-kpi">
+                            <div class="rp-tax-kpi-label">Total GST Collected</div>
+                            <div class="rp-tax-kpi-value"><?= rupees($stats['tax_total']) ?></div>
+                            <div class="rp-tax-kpi-sub">
+                                From <?= $stats['tax_orders'] ?> taxed order<?= $stats['tax_orders'] === 1 ? '' : 's' ?>
+                            </div>
+                        </div>
+
+                        <div class="rp-tax-kpi green">
+                            <div class="rp-tax-kpi-label">Net Sales (excl. GST)</div>
+                            <div class="rp-tax-kpi-value"><?= rupees($stats['net_sales']) ?></div>
+                            <div class="rp-tax-kpi-sub">Revenue minus GST</div>
+                        </div>
                     </div>
+
+                    <?php if ($taxStatus === 1): ?>
+                        <div style="padding:10px 12px;border-radius:10px;background:#fdf7ec;border:1px dashed #e8d5a8;margin-bottom:16px;font-size:11px;color:#8a6a1e;font-weight:700;">
+                            <i class="bi bi-info-circle"></i>
+                            Tax is currently <strong>ENABLED</strong> at
+                            <strong><?= (int)$taxRate ?>%</strong>
+                            (<strong><?= htmlspecialchars(ucfirst($taxType)) ?></strong>).
+                            <?php if ($gstNumber !== ''): ?>
+                                GSTIN: <strong><?= htmlspecialchars($gstNumber) ?></strong>
+                            <?php endif; ?>
+                        </div>
+                    <?php else: ?>
+                        <div style="padding:10px 12px;border-radius:10px;background:#f4efe8;border:1px dashed #d8c9b8;margin-bottom:16px;font-size:11px;color:#6f5a3f;font-weight:700;">
+                            <i class="bi bi-pause-circle"></i>
+                            Tax is currently <strong>DISABLED</strong>. No GST is being applied to new orders.
+                        </div>
+                    <?php endif; ?>
+
+                    <!-- Breakdown by tax type -->
+                    <div class="rp-tax-type-list">
+                        <div class="rp-tax-type-row">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="rp-tax-type-pill exclusive">
+                                    <i class="bi bi-plus-circle-fill"></i> EXCLUSIVE
+                                </span>
+                                <span class="count"><?= (int)$taxBreakdown['exclusive']['count'] ?> order<?= $taxBreakdown['exclusive']['count'] === 1 ? '' : 's' ?></span>
+                            </div>
+                            <span class="amt"><?= rupees($taxBreakdown['exclusive']['tax']) ?></span>
+                        </div>
+
+                        <div class="rp-tax-type-row">
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="rp-tax-type-pill inclusive">
+                                    <i class="bi bi-check-circle-fill"></i> INCLUSIVE
+                                </span>
+                                <span class="count"><?= (int)$taxBreakdown['inclusive']['count'] ?> order<?= $taxBreakdown['inclusive']['count'] === 1 ? '' : 's' ?></span>
+                            </div>
+                            <span class="amt"><?= rupees($taxBreakdown['inclusive']['tax']) ?></span>
+                        </div>
+                    </div>
+                </div>
+
+
+                <!-- Recent taxed orders -->
+                <div class="rp-card">
+                    <div class="rp-card-head">
+                        <h2 class="rp-card-title">
+                            <i class="bi bi-receipt-cutoff"></i>
+                            Recent Taxed Orders
+                        </h2>
+                    </div>
+
+                    <?php if (empty($taxedOrders)): ?>
+                        <div class="rp-empty">
+                            <i class="bi bi-inbox"></i>
+                            No taxed orders in this range.
+                        </div>
+                    <?php else: ?>
+                        <div class="rp-tax-order-list">
+                            <?php foreach ($taxedOrders as $t): ?>
+                                <div class="rp-tax-order">
+                                    <div class="rp-tax-order-icon">
+                                        <i class="bi bi-receipt"></i>
+                                    </div>
+                                    <div class="rp-tax-order-info">
+                                        <p class="rp-tax-order-code"><?= htmlspecialchars($t['order_code']) ?></p>
+                                        <p class="rp-tax-order-meta">
+                                            <?= htmlspecialchars($t['customer_name']) ?> ·
+                                            Subtotal <?= rupees($t['subtotal']) ?> ·
+                                            Total <?= rupees($t['total_amount']) ?>
+                                        </p>
+                                    </div>
+                                    <div class="rp-tax-order-right">
+                                        <p class="rp-tax-order-tax">+<?= rupees($t['tax_amount']) ?></p>
+                                        <p class="rp-tax-order-type">
+                                            <?= (int)round((float)$t['tax_rate']) ?>% <?= htmlspecialchars($t['tax_type']) ?>
+                                        </p>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
             </div>
@@ -1140,12 +1556,20 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
 
                     <div class="rp-mode-foot">
                         <div class="rp-mode-foot-item">
-                            <div class="lbl">Delivery</div>
+                            <div class="lbl">Delivery Revenue</div>
                             <div class="val"><?= rupees($modeStats['delivery']['revenue']) ?></div>
                         </div>
                         <div class="rp-mode-foot-item">
-                            <div class="lbl">Pickup</div>
+                            <div class="lbl">Delivery GST</div>
+                            <div class="val" style="color:#b8893c;"><?= rupees($modeStats['delivery']['tax']) ?></div>
+                        </div>
+                        <div class="rp-mode-foot-item">
+                            <div class="lbl">Pickup Revenue</div>
                             <div class="val"><?= rupees($modeStats['pickup']['revenue']) ?></div>
+                        </div>
+                        <div class="rp-mode-foot-item">
+                            <div class="lbl">Pickup GST</div>
+                            <div class="val" style="color:#b8893c;"><?= rupees($modeStats['pickup']['tax']) ?></div>
                         </div>
                     </div>
                 </div>
@@ -1154,7 +1578,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 <!-- Payment breakdown -->
                 <div class="rp-card">
                     <div class="rp-card-head">
-                        <h2 class="rp-card-title">
+                        <h2 class="rp-card-title green">
                             <i class="bi bi-credit-card"></i>
                             Payment Status
                         </h2>

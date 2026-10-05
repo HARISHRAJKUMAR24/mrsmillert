@@ -14,6 +14,12 @@ $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 
+/* GST settings (for display) */
+$gstNumber = trim($settings['gst_number'] ?? '');
+$taxStatus = (int)($settings['tax_status'] ?? 0);
+$taxRate   = (float)($settings['tax_rate'] ?? 0);
+$taxType   = $settings['tax_type'] ?? 'exclusive';
+
 /* =========================================================
    YEAR FILTER (for chart)
    ========================================================= */
@@ -25,31 +31,41 @@ $yearOptions = [$thisYear, $thisYear - 1, $thisYear - 2];
    KPI STATS
    ========================================================= */
 $kpi = [
-    'revenue'   => 0,
-    'orders'    => 0,
-    'products'  => 0,
-    'customers' => 0,
-    'today_rev' => 0,
-    'today_ord' => 0,
+    'revenue'    => 0,
+    'orders'     => 0,
+    'products'   => 0,
+    'customers'  => 0,
+    'today_rev'  => 0,
+    'today_ord'  => 0,
+    /* GST */
+    'tax_total'  => 0,
+    'tax_today'  => 0,
+    'tax_orders' => 0,
 ];
 
 try {
     $row = $pdo->query(
-        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt
+        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt,
+                COALESCE(SUM(CASE WHEN tax_amount > 0 THEN tax_amount ELSE 0 END),0) AS tax_sum,
+                SUM(CASE WHEN tax_amount > 0 THEN 1 ELSE 0 END) AS tax_orders
          FROM orders
          WHERE status <> 'cancelled'"
     )->fetch(PDO::FETCH_ASSOC);
-    $kpi['revenue'] = (float)$row['revenue'];
-    $kpi['orders']  = (int)$row['cnt'];
+    $kpi['revenue']    = (float)$row['revenue'];
+    $kpi['orders']     = (int)$row['cnt'];
+    $kpi['tax_total']  = (float)$row['tax_sum'];
+    $kpi['tax_orders'] = (int)$row['tax_orders'];
 
     $row = $pdo->query(
-        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt
+        "SELECT COALESCE(SUM(total_amount),0) AS revenue, COUNT(*) AS cnt,
+                COALESCE(SUM(CASE WHEN tax_amount > 0 THEN tax_amount ELSE 0 END),0) AS tax_sum
          FROM orders
          WHERE status <> 'cancelled'
            AND DATE(created_at) = CURDATE()"
     )->fetch(PDO::FETCH_ASSOC);
     $kpi['today_rev'] = (float)$row['revenue'];
     $kpi['today_ord'] = (int)$row['cnt'];
+    $kpi['tax_today'] = (float)$row['tax_sum'];
 
     $kpi['products']  = (int)$pdo->query("SELECT COUNT(*) FROM products WHERE status = 1")->fetchColumn();
     $kpi['customers'] = (int)$pdo->query("SELECT COUNT(*) FROM customers WHERE status = 1")->fetchColumn();
@@ -57,7 +73,7 @@ try {
 }
 
 /* =========================================================
-   MONTHLY REVENUE (only needed for admin chart)
+   MONTHLY REVENUE + TAX (only needed for admin chart)
    ========================================================= */
 $monthlyRevenue = [];
 $maxRevenue     = 1;
@@ -66,7 +82,8 @@ if ($isAdmin) {
     try {
         $stmt = $pdo->prepare(
             "SELECT MONTH(created_at) AS m,
-                    COALESCE(SUM(total_amount),0) AS revenue
+                    COALESCE(SUM(total_amount),0) AS revenue,
+                    COALESCE(SUM(CASE WHEN tax_amount > 0 THEN tax_amount ELSE 0 END),0) AS tax_sum
              FROM orders
              WHERE status <> 'cancelled'
                AND YEAR(created_at) = ?
@@ -75,13 +92,17 @@ if ($isAdmin) {
         $stmt->execute([$chartYear]);
         $byMonth = [];
         while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
-            $byMonth[(int)$r['m']] = (float)$r['revenue'];
+            $byMonth[(int)$r['m']] = [
+                'revenue' => (float)$r['revenue'],
+                'tax'     => (float)$r['tax_sum'],
+            ];
         }
 
         for ($m = 1; $m <= 12; $m++) {
             $monthlyRevenue[] = [
                 'mon'     => date('M', mktime(0, 0, 0, $m, 1)),
-                'revenue' => $byMonth[$m] ?? 0,
+                'revenue' => $byMonth[$m]['revenue'] ?? 0,
+                'tax'     => $byMonth[$m]['tax']     ?? 0,
             ];
         }
     } catch (PDOException $e) {
@@ -294,6 +315,195 @@ function productImg($img)
             color: #b0a79c;
             font-size: 18px;
         }
+
+        /* =====================================================
+           GST KPI CARD (gold tone)
+           ===================================================== */
+        .kpi-icon.gst {
+            background: linear-gradient(135deg, #fdf1e2 0%, #fbe3c4 100%);
+            color: #b8893c;
+        }
+
+        /* GST info strip inside hero */
+        .hero-gst-strip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 14px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, .18);
+            backdrop-filter: blur(6px);
+            border: 1px solid rgba(255, 255, 255, .28);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .03em;
+        }
+
+        .hero-gst-strip i {
+            font-size: 13px;
+            color: #ffe6b8;
+        }
+
+        .hero-gst-strip strong {
+            color: #ffe6b8;
+            font-weight: 800;
+        }
+
+        /* =====================================================
+           GST SUMMARY CARD
+           ===================================================== */
+        .gst-card {
+            background: #fff;
+            border: 1.5px solid #eee7dc;
+            border-radius: 18px;
+            padding: 20px 22px;
+            margin-bottom: 22px;
+        }
+
+        .gst-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .gst-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-family: "Playfair Display", serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: #302923;
+            margin: 0;
+        }
+
+        .gst-title i {
+            width: 32px;
+            height: 32px;
+            border-radius: 10px;
+            background: #fdf1e2;
+            color: #b8893c;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .gst-badge-active {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 10.5px;
+            font-weight: 800;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+
+        .gst-badge-active.on {
+            background: #e8f6ea;
+            color: #1b5e20;
+            border: 1px solid #c8e6c9;
+        }
+
+        .gst-badge-active.off {
+            background: #f4efe8;
+            color: #6f5a3f;
+            border: 1px solid #d8c9b8;
+        }
+
+        .gst-badge-active i {
+            font-size: 11px;
+        }
+
+        .gst-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 14px;
+        }
+
+        @media (max-width: 1024px) {
+            .gst-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 560px) {
+            .gst-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .gst-tile {
+            padding: 16px 18px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, #fffaf0 0%, #fff5e3 100%);
+            border: 1.5px solid #f3dca5;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .gst-tile.green {
+            background: linear-gradient(135deg, #f6fbf7 0%, #eef8f0 100%);
+            border-color: #c8e6c9;
+        }
+
+        .gst-tile.blue {
+            background: linear-gradient(135deg, #f2f6fd 0%, #e9f1fb 100%);
+            border-color: #cfe0f5;
+        }
+
+        .gst-tile.neutral {
+            background: #fdfaf4;
+            border-color: #ece5da;
+        }
+
+        .gst-tile-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #948c82;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .gst-tile-value {
+            font-family: "DM Sans", sans-serif;
+            font-size: 22px;
+            font-weight: 800;
+            color: #b8893c;
+            line-height: 1.1;
+        }
+
+        .gst-tile.green .gst-tile-value {
+            color: #1b5e20;
+        }
+
+        .gst-tile.blue .gst-tile-value {
+            color: #1565c0;
+        }
+
+        .gst-tile.neutral .gst-tile-value {
+            color: #302923;
+        }
+
+        .gst-tile-sub {
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .gst-tile-sub strong {
+            color: #6f5a3f;
+            letter-spacing: 1px;
+        }
     </style>
 </head>
 
@@ -383,6 +593,19 @@ function productImg($img)
                             <span>Orders Today</span>
                         </div>
                     </div>
+
+                    <?php if ($taxStatus === 1 || $gstNumber !== ''): ?>
+                        <div class="hero-gst-strip">
+                            <i class="bi bi-receipt-cutoff"></i>
+                            <?php if ($gstNumber !== ''): ?>
+                                GSTIN: <strong><?= htmlspecialchars($gstNumber) ?></strong>
+                                <?php if ($taxStatus === 1): ?> · <?php endif; ?>
+                            <?php endif; ?>
+                            <?php if ($taxStatus === 1): ?>
+                                Tax: <strong><?= (int)$taxRate ?>% <?= htmlspecialchars(ucfirst($taxType)) ?></strong>
+                            <?php endif; ?>
+                        </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="hero-decoration"></div>
@@ -406,6 +629,22 @@ function productImg($img)
                         </div>
                     </div>
                 <?php endif; ?>
+
+                <!-- GST COLLECTED — everyone -->
+                <div class="col-12 col-sm-6 col-xl-3">
+                    <div class="kpi-card">
+                        <div class="kpi-top">
+                            <div class="kpi-icon gst"><i class="bi bi-receipt"></i></div>
+                            <?php if ($taxStatus === 1): ?>
+                                <span class="trend up"><i class="bi bi-check-circle"></i> Active</span>
+                            <?php else: ?>
+                                <span class="trend down"><i class="bi bi-pause-circle"></i> Off</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="kpi-label">GST Collected</div>
+                        <div class="kpi-value"><?= rupees($kpi['tax_total']) ?></div>
+                    </div>
+                </div>
 
                 <!-- Total Orders — everyone -->
                 <div class="col-12 col-sm-6 col-xl-3">
@@ -431,7 +670,7 @@ function productImg($img)
                     </div>
                 </div>
 
-                <!-- Customers — everyone -->
+                <!-- Customers — everyone (5th card) -->
                 <div class="col-12 col-sm-6 col-xl-3">
                     <div class="kpi-card">
                         <div class="kpi-top">
@@ -444,6 +683,72 @@ function productImg($img)
                 </div>
 
             </div>
+
+
+            <!-- ============================================ -->
+            <!-- GST SUMMARY CARD                              -->
+            <!-- ============================================ -->
+            <?php if ($isAdmin): ?>
+                <div class="gst-card">
+
+                    <div class="gst-head">
+                        <h2 class="gst-title">
+                            <i class="bi bi-percent"></i>
+                            GST &amp; Tax Summary
+                        </h2>
+
+                        <?php if ($taxStatus === 1): ?>
+                            <span class="gst-badge-active on">
+                                <i class="bi bi-check-circle-fill"></i>
+                                Tax Enabled · <?= (int)$taxRate ?>% <?= htmlspecialchars(ucfirst($taxType)) ?>
+                            </span>
+                        <?php else: ?>
+                            <span class="gst-badge-active off">
+                                <i class="bi bi-pause-circle-fill"></i>
+                                Tax Disabled
+                            </span>
+                        <?php endif; ?>
+                    </div>
+
+                    <div class="gst-grid">
+
+                        <!-- Total GST -->
+                        <div class="gst-tile">
+                            <div class="gst-tile-label">Total GST Collected</div>
+                            <div class="gst-tile-value"><?= rupees($kpi['tax_total']) ?></div>
+                            <div class="gst-tile-sub">
+                                From <?= (int)$kpi['tax_orders'] ?> taxed order<?= $kpi['tax_orders'] === 1 ? '' : 's' ?>
+                            </div>
+                        </div>
+
+                        <!-- Today's GST -->
+                        <div class="gst-tile blue">
+                            <div class="gst-tile-label">GST Today</div>
+                            <div class="gst-tile-value"><?= rupees($kpi['tax_today']) ?></div>
+                            <div class="gst-tile-sub">From today's orders</div>
+                        </div>
+
+                        <!-- Net Sales -->
+                        <div class="gst-tile green">
+                            <div class="gst-tile-label">Net Sales (excl. GST)</div>
+                            <div class="gst-tile-value"><?= rupees(max(0, $kpi['revenue'] - $kpi['tax_total'])) ?></div>
+                            <div class="gst-tile-sub">Revenue minus GST</div>
+                        </div>
+
+                        <!-- GSTIN -->
+                        <div class="gst-tile neutral">
+                            <div class="gst-tile-label">GSTIN</div>
+                            <div class="gst-tile-value" style="font-size:15px;letter-spacing:1.2px;">
+                                <?= $gstNumber !== '' ? htmlspecialchars($gstNumber) : '—' ?>
+                            </div>
+                            <div class="gst-tile-sub">
+                                <?= $gstNumber !== '' ? 'Registered business' : 'Not configured' ?>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            <?php endif; ?>
 
 
             <!-- REVENUE + ORDER STATUS -->
@@ -486,7 +791,7 @@ function productImg($img)
                                     if ($h < 3) $h = 3;
                                 ?>
                                     <div class="bar-wrap">
-                                        <div class="bar" style="height:<?= $h ?>%;" title="<?= rupees($m['revenue']) ?>"></div>
+                                        <div class="bar" style="height:<?= $h ?>%;" title="<?= rupees($m['revenue']) ?> · GST <?= rupees($m['tax']) ?>"></div>
                                         <div class="bar-label"><?= htmlspecialchars($m['mon']) ?></div>
                                     </div>
                                 <?php endforeach; ?>
