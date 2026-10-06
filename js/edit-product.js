@@ -1,13 +1,6 @@
 /* =========================================================
    MRS MILL@ — EDIT PRODUCT UX
    File: ./js/edit-product.js
-   - Loads product + variants (with container) + status
-   - Add / remove / update variants
-   - Replace / Remove image
-   - Active / Inactive status toggle
-   - Popup errors
-   - 🔁 Remembers "back" param so the user returns
-        to the exact page they came from (e.g. ?page=3)
    ========================================================= */
 
 (function () {
@@ -18,24 +11,7 @@
         : "./";
 
     const PRODUCT_ID = Number(window.PRODUCT_ID || 0);
-
-    /* ---------------- 🔁 BACK URL ---------------- */
-    /* Comes from edit-product.php?id=X&back=/products.php%3Fpage%3D3 */
-    function getBackUrl() {
-        try {
-            const p = new URLSearchParams(window.location.search);
-            const raw = p.get("back") || "";
-
-            // Only allow internal relative paths — reject absolute or ../
-            if (raw && raw.indexOf("://") === -1 && raw.indexOf("..") === -1) {
-                return raw;
-            }
-        } catch (_) {}
-        return "product-list.php";
-    }
-    const BACK_URL = getBackUrl();
-
-    /* ---------------- DOM ---------------- */
+    const BACK_URL = window.BACK_URL || (BASE_URL + "products.php");
 
     const form = document.getElementById("productForm");
     const formLoading = document.getElementById("formLoading");
@@ -54,18 +30,15 @@
     const removedNote = document.getElementById("removedImageNote");
     const removeFlag = document.getElementById("remove_image");
 
-    /* variants */
     const addVariantBtn = document.getElementById("addVariantBtn");
     const variantsList = document.getElementById("variantsList");
     const variantsEmpty = document.getElementById("variantsEmpty");
 
-    /* status */
     const statusInput = document.getElementById("product_status");
     const statusRow = document.getElementById("statusToggleRow");
     const statusTitle = document.getElementById("statusToggleTitle");
     const statusDesc = document.getElementById("statusToggleDesc");
 
-    /* modals */
     const confirmOverlay = document.getElementById("confirmOverlay");
     const confirmCancel = document.getElementById("confirmCancel");
     const confirmRemove = document.getElementById("confirmRemove");
@@ -81,11 +54,7 @@
 
     if (!form) return;
 
-    /* ---------------- STATE ---------------- */
-
     let variantCounter = 0;
-
-    /* ---------------- HELPERS ---------------- */
 
     function escapeHtml(str) {
         return String(str ?? "")
@@ -107,9 +76,7 @@
 
     function applyStatusUI() {
         if (!statusInput) return;
-
         const active = statusInput.checked;
-
         if (statusRow) statusRow.classList.toggle("is-active", active);
         if (statusTitle) statusTitle.textContent = active ? "Active" : "Inactive";
         if (statusDesc) {
@@ -289,11 +256,19 @@
             ? Number(data.container_price)
             : "";
 
+        /* ✅ REAL DB ID if provided, else a temp "new_N" */
+        const rowVid = (data.id !== undefined && data.id !== null && Number(data.id) > 0)
+            ? String(data.id)
+            : "new_" + variantCounter;
+
         const row = document.createElement("div");
         row.className = "variant-row";
-        row.dataset.vid = String(variantCounter);
+        row.dataset.vid = rowVid;
+        row.dataset.isNew = rowVid.indexOf("new_") === 0 ? "1" : "0";
 
         row.innerHTML = `
+            <input type="hidden" class="js-variant-id" value="${escapeHtml(rowVid)}">
+
             <div class="variant-row-head">
                 <div class="variant-badge">
                     <i class="bi bi-layers-half"></i> Variant #${variantCounter}
@@ -434,7 +409,11 @@
                 ? (r.querySelector(".js-container-price")?.value || "").trim()
                 : "";
 
+            /* ✅ REAL DB ID (or "new_N") */
+            const vid = (r.querySelector(".js-variant-id")?.value || r.dataset.vid || "").trim();
+
             out.push({
+                id: vid,
                 index: i + 1,
                 quantity: (r.querySelector(".js-quantity")?.value || "").trim(),
                 quantity_unit: (r.querySelector(".js-unit")?.value || "").trim(),
@@ -527,6 +506,7 @@
 
                 if (Array.isArray(p.variants) && p.variants.length > 0) {
                     p.variants.forEach(v => addVariantRow({
+                        id: v.id,                              // ✅ pass real id
                         quantity: v.quantity,
                         quantity_unit: v.quantity_unit,
                         quantity_name: v.quantity_name,
@@ -586,11 +566,11 @@
         formData.append("category_id", categoryId);
         formData.append("product_status", status);
         formData.append("remove_image", removeImg);
-
-        /* 🔁 send back URL so update-product.php can redirect if needed */
         formData.append("back", BACK_URL);
 
+        /* ✅ SEND id + data */
         formData.append("variants", JSON.stringify(variants.map(v => ({
+            id: v.id,                                          // ← FIXED
             quantity: parseFloat(v.quantity).toFixed(2),
             quantity_unit: v.quantity_unit,
             quantity_name: v.quantity_name,
@@ -630,8 +610,6 @@
             });
     });
 
-    /* 🔁 When the user closes the success popup, send them back
-       to the page they came from (e.g. product list page 3). */
     function goBackToList() {
         window.location.href = BACK_URL;
     }
@@ -641,7 +619,7 @@
             if (e.target === successOverlay) {
                 successOverlay.classList.remove("show");
                 successOverlay.setAttribute("aria-hidden", "true");
-                goBackToList();   /* 🔁 auto return */
+                goBackToList();
             }
         });
     }

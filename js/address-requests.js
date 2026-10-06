@@ -2,8 +2,9 @@
    MRS MILL@ — ADDRESS REQUESTS LIST
    File: ./js/address-requests.js
    - Client-side search + pagination + per-page
-   - Status dropdown (0 = Not Called, 1 = Called)
+   - Status dropdown (0 = Not Called, 1 = Called, 2 = Rejected)
    - Call button opens tel: link
+   - WhatsApp button opens wa.me chat
    - Calls status update endpoint
    ========================================================= */
 
@@ -35,7 +36,7 @@
     let filteredRows = [];
     let currentPage  = 1;
 
-    /* Status labels — 0 = Not Called, 1 = Called */
+    /* Status labels */
     const STATUS_LABELS = {
         "0": "Not Called",
         "1": "Called",
@@ -73,6 +74,25 @@
         }
     }
 
+    /* WhatsApp — strips non-digits, adds country code 91 for India if missing */
+    function waLink(mobile, name) {
+        let digits = String(mobile || "").replace(/\D/g, "");
+
+        if (!digits) return "#";
+
+        /* Add 91 (India) if it's a 10-digit number without country code */
+        if (digits.length === 10) {
+            digits = "91" + digits;
+        }
+
+        /* Pre-filled message */
+        const msg = encodeURIComponent(
+            "Hello " + (name || "") + ", this is Mrs Mill@. Regarding your address request"
+        );
+
+        return "https://wa.me/" + digits + "?text=" + msg;
+    }
+
     /* =========================================
        TOAST
     ========================================= */
@@ -102,7 +122,7 @@
     }
 
     /* =========================================
-       STATUS DROPDOWN BUILDER
+       STATUS DROPDOWN
        ========================================= */
     function statusBtnHtml(status) {
         const s = String(status);
@@ -134,6 +154,7 @@
         const tel = String(r.customer_mobile || "").replace(/\D/g, "");
 
         const callHref = tel ? `tel:${tel}` : "#";
+        const waHref   = waLink(r.customer_mobile, r.customer_name);
 
         return `
             <tr data-id="${r.id}">
@@ -167,10 +188,16 @@
                     </div>
                 </td>
                 <td>
-                    <a class="ar-call" href="${callHref}" title="Call customer">
-                        <i class="bi bi-telephone-fill"></i>
-                        Call
-                    </a>
+                    <div class="ar-actions">
+                        <a class="ar-call" href="${callHref}" title="Call customer">
+                            <i class="bi bi-telephone-fill"></i>
+                            Call
+                        </a>
+                        <a class="ar-whatsapp" href="${waHref}" target="_blank" rel="noopener" title="WhatsApp customer">
+                            <i class="bi bi-whatsapp"></i>
+                            WhatsApp
+                        </a>
+                    </div>
                 </td>
             </tr>
         `;
@@ -424,14 +451,12 @@
        STATUS DROPDOWN — OPEN / CLOSE / SELECT
        ========================================= */
     document.addEventListener("click", function (e) {
-        /* If clicked on the toggle button */
         const btn = e.target.closest(".ar-status-btn");
         if (btn) {
             e.stopPropagation();
             const wrap = btn.closest(".ar-status");
             const wasOpen = wrap.classList.contains("open");
 
-            /* Close all other dropdowns */
             document.querySelectorAll(".ar-status.open").forEach(el => {
                 el.classList.remove("open");
             });
@@ -440,7 +465,6 @@
             return;
         }
 
-        /* If clicked on an option */
         const opt = e.target.closest(".ar-status-opt");
         if (opt) {
             e.stopPropagation();
@@ -453,7 +477,6 @@
             return;
         }
 
-        /* Click outside — close all */
         document.querySelectorAll(".ar-status.open").forEach(el => {
             el.classList.remove("open");
         });
@@ -479,11 +502,9 @@
                     return;
                 }
 
-                /* Update local data */
                 const row = allRows.find(r => String(r.id) === String(id));
                 if (row) row.status = Number(status);
 
-                /* Update button appearance */
                 wrap.dataset.status = String(status);
                 const btn = wrap.querySelector(".ar-status-btn");
                 if (btn) {
@@ -492,7 +513,6 @@
                                      <i class="bi bi-chevron-down caret"></i>`;
                 }
 
-                /* Update active option in menu */
                 wrap.querySelectorAll(".ar-status-opt").forEach(o => {
                     o.classList.toggle("active", o.dataset.status === String(status));
                 });

@@ -5,7 +5,7 @@
    - Multiple product rows with dropdown + multi-variant
    - Stock: unlimited OR count
    - Active / Inactive status toggle
-   - Duplicate recent menu
+   - Duplicate recent menu (with variant chips restored)
    - Bottom "Add Another Product" button
    ========================================================= */
 
@@ -280,7 +280,14 @@
         row.className = "prod-row";
         row.dataset.rid = String(rowCounter);
         row.dataset.pcode = prefill.product_code || "";
-        row.dataset.vids  = JSON.stringify(prefill.variant_ids || []);
+
+        /* Ensure variant_ids is an array of numbers, keep order, remove dupes */
+        let vidsInit = Array.isArray(prefill.variant_ids)
+            ? prefill.variant_ids.map(Number)
+            : [];
+        vidsInit = Array.from(new Set(vidsInit.filter(v => v > 0)));
+
+        row.dataset.vids = JSON.stringify(vidsInit);
 
         row.innerHTML = `
             <div class="prod-row-head">
@@ -392,6 +399,7 @@
 
                 renderProductTrigger(row);
                 enableVariant(row, true);
+                renderVariantChips(row);
                 prodDD.classList.remove("open");
             }
         });
@@ -467,13 +475,27 @@
         unlimitedCb.addEventListener("change", applyStockUI);
         applyStockUI();
 
-        /* Prefill */
+        /* ---------- PREFILL (from duplicate) ----------
+           Populate the product trigger, enable variant dropdown,
+           render chips for each existing variant_id.
+           If a variant id no longer exists, keep it out but don't crash. */
         if (prefill.product_code) {
             const product = PRODUCTS.find(p => p.product_code === prefill.product_code);
             if (product) {
                 renderProductTrigger(row);
                 enableVariant(row, true);
+
+                /* Filter out variant ids that don't exist in the product */
+                const validVids = vidsInit.filter(vid =>
+                    (product.variants || []).some(v => Number(v.id) === Number(vid))
+                );
+
+                row.dataset.vids = JSON.stringify(validVids);
                 renderVariantChips(row);
+            } else {
+                /* Product was deleted — leave row empty but keep the pcode out */
+                row.dataset.pcode = "";
+                row.dataset.vids = "[]";
             }
         }
 
@@ -693,7 +715,19 @@
             if (rows.length === 0) {
                 addProductRow();
             } else {
-                rows.forEach(r => addProductRow(r));
+                rows.forEach(r => {
+                    /* Ensure variant_ids is a proper array of numbers */
+                    const vids = Array.isArray(r.variant_ids)
+                        ? r.variant_ids.map(Number).filter(v => v > 0)
+                        : [];
+
+                    addProductRow({
+                        product_code:    r.product_code,
+                        variant_ids:     vids,
+                        stock_unlimited: !!r.stock_unlimited,
+                        stock_count:     r.stock_count !== undefined ? r.stock_count : 100
+                    });
+                });
             }
 
             refreshEmpty();
@@ -786,7 +820,6 @@
 
         setLoading(true);
 
-        /* STATUS */
         const status = (statusInput && statusInput.checked) ? "1" : "0";
 
         const formData = new FormData();
@@ -818,7 +851,6 @@
                 updateDurationPreview();
                 addProductRow();
 
-                /* Reset status to Active */
                 if (statusInput) statusInput.checked = true;
                 applyStatusUI();
             } else {

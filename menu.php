@@ -778,10 +778,11 @@ function fmtDateTime(string $dbDate): string
                     <h1>Menus</h1>
                     <p>All created menus with their product & variant counts.</p>
                 </div>
-
-                <a href="add-menu.php" class="btn-add">
-                    <i class="bi bi-plus-lg"></i> Add Menu
-                </a>
+                <?php if (isAdmin()): ?>
+                    <a href="add-menu.php" class="btn-add">
+                        <i class="bi bi-plus-lg"></i> Add Menu
+                    </a>
+                <?php endif; ?>
             </div>
 
 
@@ -815,7 +816,7 @@ function fmtDateTime(string $dbDate): string
                                 <th>Products</th>
                                 <th>Time Window</th>
                                 <th>Status</th>
-                                <th style="text-align:right;">Actions</th>
+                                <?php if (isAdmin()): ?> <th style="text-align:right;">Actions</th><?php endif; ?>
                             </tr>
                         </thead>
                         <tbody id="menuTbody">
@@ -880,23 +881,27 @@ function fmtDateTime(string $dbDate): string
                                                 <?= $t['label'] ?>
                                             </span>
                                         </td>
+                                        <?php if (isAdmin()): ?>
+                                            <td>
+                                                <div class="row-actions">
 
-                                        <td>
-                                            <div class="row-actions">
-                                                <a href="edit-menu.php?id=<?= (int) $m['id'] ?>"
-                                                    class="row-btn edit"
-                                                    title="Edit">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <button type="button"
-                                                    class="row-btn delete js-delete-btn"
-                                                    data-id="<?= (int) $m['id'] ?>"
-                                                    data-name="<?= htmlspecialchars($m['menu_name']) ?>"
-                                                    title="Delete">
-                                                    <i class="bi bi-trash3"></i>
-                                                </button>
-                                            </div>
-                                        </td>
+                                                    <a href="edit-menu.php?id=<?= (int) $m['id'] ?>"
+                                                        class="row-btn edit"
+                                                        title="Edit">
+                                                        <i class="bi bi-pencil"></i>
+                                                    </a>
+
+                                                    <button type="button"
+                                                        class="row-btn delete js-delete-btn"
+                                                        data-id="<?= (int) $m['id'] ?>"
+                                                        data-name="<?= htmlspecialchars($m['menu_name']) ?>"
+                                                        title="Delete">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+
+                                                </div>
+                                            </td>
+                                        <?php endif; ?>
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>

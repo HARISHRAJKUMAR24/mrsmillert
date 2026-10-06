@@ -16,7 +16,9 @@ $settings = getSettings($pdo);
     <?php include './includes/head.php'; ?>
 
     <style>
-        .ct-page { padding: 24px 26px 60px; }
+        .ct-page {
+            padding: 24px 26px 60px;
+        }
 
         .ct-header {
             display: flex;
@@ -26,6 +28,7 @@ $settings = getSettings($pdo);
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
+
         .ct-header h1 {
             font-family: "Playfair Display", serif;
             font-size: 26px;
@@ -33,7 +36,12 @@ $settings = getSettings($pdo);
             color: #302923;
             margin: 0 0 4px;
         }
-        .ct-header p { margin: 0; color: #817a71; font-size: 12.5px; }
+
+        .ct-header p {
+            margin: 0;
+            color: #817a71;
+            font-size: 12.5px;
+        }
 
         .ct-kpis {
             display: grid;
@@ -41,12 +49,14 @@ $settings = getSettings($pdo);
             gap: 14px;
             margin-bottom: 22px;
         }
+
         .ct-kpi {
             background: #fff;
             border: 1.5px solid #ece5da;
             border-radius: 16px;
             padding: 16px 18px;
         }
+
         .ct-kpi-label {
             font-size: 10px;
             font-weight: 800;
@@ -55,6 +65,7 @@ $settings = getSettings($pdo);
             letter-spacing: .08em;
             margin-bottom: 6px;
         }
+
         .ct-kpi-value {
             font-family: "Playfair Display", serif;
             font-size: 24px;
@@ -62,9 +73,18 @@ $settings = getSettings($pdo);
             color: #302923;
             line-height: 1.1;
         }
-        .ct-kpi-value.warn { color: #b8893c; }
-        .ct-kpi-value.money { color: #b51f2c; }
-        .ct-kpi-value.ok { color: #1b5e20; }
+
+        .ct-kpi-value.warn {
+            color: #b8893c;
+        }
+
+        .ct-kpi-value.money {
+            color: #b51f2c;
+        }
+
+        .ct-kpi-value.ok {
+            color: #1b5e20;
+        }
 
         .ct-card {
             background: #fff;
@@ -81,12 +101,14 @@ $settings = getSettings($pdo);
             margin-bottom: 20px;
             flex-wrap: wrap;
         }
+
         .ct-list-title h3 {
             margin: 0;
             font-size: 16px;
             font-weight: 700;
             color: #302923;
         }
+
         .ct-list-title span {
             display: block;
             margin-top: 4px;
@@ -109,6 +131,7 @@ $settings = getSettings($pdo);
             padding: 4px;
             gap: 4px;
         }
+
         .ct-tab {
             border: none;
             background: transparent;
@@ -122,7 +145,11 @@ $settings = getSettings($pdo);
             transition: .18s ease;
             white-space: nowrap;
         }
-        .ct-tab:hover { color: #b51f2c; }
+
+        .ct-tab:hover {
+            color: #b51f2c;
+        }
+
         .ct-tab.active {
             background: #fff;
             color: #b51f2c;
@@ -133,6 +160,7 @@ $settings = getSettings($pdo);
             position: relative;
             width: 250px;
         }
+
         .ct-search input {
             width: 100%;
             height: 40px;
@@ -146,12 +174,14 @@ $settings = getSettings($pdo);
             outline: none;
             transition: .15s ease;
         }
+
         .ct-search input:focus {
             border-color: #b51f2c;
             background: #fff;
-            box-shadow: 0 0 0 3px rgba(181,31,44,.08);
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .08);
         }
-        .ct-search > i {
+
+        .ct-search>i {
             position: absolute;
             left: 13px;
             top: 50%;
@@ -175,13 +205,15 @@ $settings = getSettings($pdo);
             overflow: hidden;
             transition: .2s ease;
         }
+
         .ct-group:hover {
             border-color: #d98a91;
             box-shadow: 0 8px 22px rgba(48, 41, 35, .06);
         }
+
         .ct-group.open {
             border-color: #b51f2c;
-            box-shadow: 0 12px 28px rgba(181,31,44,.08);
+            box-shadow: 0 12px 28px rgba(181, 31, 44, .08);
         }
 
         .ct-group-head {
@@ -194,7 +226,10 @@ $settings = getSettings($pdo);
             user-select: none;
             transition: .15s ease;
         }
-        .ct-group-head:hover { background: #fffdf9; }
+
+        .ct-group-head:hover {
+            background: #fffdf9;
+        }
 
         .ct-cust {
             display: flex;
@@ -202,6 +237,7 @@ $settings = getSettings($pdo);
             gap: 12px;
             min-width: 0;
         }
+
         .ct-cust-avatar {
             width: 44px;
             height: 44px;
@@ -214,8 +250,9 @@ $settings = getSettings($pdo);
             font-size: 14px;
             font-weight: 800;
             flex-shrink: 0;
-            box-shadow: 0 6px 14px rgba(181,31,44,.2);
+            box-shadow: 0 6px 14px rgba(181, 31, 44, .2);
         }
+
         .ct-cust-name {
             font-weight: 800;
             color: #302923;
@@ -224,6 +261,7 @@ $settings = getSettings($pdo);
             overflow: hidden;
             text-overflow: ellipsis;
         }
+
         .ct-cust-mobile {
             font-size: 11.5px;
             color: #948c82;
@@ -235,6 +273,7 @@ $settings = getSettings($pdo);
             text-align: center;
             min-width: 80px;
         }
+
         .ct-stat-label {
             font-size: 9.5px;
             font-weight: 800;
@@ -243,15 +282,25 @@ $settings = getSettings($pdo);
             letter-spacing: .08em;
             margin-bottom: 4px;
         }
+
         .ct-stat-val {
             font-family: "Playfair Display", serif;
             font-size: 16px;
             font-weight: 700;
             color: #302923;
         }
-        .ct-stat-val.warn { color: #b8893c; }
-        .ct-stat-val.money { color: #b51f2c; }
-        .ct-stat-val.ok { color: #1b5e20; }
+
+        .ct-stat-val.warn {
+            color: #b8893c;
+        }
+
+        .ct-stat-val.money {
+            color: #b51f2c;
+        }
+
+        .ct-stat-val.ok {
+            color: #1b5e20;
+        }
 
         .ct-group-status {
             display: inline-flex;
@@ -265,9 +314,21 @@ $settings = getSettings($pdo);
             letter-spacing: .4px;
             white-space: nowrap;
         }
-        .ct-group-status.not_received { background: #fdf1e2; color: #a35a0e; }
-        .ct-group-status.partial      { background: #e5eefb; color: #1565c0; }
-        .ct-group-status.received     { background: #e8f6ea; color: #1b5e20; }
+
+        .ct-group-status.not_received {
+            background: #fdf1e2;
+            color: #a35a0e;
+        }
+
+        .ct-group-status.partial {
+            background: #e5eefb;
+            color: #1565c0;
+        }
+
+        .ct-group-status.received {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
 
         .ct-group-arrow {
             width: 32px;
@@ -282,6 +343,7 @@ $settings = getSettings($pdo);
             transition: .2s ease;
             flex-shrink: 0;
         }
+
         .ct-group.open .ct-group-arrow {
             background: #b51f2c;
             color: #fff;
@@ -295,6 +357,7 @@ $settings = getSettings($pdo);
             background: #fdfaf4;
             padding: 12px 14px;
         }
+
         .ct-group.open .ct-group-body {
             display: block;
         }
@@ -303,7 +366,6 @@ $settings = getSettings($pdo);
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-bottom: 12px;
         }
 
         .ct-order {
@@ -316,11 +378,13 @@ $settings = getSettings($pdo);
             border-radius: 11px;
             padding: 12px 14px;
         }
+
         .ct-order-code {
             font-weight: 800;
             color: #b51f2c;
             font-size: 12.5px;
         }
+
         .ct-order-time {
             font-size: 10.5px;
             color: #948c82;
@@ -332,6 +396,7 @@ $settings = getSettings($pdo);
             color: #302923;
             font-size: 12px;
         }
+
         .ct-order-count-sub {
             font-size: 10px;
             color: #948c82;
@@ -355,11 +420,24 @@ $settings = getSettings($pdo);
             font-weight: 800;
             text-transform: uppercase;
         }
-        .ct-order-status.not_received { background: #fdf1e2; color: #a35a0e; }
-        .ct-order-status.partial      { background: #e5eefb; color: #1565c0; }
-        .ct-order-status.received     { background: #e8f6ea; color: #1b5e20; }
+
+        .ct-order-status.not_received {
+            background: #fdf1e2;
+            color: #a35a0e;
+        }
+
+        .ct-order-status.partial {
+            background: #e5eefb;
+            color: #1565c0;
+        }
+
+        .ct-order-status.received {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
 
         /* Receive bar (inside expanded area) */
+
         .ct-receive-bar {
             display: flex;
             align-items: center;
@@ -369,7 +447,9 @@ $settings = getSettings($pdo);
             background: #fff;
             border: 1.5px solid #ece5da;
             border-radius: 11px;
+            margin-bottom: 12px;
         }
+
         .ct-receive-bar-lbl {
             font-size: 12px;
             font-weight: 700;
@@ -377,7 +457,10 @@ $settings = getSettings($pdo);
             flex: 1;
             min-width: 0;
         }
-        .ct-receive-bar-lbl strong { color: #b51f2c; }
+
+        .ct-receive-bar-lbl strong {
+            color: #b51f2c;
+        }
 
         .ct-action {
             height: 38px;
@@ -396,21 +479,25 @@ $settings = getSettings($pdo);
             transition: .15s ease;
             white-space: nowrap;
         }
+
         .ct-action:hover {
             background: #fbe8e9;
             border-color: #f1c8cc;
             color: #b51f2c;
         }
+
         .ct-action.receive {
             background: linear-gradient(135deg, #1f7a3d 0%, #14532d 100%);
             color: #fff;
             border: 0;
-            box-shadow: 0 4px 12px rgba(31,122,61,.22);
+            box-shadow: 0 4px 12px rgba(31, 122, 61, .22);
         }
+
         .ct-action.receive:hover {
             background: linear-gradient(135deg, #166534 0%, #0f3d1f 100%);
             color: #fff;
         }
+
         .ct-action:disabled {
             opacity: .55;
             cursor: not-allowed;
@@ -421,7 +508,13 @@ $settings = getSettings($pdo);
             padding: 60px 20px;
             color: #948c82;
         }
-        .ct-empty i { font-size: 40px; color: #ece5da; display: block; margin-bottom: 10px; }
+
+        .ct-empty i {
+            font-size: 40px;
+            color: #ece5da;
+            display: block;
+            margin-bottom: 10px;
+        }
 
         /* Pagination */
         .ct-pagination {
@@ -434,9 +527,24 @@ $settings = getSettings($pdo);
             border-top: 1px solid #f2ede5;
             flex-wrap: wrap;
         }
-        .ct-pag-info { font-size: 11px; color: #817a71; }
-        .ct-pag-info strong { color: #302923; font-weight: 700; }
-        .ct-pag-controls { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+
+        .ct-pag-info {
+            font-size: 11px;
+            color: #817a71;
+        }
+
+        .ct-pag-info strong {
+            color: #302923;
+            font-weight: 700;
+        }
+
+        .ct-pag-controls {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
         .ct-pag-controls button {
             min-width: 34px;
             height: 34px;
@@ -453,18 +561,24 @@ $settings = getSettings($pdo);
             padding: 0 8px;
             font-family: inherit;
         }
+
         .ct-pag-controls button:hover:not(:disabled):not(.active) {
             background: #faf7f0;
             border-color: #e4ddd3;
             color: #302923;
         }
+
         .ct-pag-controls button.active {
             background: #b51f2c;
             border-color: #b51f2c;
             color: #fff;
             cursor: default;
         }
-        .ct-pag-controls button:disabled { opacity: .4; cursor: not-allowed; }
+
+        .ct-pag-controls button:disabled {
+            opacity: .4;
+            cursor: not-allowed;
+        }
 
         /* Modal */
         .ct-modal-overlay {
@@ -482,7 +596,11 @@ $settings = getSettings($pdo);
             transition: .22s ease;
             overflow-y: auto;
         }
-        .ct-modal-overlay.show { opacity: 1; visibility: visible; }
+
+        .ct-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
 
         .ct-modal {
             background: #fff;
@@ -490,13 +608,16 @@ $settings = getSettings($pdo);
             padding: 26px;
             max-width: 520px;
             width: 100%;
-            box-shadow: 0 30px 80px rgba(0,0,0,.28);
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .28);
             transform: translateY(15px) scale(.96);
-            transition: transform .25s cubic-bezier(.2,.9,.3,1.2);
+            transition: transform .25s cubic-bezier(.2, .9, .3, 1.2);
             position: relative;
             margin: auto;
         }
-        .ct-modal-overlay.show .ct-modal { transform: translateY(0) scale(1); }
+
+        .ct-modal-overlay.show .ct-modal {
+            transform: translateY(0) scale(1);
+        }
 
         .ct-modal-close {
             position: absolute;
@@ -514,7 +635,12 @@ $settings = getSettings($pdo);
             justify-content: center;
             font-size: 14px;
         }
-        .ct-modal-close:hover { background: #fbe8e9; border-color: #f1c8cc; color: #b51f2c; }
+
+        .ct-modal-close:hover {
+            background: #fbe8e9;
+            border-color: #f1c8cc;
+            color: #b51f2c;
+        }
 
         .ct-modal-head {
             display: flex;
@@ -522,6 +648,7 @@ $settings = getSettings($pdo);
             gap: 12px;
             margin-bottom: 18px;
         }
+
         .ct-modal-icon {
             width: 46px;
             height: 46px;
@@ -533,8 +660,9 @@ $settings = getSettings($pdo);
             justify-content: center;
             font-size: 20px;
             flex-shrink: 0;
-            box-shadow: 0 8px 20px rgba(31,122,61,.25);
+            box-shadow: 0 8px 20px rgba(31, 122, 61, .25);
         }
+
         .ct-modal-head h3 {
             margin: 0;
             font-family: "Playfair Display", serif;
@@ -542,6 +670,7 @@ $settings = getSettings($pdo);
             font-weight: 700;
             color: #302923;
         }
+
         .ct-modal-head p {
             margin: 4px 0 0;
             font-size: 12px;
@@ -555,6 +684,7 @@ $settings = getSettings($pdo);
             padding: 14px 16px;
             margin-bottom: 16px;
         }
+
         .ct-info-row {
             display: flex;
             justify-content: space-between;
@@ -562,10 +692,22 @@ $settings = getSettings($pdo);
             padding: 5px 0;
             font-size: 12px;
         }
-        .ct-info-row .lbl { color: #948c82; font-weight: 600; }
-        .ct-info-row .val { color: #302923; font-weight: 700; text-align: right; }
 
-        .ct-field { margin-bottom: 14px; }
+        .ct-info-row .lbl {
+            color: #948c82;
+            font-weight: 600;
+        }
+
+        .ct-info-row .val {
+            color: #302923;
+            font-weight: 700;
+            text-align: right;
+        }
+
+        .ct-field {
+            margin-bottom: 14px;
+        }
+
         .ct-field label {
             display: block;
             font-size: 10.5px;
@@ -575,6 +717,7 @@ $settings = getSettings($pdo);
             text-transform: uppercase;
             letter-spacing: .05em;
         }
+
         .ct-field input,
         .ct-field textarea {
             width: 100%;
@@ -590,26 +733,35 @@ $settings = getSettings($pdo);
             outline: none;
             transition: .15s ease;
         }
+
         .ct-field textarea {
             height: auto;
             min-height: 70px;
             padding: 12px 14px;
             resize: vertical;
         }
+
         .ct-field input:focus,
         .ct-field textarea:focus {
             border-color: #b51f2c;
             background: #fff;
-            box-shadow: 0 0 0 4px rgba(181,31,44,.08);
+            box-shadow: 0 0 0 4px rgba(181, 31, 44, .08);
         }
+
         .ct-field .hint {
             font-size: 11px;
             color: #948c82;
             margin-top: 6px;
             font-weight: 600;
         }
-        .ct-field .hint.green { color: #1b5e20; }
-        .ct-field .hint.red { color: #b51f2c; }
+
+        .ct-field .hint.green {
+            color: #1b5e20;
+        }
+
+        .ct-field .hint.red {
+            color: #b51f2c;
+        }
 
         .ct-quick-btns {
             display: flex;
@@ -617,6 +769,7 @@ $settings = getSettings($pdo);
             flex-wrap: wrap;
             margin-top: 8px;
         }
+
         .ct-quick-btn {
             height: 28px;
             padding: 0 12px;
@@ -630,6 +783,7 @@ $settings = getSettings($pdo);
             cursor: pointer;
             transition: .15s ease;
         }
+
         .ct-quick-btn:hover {
             background: #fbe8e9;
             border-color: #f1c8cc;
@@ -641,6 +795,7 @@ $settings = getSettings($pdo);
             gap: 10px;
             margin-top: 20px;
         }
+
         .ct-modal-btn {
             flex: 1;
             height: 46px;
@@ -656,30 +811,47 @@ $settings = getSettings($pdo);
             gap: 7px;
             transition: .18s ease;
         }
+
         .ct-modal-btn.primary {
             background: linear-gradient(135deg, #1f7a3d 0%, #14532d 100%);
             color: #fff;
-            box-shadow: 0 8px 20px rgba(31,122,61,.25);
+            box-shadow: 0 8px 20px rgba(31, 122, 61, .25);
         }
-        .ct-modal-btn.primary:hover:not(:disabled) { transform: translateY(-1px); }
-        .ct-modal-btn.primary:disabled { opacity: .55; cursor: not-allowed; }
+
+        .ct-modal-btn.primary:hover:not(:disabled) {
+            transform: translateY(-1px);
+        }
+
+        .ct-modal-btn.primary:disabled {
+            opacity: .55;
+            cursor: not-allowed;
+        }
+
         .ct-modal-btn.ghost {
             background: #fff;
             border: 1.5px solid #e4ddd3;
             color: #6f675f;
         }
-        .ct-modal-btn.ghost:hover { background: #faf7f0; }
+
+        .ct-modal-btn.ghost:hover {
+            background: #faf7f0;
+        }
 
         .ct-spinner {
             width: 14px;
             height: 14px;
-            border: 2px solid rgba(255,255,255,.4);
+            border: 2px solid rgba(255, 255, 255, .4);
             border-top-color: #fff;
             border-radius: 50%;
             animation: ctSpin .7s linear infinite;
             display: inline-block;
         }
-        @keyframes ctSpin { to { transform: rotate(360deg); } }
+
+        @keyframes ctSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
 
         /* Toast */
         .ct-toast-wrap {
@@ -692,6 +864,7 @@ $settings = getSettings($pdo);
             z-index: 10000;
             pointer-events: none;
         }
+
         .ct-toast {
             min-width: 260px;
             max-width: 360px;
@@ -704,13 +877,18 @@ $settings = getSettings($pdo);
             font-size: 12px;
             color: #302923;
             border: 1px solid #eee7dc;
-            box-shadow: 0 14px 34px rgba(0,0,0,.14);
+            box-shadow: 0 14px 34px rgba(0, 0, 0, .14);
             transform: translateX(120%);
             opacity: 0;
-            transition: transform .3s cubic-bezier(.2,.9,.3,1.2), opacity .3s ease;
+            transition: transform .3s cubic-bezier(.2, .9, .3, 1.2), opacity .3s ease;
             pointer-events: auto;
         }
-        .ct-toast.show { transform: translateX(0); opacity: 1; }
+
+        .ct-toast.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
         .ct-toast-icon {
             width: 24px;
             height: 24px;
@@ -722,10 +900,25 @@ $settings = getSettings($pdo);
             flex-shrink: 0;
             color: #fff;
         }
-        .ct-toast.success .ct-toast-icon { background: #4caf50; }
-        .ct-toast.error   .ct-toast-icon { background: #c62828; }
-        .ct-toast.info    .ct-toast-icon { background: #3b82f6; }
-        .ct-toast-body { flex: 1; padding-top: 3px; line-height: 1.5; }
+
+        .ct-toast.success .ct-toast-icon {
+            background: #4caf50;
+        }
+
+        .ct-toast.error .ct-toast-icon {
+            background: #c62828;
+        }
+
+        .ct-toast.info .ct-toast-icon {
+            background: #3b82f6;
+        }
+
+        .ct-toast-body {
+            flex: 1;
+            padding-top: 3px;
+            line-height: 1.5;
+        }
+
         .ct-toast-close {
             background: transparent;
             border: 0;
@@ -737,31 +930,70 @@ $settings = getSettings($pdo);
         }
 
         @media (max-width: 768px) {
-            .ct-page { padding: 18px 14px 40px; }
-            .ct-card { padding: 17px; border-radius: 17px; }
-            .ct-list-head { flex-direction: column; align-items: stretch; }
-            .ct-filters { flex-direction: column; align-items: stretch; }
-            .ct-search { width: 100%; }
+            .ct-page {
+                padding: 18px 14px 40px;
+            }
+
+            .ct-card {
+                padding: 17px;
+                border-radius: 17px;
+            }
+
+            .ct-list-head {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ct-filters {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ct-search {
+                width: 100%;
+            }
 
             .ct-group-head {
                 grid-template-columns: 1fr auto;
                 row-gap: 10px;
             }
-            .ct-stat-box { text-align: left; }
-            .ct-stat-label { text-align: left; }
+
+            .ct-stat-box {
+                text-align: left;
+            }
+
+            .ct-stat-label {
+                text-align: left;
+            }
 
             .ct-order {
                 grid-template-columns: 1fr auto;
                 row-gap: 8px;
             }
 
-            .ct-pagination { flex-direction: column; align-items: stretch; }
-            .ct-pag-info, .ct-pag-controls { text-align: center; justify-content: center; }
+            .ct-pagination {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .ct-pag-info,
+            .ct-pag-controls {
+                text-align: center;
+                justify-content: center;
+            }
         }
 
         @media (max-width: 480px) {
-            .ct-toast-wrap { top: 14px; right: 14px; left: 14px; }
-            .ct-toast { min-width: 0; width: 100%; }
+            .ct-toast-wrap {
+                top: 14px;
+                right: 14px;
+                left: 14px;
+            }
+
+            .ct-toast {
+                min-width: 0;
+                width: 100%;
+            }
         }
     </style>
 </head>

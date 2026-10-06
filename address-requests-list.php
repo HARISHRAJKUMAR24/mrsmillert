@@ -8,6 +8,9 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     exit;
 }
 
+/* ADMIN ONLY */
+requireAdmin();
+
 $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin');
 
 $settings = getSettings($pdo);
@@ -393,7 +396,43 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
         .ar-call i {
             font-size: 12px;
         }
+        /* ---------- WHATSAPP BUTTON ---------- */
+        .ar-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: nowrap;
+        }
 
+        .ar-whatsapp {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            height: 34px;
+            padding: 0 14px;
+            border-radius: 8px;
+            border: 1.5px solid #c8e6c9;
+            background: #e8f6ea;
+            color: #1f7a3d;
+            font-family: "DM Sans", sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: none;
+            transition: .15s ease;
+            white-space: nowrap;
+        }
+
+        .ar-whatsapp:hover {
+            background: #25d366;
+            border-color: #25d366;
+            color: #fff;
+        }
+
+        .ar-whatsapp i {
+            font-size: 13px;
+        }
         /* =====================================================
            EMPTY STATE
            ===================================================== */

@@ -7,7 +7,8 @@ if ($id <= 0) {
     header('Location: menu.php');
     exit;
 }
-
+/* ADMIN ONLY */
+requireAdmin();
 /* =========================================================
    LOAD PRODUCTS + VARIANTS
    ========================================================= */

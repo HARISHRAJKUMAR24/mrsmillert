@@ -49,7 +49,9 @@ try {
     <?php include './includes/head.php'; ?>
 
     <style>
-        .or-page { padding: 30px 32px 40px; }
+        .or-page {
+            padding: 30px 32px 40px;
+        }
 
         .or-header {
             display: flex;
@@ -72,6 +74,85 @@ try {
             margin: 0;
             color: #817a71;
             font-size: 13px;
+        }
+
+        /* Selection toolbar */
+        .or-bulk {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #fff5f5 0%, #fbe8e9 100%);
+            border: 1.5px solid #f1c8cc;
+            border-radius: 14px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            transform: translateY(-10px);
+            opacity: 0;
+            max-height: 0;
+            overflow: hidden;
+            transition: .22s ease;
+        }
+
+        .or-bulk.show {
+            transform: translateY(0);
+            opacity: 1;
+            max-height: 200px;
+        }
+
+        .or-bulk-count {
+            font-size: 12.5px;
+            font-weight: 800;
+            color: #b51f2c;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .or-bulk-count i {
+            font-size: 14px;
+        }
+
+        .or-bulk-spacer {
+            flex: 1;
+        }
+
+        .or-bulk-btn {
+            height: 34px;
+            padding: 0 14px;
+            border-radius: 9px;
+            border: 1.5px solid #e4ddd3;
+            background: #fff;
+            color: #6f675f;
+            font-family: "DM Sans", sans-serif;
+            font-size: 11px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: .15s ease;
+            white-space: nowrap;
+        }
+
+        .or-bulk-btn:hover {
+            background: #faf7f0;
+            color: #302923;
+        }
+
+        .or-bulk-btn.primary {
+            background: #b51f2c;
+            color: #fff;
+            border-color: #b51f2c;
+        }
+
+        .or-bulk-btn.primary:hover {
+            background: #8e1722;
+            color: #fff;
+        }
+
+        .or-bulk-btn i {
+            font-size: 12px;
         }
 
         .or-stats {
@@ -117,9 +198,17 @@ try {
             margin-top: 6px;
         }
 
-        .or-stat.red .or-stat-value { color: #b51f2c; }
-        .or-stat.green .or-stat-value { color: #2e7d32; }
-        .or-stat.gold .or-stat-value { color: #b8893c; }
+        .or-stat.red .or-stat-value {
+            color: #b51f2c;
+        }
+
+        .or-stat.green .or-stat-value {
+            color: #2e7d32;
+        }
+
+        .or-stat.gold .or-stat-value {
+            color: #b8893c;
+        }
 
         /* Filters */
         .or-filters {
@@ -147,7 +236,7 @@ try {
             box-shadow: 0 0 0 4px rgba(181, 31, 44, .08);
         }
 
-        .or-date-filter > i {
+        .or-date-filter>i {
             position: absolute;
             left: 12px;
             top: 50%;
@@ -210,11 +299,6 @@ try {
             font-weight: 700;
         }
 
-        .or-date-custom input[type="date"]::-webkit-calendar-picker-indicator {
-            cursor: pointer;
-            opacity: .55;
-        }
-
         .or-tabs {
             display: flex;
             background: #fdfaf4;
@@ -239,7 +323,9 @@ try {
             white-space: nowrap;
         }
 
-        .or-tab:hover { color: #b51f2c; }
+        .or-tab:hover {
+            color: #b51f2c;
+        }
 
         .or-tab.active {
             background: #fff;
@@ -273,7 +359,7 @@ try {
             box-shadow: 0 0 0 4px rgba(181, 31, 44, .08);
         }
 
-        .or-search > i {
+        .or-search>i {
             position: absolute;
             left: 14px;
             top: 50%;
@@ -283,7 +369,7 @@ try {
             pointer-events: none;
         }
 
-        /* Table */
+        /* Card + table */
         .or-card {
             background: #fff;
             border: 1px solid #eee7dc;
@@ -300,7 +386,7 @@ try {
         .or-table {
             width: 100%;
             border-collapse: collapse;
-            min-width: 980px;
+            min-width: 1080px;
         }
 
         .or-table thead th {
@@ -316,19 +402,99 @@ try {
             white-space: nowrap;
         }
 
+        /* Checkbox column */
+        .or-table th.col-check,
+        .or-table td.col-check {
+            width: 44px;
+            padding-left: 18px;
+            padding-right: 4px;
+        }
+
         .or-table tbody tr {
             transition: background .2s ease;
             border-bottom: 1px solid #f4efe8;
+            cursor: pointer;
         }
 
-        .or-table tbody tr:last-child { border-bottom: 0; }
-        .or-table tbody tr:hover { background: #fffcf5; }
+        .or-table tbody tr:last-child {
+            border-bottom: 0;
+        }
+
+        .or-table tbody tr:hover {
+            background: #fffcf5;
+        }
+
+        .or-table tbody tr.is-selected {
+            background: #fff8f8;
+        }
+
+        .or-table tbody tr.is-selected:hover {
+            background: #fff5f5;
+        }
 
         .or-table tbody td {
             padding: 14px 16px;
             font-size: 12px;
             color: #4e4841;
             vertical-align: middle;
+        }
+
+        /* Custom checkbox */
+        .or-check {
+            position: relative;
+            width: 20px;
+            height: 20px;
+            border-radius: 6px;
+            border: 2px solid #d5cbbd;
+            background: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: .15s ease;
+            flex-shrink: 0;
+            user-select: none;
+        }
+
+        .or-check:hover {
+            border-color: #b51f2c;
+        }
+
+        .or-check::after {
+            content: "";
+            width: 5px;
+            height: 9px;
+            border: solid #fff;
+            border-width: 0 2.5px 2.5px 0;
+            transform: rotate(45deg) translate(-1px, -1px);
+            opacity: 0;
+            transition: .15s ease;
+        }
+
+        .or-check.checked {
+            background: #b51f2c;
+            border-color: #b51f2c;
+        }
+
+        .or-check.checked::after {
+            opacity: 1;
+        }
+
+        .or-check.indeterminate {
+            background: #b51f2c;
+            border-color: #b51f2c;
+        }
+
+        .or-check.indeterminate::after {
+            content: "";
+            width: 10px;
+            height: 2.5px;
+            background: #fff;
+            border: 0;
+            transform: none;
+            border-radius: 2px;
+            opacity: 1;
+            margin: 0;
         }
 
         .order-cell {
@@ -351,7 +517,9 @@ try {
             box-shadow: 0 4px 12px rgba(181, 31, 44, .2);
         }
 
-        .order-info { min-width: 0; }
+        .order-info {
+            min-width: 0;
+        }
 
         .order-code {
             font-weight: 800;
@@ -365,7 +533,9 @@ try {
             margin-top: 2px;
         }
 
-        .cust-cell { min-width: 160px; }
+        .cust-cell {
+            min-width: 160px;
+        }
 
         .cust-name {
             font-weight: 700;
@@ -400,17 +570,46 @@ try {
             white-space: nowrap;
         }
 
-        .status-pending { background: #fdf1e2; color: #a35a0e; }
-        .status-confirmed { background: #e8f1e8; color: #2e7d32; }
-        .status-processing { background: #e5eefb; color: #1565c0; }
-        .status-delivered { background: #e8f6ea; color: #1b5e20; }
-        .status-cancelled { background: #fdeaea; color: #b51f2c; }
+        .status-pending {
+            background: #fdf1e2;
+            color: #a35a0e;
+        }
 
-        .pay-paid { background: #e8f6ea; color: #1b5e20; }
-        .pay-unpaid { background: #fff4d6; color: #8a6a1e; }
-        .pay-failed { background: #fdeaea; color: #b51f2c; }
+        .status-confirmed {
+            background: #e8f1e8;
+            color: #2e7d32;
+        }
 
-        /* Mode pill */
+        .status-processing {
+            background: #e5eefb;
+            color: #1565c0;
+        }
+
+        .status-delivered {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
+
+        .status-cancelled {
+            background: #fdeaea;
+            color: #b51f2c;
+        }
+
+        .pay-paid {
+            background: #e8f6ea;
+            color: #1b5e20;
+        }
+
+        .pay-unpaid {
+            background: #fff4d6;
+            color: #8a6a1e;
+        }
+
+        .pay-failed {
+            background: #fdeaea;
+            color: #b51f2c;
+        }
+
         .mode-pill {
             display: inline-flex;
             align-items: center;
@@ -423,10 +622,20 @@ try {
             text-transform: uppercase;
             white-space: nowrap;
         }
-        .mode-pill i { font-size: 10px; }
 
-        .mode-delivery { background: #e5eefb; color: #1565c0; }
-        .mode-pickup { background: #fdf1e2; color: #a35a0e; }
+        .mode-pill i {
+            font-size: 10px;
+        }
+
+        .mode-delivery {
+            background: #e5eefb;
+            color: #1565c0;
+        }
+
+        .mode-pickup {
+            background: #fdf1e2;
+            color: #a35a0e;
+        }
 
         .amount-cell {
             font-family: "Playfair Display", serif;
@@ -477,7 +686,10 @@ try {
             font-weight: 700;
         }
 
-        .or-empty p { margin: 0; font-size: 12px; }
+        .or-empty p {
+            margin: 0;
+            font-size: 12px;
+        }
 
         /* Pagination */
         .or-pagination {
@@ -591,23 +803,140 @@ try {
             user-select: none;
         }
 
-        .pagination-controls i { font-size: 12px; }
+        .pagination-controls i {
+            font-size: 12px;
+        }
+
+        .or-stock-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            padding: 0 20px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #b51f2c 0%, #8e1722 100%);
+            color: #fff;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+            box-shadow: 0 10px 24px rgba(181, 31, 44, .22);
+            transition: .2s ease;
+            white-space: nowrap;
+            border: none;
+            cursor: pointer;
+        }
+
+        .or-stock-btn i {
+            font-size: 14px;
+        }
+
+        .or-stock-btn:hover {
+            transform: translateY(-1px);
+            color: #fff;
+            box-shadow: 0 14px 28px rgba(181, 31, 44, .3);
+        }
+
+        .or-stock-btn:active {
+            transform: translateY(0);
+        }
+        /* =====================================================
+           HEADER ACTIONS GROUP
+           ===================================================== */
+        .or-header-actions {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        /* ---------- APARTMENT ORDERS BUTTON ---------- */
+        .or-apartment-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            padding: 0 20px;
+            border-radius: 12px;
+            background: #fff;
+            border: 1.5px solid #ece5da;
+            color: #6f675f;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            text-decoration: none;
+            transition: .2s ease;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        .or-apartment-btn i {
+            font-size: 14px;
+            color: #b51f2c;
+        }
+
+        .or-apartment-btn:hover {
+            background: #fdfaf4;
+            border-color: #d98a91;
+            color: #302923;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(48, 41, 35, .08);
+        }
+
+        .or-apartment-btn:active {
+            transform: translateY(0);
+        }
+
+        @media (max-width: 640px) {
+            .or-header-actions {
+                width: 100%;
+            }
+            .or-apartment-btn,
+            .or-stock-btn {
+                flex: 1;
+                justify-content: center;
+            }
+        }
 
         @media (max-width: 1024px) {
-            .or-stats { grid-template-columns: repeat(2, 1fr); }
+            .or-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 768px) {
-            .or-page { padding: 20px 15px 30px; }
-            .or-stats { grid-template-columns: repeat(2, 1fr); }
-            .or-pagination { flex-direction: column; align-items: stretch; }
-            .pagination-left { justify-content: center; }
-            .pagination-info { text-align: center; }
-            .pagination-controls { justify-content: center; flex-wrap: wrap; }
+            .or-page {
+                padding: 20px 15px 30px;
+            }
+
+            .or-stats {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .or-pagination {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .pagination-left {
+                justify-content: center;
+            }
+
+            .pagination-info {
+                text-align: center;
+            }
+
+            .pagination-controls {
+                justify-content: center;
+                flex-wrap: wrap;
+            }
         }
 
         @media (max-width: 480px) {
-            .or-stats { grid-template-columns: 1fr; }
+            .or-stats {
+                grid-template-columns: 1fr;
+            }
+
             .pagination-controls button {
                 min-width: 30px;
                 height: 30px;
@@ -653,8 +982,39 @@ try {
             <div class="or-header">
                 <div class="or-title">
                     <h1>Orders</h1>
-                    <p>Click a row to view full details.</p>
+                    <p>Click a row to view full details, or tick rows for bulk actions.</p>
                 </div>
+
+                <div class="or-header-actions">
+                    <a href="<?= ADMIN_URL ?>apartment-orders.php" class="or-apartment-btn">
+                        <i class="bi bi-buildings"></i>
+                        Apartment Orders
+                    </a>
+
+                    <a href="<?= ADMIN_URL ?>stock-orders.php" class="or-stock-btn">
+                        <i class="bi bi-box-seam"></i>
+                        Stock Orders Report
+                    </a>
+                </div>
+            </div>
+
+
+            <!-- BULK TOOLBAR -->
+            <div class="or-bulk" id="orBulkBar">
+                <span class="or-bulk-count">
+                    <i class="bi bi-check2-square"></i>
+                    <span id="orBulkCount">0</span> selected
+                </span>
+
+                <div class="or-bulk-spacer"></div>
+
+                <button type="button" class="or-bulk-btn" id="orBulkClear">
+                    <i class="bi bi-x-lg"></i> Clear
+                </button>
+
+                <button type="button" class="or-bulk-btn primary" id="orBulkSample">
+                    <i class="bi bi-lightning-charge"></i> Bulk Action
+                </button>
             </div>
 
 
@@ -730,6 +1090,9 @@ try {
                     <table class="or-table" id="orTable">
                         <thead>
                             <tr>
+                                <th class="col-check">
+                                    <div class="or-check" id="orSelectAll"></div>
+                                </th>
                                 <th>Order</th>
                                 <th>Customer</th>
                                 <th>Mode / Branch</th>
@@ -742,7 +1105,7 @@ try {
                         </thead>
                         <tbody id="orTbody">
                             <tr>
-                                <td colspan="8" style="text-align:center;padding:40px;color:#948c82;">
+                                <td colspan="9" style="text-align:center;padding:40px;color:#948c82;">
                                     Loading orders...
                                 </td>
                             </tr>

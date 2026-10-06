@@ -101,11 +101,14 @@ $isAdminUser = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'a
             <i class="bi bi-alarm-fill"></i>
             Urgency Swap Orders
         </a>
+        
+        <?php if ($isAdminUser): ?>
+            <a href="address-requests-list.php">
+                <i class="bi bi-building-add"></i>
+                Apartment Requests
+            </a>
+        <?php endif; ?>
 
-        <a href="address-requests-list.php">
-            <i class="bi bi-building-add"></i>
-            Apartment Requests
-        </a>
 
         <div class="menu-title px-2 pt-4">
             Management
@@ -133,10 +136,6 @@ $isAdminUser = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'a
             </a>
         <?php endif; ?>
 
-        <a href="#">
-            <i class="bi bi-truck"></i>
-            Delivery
-        </a>
 
         <?php if ($isAdminUser): ?>
             <a href="payment-settings.php">

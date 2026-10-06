@@ -335,7 +335,7 @@ function productImg($img)
             background: rgba(255, 255, 255, .18);
             backdrop-filter: blur(6px);
             border: 1px solid rgba(255, 255, 255, .28);
-            color: #fff;
+            color: #000000;
             font-size: 11px;
             font-weight: 700;
             letter-spacing: .03em;
@@ -343,11 +343,11 @@ function productImg($img)
 
         .hero-gst-strip i {
             font-size: 13px;
-            color: #ffe6b8;
+            color: #393939;
         }
 
         .hero-gst-strip strong {
-            color: #ffe6b8;
+            color: #393939;
             font-weight: 800;
         }
 

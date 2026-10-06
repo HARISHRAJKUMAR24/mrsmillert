@@ -3,6 +3,7 @@
    MRS MILL@ — AJAX: UPDATE MENU
    File: ./ajax/update-menu.php
    - Updates menu name + status + time
+   - Skips variants that no longer exist in the DB
    - Deletes all menu_products for this menu, re-inserts
    ========================================================= */
 
@@ -69,10 +70,10 @@ foreach ($rows as $i => $r) {
 
     foreach ($vids as $vid) {
         $flat[] = [
-            'product_code' => $pcode,
-            'variant_id'   => $vid,
+            'product_code'    => $pcode,
+            'variant_id'      => $vid,
             'stock_unlimited' => $unlim,
-            'stock_count'  => $count
+            'stock_count'     => $count
         ];
     }
 }
@@ -98,24 +99,47 @@ try {
     $pStmt->execute($vcodes);
     $validProducts = $pStmt->fetchAll(PDO::FETCH_COLUMN);
 
-    $vStmt = $pdo->prepare("SELECT id, product_code FROM product_variants WHERE id IN ($vPh)");
+    /* Only include variants that still exist AND are active */
+    $vStmt = $pdo->prepare(
+        "SELECT id, product_code
+         FROM product_variants
+         WHERE id IN ($vPh) AND status = 1"
+    );
     $vStmt->execute($vids);
     $validVariants = [];
     foreach ($vStmt->fetchAll() as $v) {
         $validVariants[(int)$v['id']] = $v['product_code'];
     }
 
+    /* --------- SILENTLY SKIP DELETED PRODUCTS/VARIANTS --------- */
+    $cleanFlat = [];
+
     foreach ($flat as $r) {
+
+        /* Product gone from DB — skip */
         if (!in_array($r['product_code'], $validProducts, true)) {
-            jsonResponse(false, 'Product not found: ' . $r['product_code']);
+            continue;
         }
+
+        /* Variant gone from DB — skip */
         if (!isset($validVariants[$r['variant_id']])) {
-            jsonResponse(false, 'Variant not found: #' . $r['variant_id']);
+            continue;
         }
+
+        /* Variant belongs to a different product — skip */
         if ($validVariants[$r['variant_id']] !== $r['product_code']) {
-            jsonResponse(false, 'Variant does not belong to its product.');
+            continue;
         }
+
+        $cleanFlat[] = $r;
     }
+
+    if (count($cleanFlat) === 0) {
+        jsonResponse(false, 'None of the selected variants exist anymore. Please reload the page and try again.');
+    }
+
+    /* Use the cleaned list from here on */
+    $flat = $cleanFlat;
 
 } catch (PDOException $e) {
     jsonResponse(false, 'Server error while validating.');

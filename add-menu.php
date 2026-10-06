@@ -2,6 +2,15 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
+if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
+    header('Location: login.php');
+    exit;
+}
+$isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin');
+$settings = getSettings($pdo);
+
+/* ADMIN ONLY */
+requireAdmin();
 /* =========================================================
    LOAD PRODUCTS + VARIANTS
    ========================================================= */
@@ -50,6 +59,16 @@ try {
 
 /* =========================================================
    LOAD RECENT MENUS (last 20) for duplicate dropdown
+   ----------------------------------------------------------
+   Stored menu_products.variant_id may be orphaned if the
+   product was edited and its variants recreated. We
+   resolve each stored variant_id against the CURRENT live
+   variants of that product:
+
+     1. If stored variant_id still exists → use it
+     2. Otherwise → assign a DIFFERENT live variant for
+        each orphaned row (round-robin) so all stored rows
+        are preserved.
    ========================================================= */
 
 $recentMenus = [];
@@ -74,30 +93,93 @@ try {
              ORDER BY id ASC"
         );
         $rStmt->execute($codes);
+        $menuRows = $rStmt->fetchAll();
 
-        $grouped = [];
-        foreach ($rStmt->fetchAll() as $row) {
-            $grouped[$row['menu_code']][] = $row;
+        /* Live variant list per product code */
+        $liveVariantsByProduct = [];
+        if (!empty($menuRows)) {
+            $pCodes = array_unique(array_column($menuRows, 'product_code'));
+            $vPh = implode(',', array_fill(0, count($pCodes), '?'));
+
+            $liveStmt = $pdo->prepare(
+                "SELECT id, product_code
+                 FROM product_variants
+                 WHERE product_code IN ($vPh)
+                   AND status = 1
+                 ORDER BY id ASC"
+            );
+            $liveStmt->execute($pCodes);
+
+            foreach ($liveStmt->fetchAll() as $v) {
+                $liveVariantsByProduct[$v['product_code']][] = (int)$v['id'];
+            }
         }
 
-        foreach ($recentMenus as &$m) {
-            $items = $grouped[$m['menu_code']] ?? [];
-            $byProduct = [];
+        /* Group by menu + product, and assign orphaned rows
+           round-robin across the live variants */
+        $grouped = [];
+        $orphanCursor = []; /* keyed by menuCode|pcode to remember position */
 
-            foreach ($items as $it) {
-                if (!isset($byProduct[$it['product_code']])) {
-                    $byProduct[$it['product_code']] = [
-                        'product_code'    => $it['product_code'],
-                        'variant_ids'     => [],
-                        'stock_unlimited' => (int) $it['stock_unlimited'],
-                        'stock_count'     => (int) $it['stock_count'],
-                    ];
+        foreach ($menuRows as $row) {
+            $menuCode = $row['menu_code'];
+            $pcode    = $row['product_code'];
+            $storedId = (int)$row['variant_id'];
+
+            $liveIds = $liveVariantsByProduct[$pcode] ?? [];
+            if (empty($liveIds)) continue;
+
+            $resolvedId = null;
+
+            if (in_array($storedId, $liveIds, true)) {
+                $resolvedId = $storedId;
+            } else {
+                /* Orphan — pick next live variant round-robin */
+                $cursorKey = $menuCode . '|' . $pcode;
+                if (!isset($orphanCursor[$cursorKey])) {
+                    $orphanCursor[$cursorKey] = 0;
                 }
-                $byProduct[$it['product_code']]['variant_ids'][] = (int) $it['variant_id'];
+                $idx = $orphanCursor[$cursorKey] % count($liveIds);
+                $resolvedId = $liveIds[$idx];
+                $orphanCursor[$cursorKey]++;
             }
 
-            $m['rows'] = array_values($byProduct);
+            $key = $menuCode . '|' . $pcode;
+
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'menu_code'       => $menuCode,
+                    'product_code'    => $pcode,
+                    'variant_ids'     => [],
+                    'stock_unlimited' => (int)$row['stock_unlimited'],
+                    'stock_count'     => (int)$row['stock_count'],
+                ];
+            }
+
+            $grouped[$key]['variant_ids'][] = $resolvedId;
         }
+
+        /* Deduplicate variant_ids inside each product group */
+        foreach ($grouped as &$g) {
+            $g['variant_ids'] = array_values(array_unique($g['variant_ids']));
+        }
+        unset($g);
+
+        /* Attach resolved rows to each recent menu */
+        foreach ($recentMenus as &$m) {
+            $rows = [];
+            foreach ($grouped as $g) {
+                if ($g['menu_code'] === $m['menu_code']) {
+                    $rows[] = [
+                        'product_code'    => $g['product_code'],
+                        'variant_ids'     => $g['variant_ids'],
+                        'stock_unlimited' => $g['stock_unlimited'],
+                        'stock_count'     => $g['stock_count'],
+                    ];
+                }
+            }
+            $m['rows'] = $rows;
+        }
+        unset($m);
     }
 } catch (PDOException $e) {
     $recentMenus = [];
@@ -283,10 +365,6 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
             font-size: 15px; pointer-events: none;
         }
         .input-icon-wrap .menu-input { padding-left: 40px; }
-
-        /* =====================================================
-           STATUS TOGGLE
-        ===================================================== */
 
         .status-toggle-row {
             display: flex; align-items: center; justify-content: space-between;

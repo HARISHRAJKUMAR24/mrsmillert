@@ -1,7 +1,9 @@
 /* =========================================================
    MRS MILL@ — ORDERS LIST (admin panel)
    File: ./js/orders.js
-   Returns ALL orders by default (delivery + pickup)
+   + 12-hour time format
+   + Row checkboxes (select-all with indeterminate state)
+   + Bulk action bar
    ========================================================= */
 
 (function () {
@@ -11,7 +13,6 @@
         ? window.ADMIN_URL
         : "./";
 
-    /* Ensure trailing slash */
     if (!BASE_URL.endsWith("/")) BASE_URL += "/";
 
     /* DOM */
@@ -28,6 +29,13 @@
     const paginationControls = document.getElementById("paginationControls");
     const perPageSelect      = document.getElementById("perPageSelect");
 
+    /* Checkbox + bulk */
+    const selectAllBox = document.getElementById("orSelectAll");
+    const bulkBar      = document.getElementById("orBulkBar");
+    const bulkCountEl  = document.getElementById("orBulkCount");
+    const bulkClear    = document.getElementById("orBulkClear");
+    const bulkSample   = document.getElementById("orBulkSample");
+
     if (!tbody) return;
 
     /* STATE */
@@ -41,6 +49,9 @@
     let activeDate   = "all";
     let searchTerm   = "";
 
+    /* Track selected order IDs across pages */
+    const selectedIds = new Set();
+
     /* HELPERS */
     function money(n) { return "₹" + Math.round(Number(n) || 0); }
 
@@ -52,16 +63,25 @@
             .replace(/"/g, "&quot;");
     }
 
+    /* ✅ 12-hour format with AM/PM */
     function formatDate(str) {
         if (!str) return "—";
         const d = new Date(str.replace(" ", "T"));
         if (isNaN(d.getTime())) return str;
+
         const dd  = String(d.getDate()).padStart(2, "0");
         const mon = d.toLocaleString("en-IN", { month: "short" });
         const yr  = d.getFullYear();
-        const hh  = String(d.getHours()).padStart(2, "0");
-        const mm  = String(d.getMinutes()).padStart(2, "0");
-        return `${dd} ${mon} ${yr} · ${hh}:${mm}`;
+
+        let hours = d.getHours();
+        const mins = String(d.getMinutes()).padStart(2, "0");
+        const ampm = hours >= 12 ? "PM" : "AM";
+
+        hours = hours % 12;
+        if (hours === 0) hours = 12;
+        const hh = String(hours).padStart(2, "0");
+
+        return `${dd} ${mon} ${yr} · ${hh}:${mins} ${ampm}`;
     }
 
     function orderStatusBadge(s) {
@@ -88,6 +108,7 @@
     function renderRow(o) {
         const initial  = (o.customer_name || "?").trim().charAt(0).toUpperCase();
         const isPickup = o.delivery_mode === "pickup";
+        const isChecked = selectedIds.has(String(o.id));
 
         let modeCell = "";
 
@@ -111,7 +132,12 @@
         }
 
         return `
-            <tr data-id="${o.id}" data-href="${BASE_URL}order-view.php?id=${o.id}">
+            <tr data-id="${o.id}" class="${isChecked ? 'is-selected' : ''}" data-href="${BASE_URL}order-view.php?id=${o.id}">
+                <td class="col-check">
+                    <div class="or-check ${isChecked ? 'checked' : ''}"
+                         data-check-id="${o.id}"></div>
+                </td>
+
                 <td>
                     <div class="order-cell">
                         <div class="order-avatar">${escapeHtml(initial)}</div>
@@ -162,7 +188,7 @@
         if (total === 0) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="8">
+                    <td colspan="9">
                         <div class="or-empty">
                             <i class="bi bi-inbox"></i>
                             <h3>No orders found</h3>
@@ -171,6 +197,7 @@
                     </td>
                 </tr>`;
             if (paginationWrap) paginationWrap.style.display = "none";
+            syncSelectAllState();
             return;
         }
 
@@ -192,6 +219,8 @@
 
         renderPaginationControls(totalPages);
         if (paginationWrap) paginationWrap.style.display = "flex";
+
+        syncSelectAllState();
     }
 
     function renderPaginationControls(totalPages) {
@@ -316,7 +345,7 @@
     function loadOrders() {
         tbody.innerHTML = `
             <tr>
-                <td colspan="8" style="text-align:center;padding:40px;color:#948c82;">
+                <td colspan="9" style="text-align:center;padding:40px;color:#948c82;">
                     Loading orders...
                 </td>
             </tr>`;
@@ -341,29 +370,99 @@
                 if (!res || !res.success || !Array.isArray(res.data)) {
                     tbody.innerHTML = `
                         <tr>
-                            <td colspan="8" style="text-align:center;padding:40px;color:#b51f2c;">
+                            <td colspan="9" style="text-align:center;padding:40px;color:#b51f2c;">
                                 ${escapeHtml((res && res.message) || "Failed to load orders.")}
                             </td>
                         </tr>`;
+                    syncSelectAllState();
                     return;
                 }
 
                 allRows = res.data;
+
+                /* Drop selections that no longer exist */
+                const validIds = new Set(allRows.map(r => String(r.id)));
+                Array.from(selectedIds).forEach(id => {
+                    if (!validIds.has(id)) selectedIds.delete(id);
+                });
+                updateBulkBar();
+
                 currentPage = 1;
                 applyFilterAndRender();
             })
             .catch(() => {
                 tbody.innerHTML = `
                     <tr>
-                        <td colspan="8" style="text-align:center;padding:40px;color:#b51f2c;">
+                        <td colspan="9" style="text-align:center;padding:40px;color:#b51f2c;">
                             Unable to connect to server.
                         </td>
                     </tr>`;
+                syncSelectAllState();
             });
     }
 
-    /* ROW CLICK → navigate */
+    /* =========================================================
+       CHECKBOX LOGIC
+       ========================================================= */
+    function updateBulkBar() {
+        if (!bulkBar) return;
+        const n = selectedIds.size;
+        if (bulkCountEl) bulkCountEl.textContent = n;
+        bulkBar.classList.toggle("show", n > 0);
+    }
+
+    function syncSelectAllState() {
+        if (!selectAllBox) return;
+
+        const checkboxes = tbody.querySelectorAll(".or-check[data-check-id]");
+        const total = checkboxes.length;
+        const checked = tbody.querySelectorAll(".or-check.checked[data-check-id]").length;
+
+        selectAllBox.classList.remove("checked", "indeterminate");
+
+        if (total === 0) return;
+
+        if (checked === 0) {
+            /* none */
+        } else if (checked === total) {
+            selectAllBox.classList.add("checked");
+        } else {
+            selectAllBox.classList.add("indeterminate");
+        }
+    }
+
+    function toggleRowCheckbox(checkboxEl) {
+        const id = checkboxEl.dataset.checkId;
+        if (!id) return;
+
+        if (selectedIds.has(String(id))) {
+            selectedIds.delete(String(id));
+            checkboxEl.classList.remove("checked");
+            const tr = checkboxEl.closest("tr");
+            if (tr) tr.classList.remove("is-selected");
+        } else {
+            selectedIds.add(String(id));
+            checkboxEl.classList.add("checked");
+            const tr = checkboxEl.closest("tr");
+            if (tr) tr.classList.add("is-selected");
+        }
+
+        updateBulkBar();
+        syncSelectAllState();
+    }
+
+    /* Toggle on checkbox click */
     tbody.addEventListener("click", function (e) {
+
+        /* Checkbox click */
+        const checkbox = e.target.closest(".or-check[data-check-id]");
+        if (checkbox) {
+            e.stopPropagation();
+            toggleRowCheckbox(checkbox);
+            return;
+        }
+
+        /* Row click → navigate unless clicking view link or checkbox */
         if (e.target.closest(".row-view")) return;
 
         const tr = e.target.closest("tr[data-id]");
@@ -372,6 +471,69 @@
         const href = tr.dataset.href;
         if (href) window.location.href = href;
     });
+
+    /* Select all in header */
+    if (selectAllBox) {
+        selectAllBox.addEventListener("click", function () {
+
+            const checkboxes = tbody.querySelectorAll(".or-check[data-check-id]");
+            const total = checkboxes.length;
+            const checked = tbody.querySelectorAll(".or-check.checked[data-check-id]").length;
+
+            const shouldSelectAll = checked < total;  /* if not all selected → select all */
+
+            checkboxes.forEach(cb => {
+                const id = String(cb.dataset.checkId);
+                const tr = cb.closest("tr");
+
+                if (shouldSelectAll) {
+                    if (!selectedIds.has(id)) {
+                        selectedIds.add(id);
+                        cb.classList.add("checked");
+                        if (tr) tr.classList.add("is-selected");
+                    }
+                } else {
+                    selectedIds.delete(id);
+                    cb.classList.remove("checked");
+                    if (tr) tr.classList.remove("is-selected");
+                }
+            });
+
+            updateBulkBar();
+            syncSelectAllState();
+        });
+    }
+
+    /* Bulk clear */
+    if (bulkClear) {
+        bulkClear.addEventListener("click", function () {
+            selectedIds.clear();
+
+            tbody.querySelectorAll(".or-check[data-check-id]").forEach(cb => {
+                cb.classList.remove("checked");
+                const tr = cb.closest("tr");
+                if (tr) tr.classList.remove("is-selected");
+            });
+
+            updateBulkBar();
+            syncSelectAllState();
+        });
+    }
+
+    /* Sample bulk action — replace with your real action */
+    if (bulkSample) {
+        bulkSample.addEventListener("click", function () {
+            const ids = Array.from(selectedIds);
+            if (!ids.length) return;
+
+            /* Example: show a confirm or fire an AJAX call */
+            alert("Bulk action on " + ids.length + " order(s):\n\n" + ids.join(", "));
+
+            /* TODO: replace with real AJAX call, e.g.
+               fetch(BASE_URL + 'ajax/bulk-orders-action.php', { ... })
+            */
+        });
+    }
 
     /* FILTER TABS */
     tabs.forEach(tab => {

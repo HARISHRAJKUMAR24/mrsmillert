@@ -278,10 +278,10 @@
                 </div>
 
                 <div class="ct-group-body">
+                    ${receiveBar}
                     <div class="ct-orders">
                         ${ordersHtml}
                     </div>
-                    ${receiveBar}
                 </div>
             </div>
         `;
