@@ -1,6 +1,7 @@
 /* =========================================================
    MRS MILL@ — ALLOCATE APARTMENTS (card view + popup)
    File: ./js/allocate-apartments.js
+   + Individual House pseudo-apartments
    ========================================================= */
 
 (function () {
@@ -36,6 +37,8 @@
     let currentBoy = null;
     let availableApts = [];
     let allocatedApts = [];
+    let ihAvailable = [];
+    let ihAllocated = [];
     let selectedCodes = new Set();
 
     /* ---------- Helpers ---------- */
@@ -106,7 +109,7 @@
                     <div class="ac-card-foot">
                         <span class="ac-count ${has ? 'has' : 'none'}">
                             <i class="bi ${has ? 'bi-building-check' : 'bi-building'}"></i>
-                            ${count} ${count === 1 ? 'apartment' : 'apartments'}
+                            ${count} ${count === 1 ? 'allocation' : 'allocations'}
                         </span>
                         <span class="ac-card-go">
                             <i class="bi bi-arrow-right"></i>
@@ -117,12 +120,10 @@
         }).join("");
     }
 
-    /* Boy search — LIVE filter */
     boySearch?.addEventListener("input", function () {
         renderBoyCards(this.value);
     });
 
-    /* Click a card → open modal */
     grid?.addEventListener("click", function (e) {
         const card = e.target.closest(".ac-card");
         if (!card) return;
@@ -150,6 +151,8 @@
 
         availableApts = [];
         allocatedApts = [];
+        ihAvailable = [];
+        ihAllocated = [];
 
         availList.innerHTML = `<div class="ac-empty-inline"><i class="bi bi-hourglass-split"></i>Loading...</div>`;
         allocList.innerHTML = `<div class="ac-empty-inline"><i class="bi bi-hourglass-split"></i>Loading...</div>`;
@@ -217,11 +220,13 @@
 
                 availableApts = Array.isArray(res.data.available) ? res.data.available : [];
                 allocatedApts = Array.isArray(res.data.allocated) ? res.data.allocated : [];
+                ihAvailable   = Array.isArray(res.data.ih_available) ? res.data.ih_available : [];
+                ihAllocated   = Array.isArray(res.data.ih_allocated) ? res.data.ih_allocated : [];
 
                 renderAvailable();
                 renderAllocated();
 
-                allocCount.textContent = allocatedApts.length;
+                allocCount.textContent = allocatedApts.length + ihAllocated.length;
             })
             .catch(() => {
                 availList.innerHTML = `<div class="ac-empty-inline"><i class="bi bi-wifi-off"></i>Unable to connect.</div>`;
@@ -230,42 +235,81 @@
     }
 
     /* =========================================================
-       RENDER AVAILABLE LIST
+       RENDER AVAILABLE LIST (apartments + IH section)
        ========================================================= */
     function renderAvailable() {
         if (!availList) return;
 
-        if (!availableApts.length) {
+        const hasApts = availableApts.length > 0;
+        const hasIH   = ihAvailable.length > 0;
+
+        if (!hasApts && !hasIH) {
             availList.innerHTML = `
                 <div class="ac-empty-inline">
                     <i class="bi bi-check2-circle"></i>
-                    All apartments are already allocated to this delivery boy.
+                    Everything is already allocated to this delivery boy.
                 </div>`;
             return;
         }
 
-        availList.innerHTML = availableApts.map(a => {
-            const checked = selectedCodes.has(a.apartment_code);
-            return `
-                <div class="ac-item ${checked ? 'is-checked' : ''}"
-                     data-code="${esc(a.apartment_code)}">
-                    <div class="ac-check"></div>
-                    <div class="ac-item-info">
-                        <p class="ac-item-name">${esc(a.apartment_name)}</p>
-                        <p class="ac-item-code">#${esc(a.apartment_code)}</p>
+        let html = "";
+
+        /* Real apartments section */
+        if (hasApts) {
+            html += `<div style="font-size:10.5px;font-weight:800;color:#948c82;text-transform:uppercase;letter-spacing:.08em;margin:4px 2px 8px;">Apartments (${availableApts.length})</div>`;
+            html += availableApts.map(a => {
+                const checked = selectedCodes.has(a.apartment_code);
+                return `
+                    <div class="ac-item ${checked ? 'is-checked' : ''}"
+                         data-code="${esc(a.apartment_code)}">
+                        <div class="ac-check"></div>
+                        <div class="ac-item-info">
+                            <p class="ac-item-name">${esc(a.apartment_name)}</p>
+                            <p class="ac-item-code">#${esc(a.apartment_code)}</p>
+                        </div>
                     </div>
-                </div>
-            `;
-        }).join("");
+                `;
+            }).join("");
+        }
+
+        /* Individual house section */
+        if (hasIH) {
+            html += `<div style="font-size:10.5px;font-weight:800;color:#2e7d32;text-transform:uppercase;letter-spacing:.08em;margin:14px 2px 8px;">
+                        <i class="bi bi-house-door"></i> Individual Houses (${ihAvailable.length})
+                     </div>`;
+            html += ihAvailable.map(a => {
+                const checked = selectedCodes.has(a.apartment_code);
+                return `
+                    <div class="ac-item ${checked ? 'is-checked' : ''}"
+                         data-code="${esc(a.apartment_code)}"
+                         data-is-ih="1">
+                        <div class="ac-check"></div>
+                        <div class="ac-item-info">
+                            <p class="ac-item-name">${esc(a.apartment_name)}</p>
+                            <p class="ac-item-code">
+                                <span style="background:#eef7f0;color:#2e7d32;padding:2px 7px;border-radius:6px;font-size:9.5px;font-weight:800;letter-spacing:.03em;">
+                                    <i class="bi bi-house-door"></i> INDIVIDUAL HOUSE
+                                </span>
+                            </p>
+                        </div>
+                    </div>
+                `;
+            }).join("");
+        }
+
+        availList.innerHTML = html;
     }
 
     /* =========================================================
-       RENDER ALLOCATED LIST
+       RENDER ALLOCATED LIST (apartments + IH)
        ========================================================= */
     function renderAllocated() {
         if (!allocList) return;
 
-        if (!allocatedApts.length) {
+        const hasApts = allocatedApts.length > 0;
+        const hasIH   = ihAllocated.length > 0;
+
+        if (!hasApts && !hasIH) {
             allocList.innerHTML = `
                 <div class="ac-empty-inline">
                     <i class="bi bi-inbox"></i>
@@ -274,21 +318,49 @@
             return;
         }
 
-        allocList.innerHTML = allocatedApts.map(a => `
-            <div class="ac-item is-existing">
-                <div class="ac-existing-icon"><i class="bi bi-check-lg"></i></div>
-                <div class="ac-item-info">
-                    <p class="ac-item-name">${esc(a.apartment_name)}</p>
-                    <p class="ac-item-code">#${esc(a.apartment_code)}</p>
+        let html = "";
+
+        if (hasApts) {
+            html += `<div style="font-size:10.5px;font-weight:800;color:#948c82;text-transform:uppercase;letter-spacing:.08em;margin:4px 2px 8px;">Apartments (${allocatedApts.length})</div>`;
+            html += allocatedApts.map(a => `
+                <div class="ac-item is-existing">
+                    <div class="ac-existing-icon"><i class="bi bi-check-lg"></i></div>
+                    <div class="ac-item-info">
+                        <p class="ac-item-name">${esc(a.apartment_name)}</p>
+                        <p class="ac-item-code">#${esc(a.apartment_code)}</p>
+                    </div>
+                    <button type="button" class="ac-modal-close js-remove-alloc"
+                            data-code="${esc(a.apartment_code)}"
+                            title="Remove"
+                            style="width:30px;height:30px;font-size:12px;background:#fff;border:1.5px solid #f0d6d8;color:#b51f2c;">
+                        <i class="bi bi-trash3"></i>
+                    </button>
                 </div>
-                <button type="button" class="ac-modal-close js-remove-alloc"
-                        data-code="${esc(a.apartment_code)}"
-                        title="Remove"
-                        style="width:30px;height:30px;font-size:12px;background:#fff;border:1.5px solid #f0d6d8;color:#b51f2c;">
-                    <i class="bi bi-trash3"></i>
-                </button>
-            </div>
-        `).join("");
+            `).join("");
+        }
+
+        if (hasIH) {
+            html += `<div style="font-size:10.5px;font-weight:800;color:#2e7d32;text-transform:uppercase;letter-spacing:.08em;margin:14px 2px 8px;">
+                        <i class="bi bi-house-door"></i> Individual Houses (${ihAllocated.length})
+                     </div>`;
+            html += ihAllocated.map(a => `
+                <div class="ac-item is-existing" style="border-color:#c9e3ce;background:#f3fbf5;">
+                    <div class="ac-existing-icon" style="background:#2e7d32;"><i class="bi bi-house-door"></i></div>
+                    <div class="ac-item-info">
+                        <p class="ac-item-name">${esc(a.apartment_name)}</p>
+                        <p class="ac-item-code" style="color:#2e7d32;">Individual House</p>
+                    </div>
+                    <button type="button" class="ac-modal-close js-remove-alloc"
+                            data-code="${esc(a.apartment_code)}"
+                            title="Remove"
+                            style="width:30px;height:30px;font-size:12px;background:#fff;border:1.5px solid #c9e3ce;color:#2e7d32;">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+            `).join("");
+        }
+
+        allocList.innerHTML = html;
     }
 
     /* =========================================================
@@ -324,7 +396,7 @@
     }
 
     /* =========================================================
-       SEARCH APARTMENTS IN MODAL — LIVE filter
+       SEARCH APARTMENTS IN MODAL
        ========================================================= */
     aptSearch?.addEventListener("input", function () {
         const q = this.value.trim().toLowerCase();
@@ -371,14 +443,12 @@
 
                 showToast(res.message || "Allocated successfully.");
 
-                /* Refresh the boy's apartment counts on the card */
                 if (res.data && typeof res.data.new_count === "number") {
                     const boy = BOYS.find(b => Number(b.id) === Number(currentBoy.id));
                     if (boy) boy.apt_count = res.data.new_count;
                     renderBoyCards(boySearch ? boySearch.value : "");
                 }
 
-                /* Reload the modal lists */
                 selectedCodes = new Set();
                 updateSelectedPill();
                 loadBoyApartments(currentBoy.id);
@@ -391,8 +461,7 @@
     });
 
     /* =========================================================
-       REMOVE ALLOCATION (from Allocated tab)
-       — no confirm dialog, deletes immediately
+       REMOVE ALLOCATION
        ========================================================= */
     allocList?.addEventListener("click", function (e) {
         const btn = e.target.closest(".js-remove-alloc");

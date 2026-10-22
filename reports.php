@@ -11,8 +11,8 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
 /* ADMIN ONLY */
 requireAdmin();
 
-$settings = getSettings($pdo);
-$siteName = $settings['username'] ?? 'Mrs Mill@';
+$settings  = getSettings($pdo);
+$siteName  = $settings['username'] ?? 'Mrs Mill@';
 
 /* GST settings for display */
 $gstNumber = trim($settings['gst_number'] ?? '');
@@ -21,9 +21,9 @@ $taxRate   = (float)($settings['tax_rate'] ?? 0);
 $taxType   = $settings['tax_type'] ?? 'exclusive';
 
 /* ---------------- DATE RANGE ---------------- */
-$range  = $_GET['range']  ?? 'today';
-$from   = $_GET['from']   ?? '';
-$to     = $_GET['to']     ?? '';
+$range = $_GET['range'] ?? 'today';
+$from  = $_GET['from']  ?? '';
+$to    = $_GET['to']    ?? '';
 
 $dateFrom = null;
 $dateTo   = null;
@@ -82,6 +82,10 @@ $stats = [
     'tax_total'  => 0,
     'net_sales'  => 0,
     'tax_orders' => 0,
+    /* Address type */
+    'apartment'         => 0,
+    'individual_house'  => 0,
+    'pickup_addr'       => 0,
 ];
 
 try {
@@ -96,7 +100,10 @@ try {
                 SUM(CASE WHEN delivery_status = 'enabled' THEN 1 ELSE 0 END) AS delivered_count,
                 SUM(CASE WHEN delivery_status = 'disabled' THEN 1 ELSE 0 END) AS pending_count,
                 SUM(CASE WHEN payment_status = 'paid'   THEN 1 ELSE 0 END) AS paid_count,
-                SUM(CASE WHEN payment_status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count
+                SUM(CASE WHEN payment_status = 'unpaid' THEN 1 ELSE 0 END) AS unpaid_count,
+                SUM(CASE WHEN address_type = 'apartment'        THEN 1 ELSE 0 END) AS apartment_count,
+                SUM(CASE WHEN address_type = 'individual_house' THEN 1 ELSE 0 END) AS individual_count,
+                SUM(CASE WHEN address_type = 'pickup'           THEN 1 ELSE 0 END) AS pickup_addr_count
             FROM orders o
             WHERE o.status <> 'cancelled'
             $dateWhere";
@@ -117,8 +124,10 @@ try {
         $stats['tax_total']  = (float)($row['tax_sum'] ?? 0);
         $stats['tax_orders'] = (int)($row['tax_orders'] ?? 0);
 
-        /* Net sales = revenue − tax (for inclusive tax, this equals subtotal;
-           for exclusive tax, subtotal is already without tax) */
+        $stats['apartment']        = (int)($row['apartment_count'] ?? 0);
+        $stats['individual_house'] = (int)($row['individual_count'] ?? 0);
+        $stats['pickup_addr']      = (int)($row['pickup_addr_count'] ?? 0);
+
         $stats['net_sales']  = max(0, $stats['revenue'] - $stats['tax_total']);
     }
 } catch (PDOException $e) {
@@ -152,6 +161,33 @@ try {
 } catch (PDOException $e) {
 }
 
+/* ---------------- ADDRESS TYPE BREAKDOWN ---------------- */
+$addrStats = [
+    'apartment'        => ['count' => 0, 'revenue' => 0],
+    'individual_house' => ['count' => 0, 'revenue' => 0],
+    'pickup'           => ['count' => 0, 'revenue' => 0],
+];
+
+try {
+    $sql = "SELECT address_type,
+                COUNT(*) AS cnt,
+                SUM(total_amount) AS rev
+            FROM orders o
+            WHERE o.status <> 'cancelled'
+            $dateWhere
+            GROUP BY address_type";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($dateParams);
+    while ($r = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $t = $r['address_type'] ?: 'apartment';
+        if (isset($addrStats[$t])) {
+            $addrStats[$t]['count']   = (int)$r['cnt'];
+            $addrStats[$t]['revenue'] = (float)$r['rev'];
+        }
+    }
+} catch (PDOException $e) {
+}
+
 /* ---------------- TAX BREAKDOWN BY TYPE ---------------- */
 $taxBreakdown = [
     'exclusive' => ['count' => 0, 'tax' => 0, 'revenue' => 0],
@@ -180,13 +216,16 @@ try {
 } catch (PDOException $e) {
 }
 
-/* ---------------- RECENT TAXED ORDERS ---------------- */
+/* ---------------- RECENT TAXED ORDERS (FIXED: join customers) ---------------- */
 $taxedOrders = [];
 try {
-    $sql = "SELECT o.order_code, o.customer_name, o.customer_mobile,
+    $sql = "SELECT o.order_code,
+                c.full_name     AS customer_name,
+                c.mobile_number AS customer_mobile,
                 o.subtotal, o.tax_amount, o.tax_rate, o.tax_type,
                 o.total_amount, o.created_at
             FROM orders o
+            LEFT JOIN customers c ON c.customer_id = o.customer_id
             WHERE o.status <> 'cancelled'
               AND o.tax_amount > 0
             $dateWhere
@@ -219,24 +258,53 @@ try {
 } catch (PDOException $e) {
 }
 
-/* ---------------- TOP APARTMENTS ---------------- */
+/* ---------------- TOP APARTMENTS (FIXED: extract from JSON) ---------------- */
 $topApartments = [];
 try {
-    $sql = "SELECT o.apartment_code, o.apartment_name,
+    $sql = "SELECT
+                JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code')) AS apartment_code,
+                JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_name')) AS apartment_name,
                 COUNT(*) AS order_count,
                 SUM(o.total_amount) AS revenue
             FROM orders o
             WHERE o.status <> 'cancelled'
               AND o.delivery_mode = 'delivery'
-              AND o.apartment_code IS NOT NULL
-              AND o.apartment_code <> ''
+              AND o.address_type = 'apartment'
+              AND JSON_VALID(o.address_json)
+              AND JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code')) IS NOT NULL
+              AND JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code')) <> ''
               $dateWhere
-            GROUP BY o.apartment_code
+            GROUP BY apartment_code, apartment_name
             ORDER BY order_count DESC
             LIMIT 8";
     $stmt = $pdo->prepare($sql);
     $stmt->execute($dateParams);
     $topApartments = $stmt->fetchAll(PDO::FETCH_ASSOC);
+} catch (PDOException $e) {
+}
+
+/* ---------------- TOP INDIVIDUAL HOUSE ADDRESSES (NEW) ---------------- */
+$topIndividual = [];
+try {
+    $sql = "SELECT
+                JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.full_address')) AS full_address,
+                COUNT(*) AS order_count,
+                SUM(o.total_amount) AS revenue,
+                SUM(CASE WHEN o.payment_status = 'paid' THEN 1 ELSE 0 END) AS paid_count
+            FROM orders o
+            WHERE o.status <> 'cancelled'
+              AND o.delivery_mode = 'delivery'
+              AND o.address_type = 'individual_house'
+              AND JSON_VALID(o.address_json)
+              AND JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.full_address')) IS NOT NULL
+              AND JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.full_address')) <> ''
+              $dateWhere
+            GROUP BY full_address
+            ORDER BY order_count DESC
+            LIMIT 8";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute($dateParams);
+    $topIndividual = $stmt->fetchAll(PDO::FETCH_ASSOC);
 } catch (PDOException $e) {
 }
 
@@ -300,6 +368,11 @@ $activeLabel = $rangeLabels[$range] ?? 'Today';
 $maxModeCount = max(1, $modeStats['delivery']['count'], $modeStats['pickup']['count']);
 $deliveryH    = (int)round(($modeStats['delivery']['count'] / $maxModeCount) * 100);
 $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 100);
+
+/* Address type bars (additive) */
+$maxAddrCount = max(1, $addrStats['apartment']['count'], $addrStats['individual_house']['count']);
+$aptH = (int)round(($addrStats['apartment']['count']        / $maxAddrCount) * 100);
+$indH = (int)round(($addrStats['individual_house']['count'] / $maxAddrCount) * 100);
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -343,7 +416,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             flex-wrap: wrap;
         }
 
-        /* GST badge in header */
         .rp-gst-badge {
             display: inline-flex;
             align-items: center;
@@ -369,9 +441,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             letter-spacing: 1.2px;
         }
 
-        /* =====================================================
-           FILTER BAR
-           ===================================================== */
+        /* FILTER BAR */
         .rp-filters {
             background: #fff;
             border: 1.5px solid #eee7dc;
@@ -483,9 +553,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             letter-spacing: .04em;
         }
 
-        /* =====================================================
-           STAT CARDS
-           ===================================================== */
+        /* STAT CARDS */
         .rp-stats {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
@@ -577,9 +645,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             font-weight: 600;
         }
 
-        /* =====================================================
-           SECTION CARDS
-           ===================================================== */
+        /* SECTION CARDS */
         .rp-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -636,9 +702,12 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             color: #1b5e20;
         }
 
-        /* =====================================================
-           TAX KPI STRIP inside tax card
-           ===================================================== */
+        .rp-card-title.blue i {
+            background: #e5eefb;
+            color: #1565c0;
+        }
+
+        /* TAX KPI STRIP */
         .rp-tax-kpis {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -686,7 +755,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin-top: 3px;
         }
 
-        /* Tax type rows */
         .rp-tax-type-list {
             display: flex;
             flex-direction: column;
@@ -739,7 +807,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             color: #b8893c;
         }
 
-        /* Taxed orders list */
+        /* Recent taxed orders */
         .rp-tax-order-list {
             display: flex;
             flex-direction: column;
@@ -847,9 +915,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin-bottom: 10px;
         }
 
-        /* =====================================================
-           MODE CHART (existing)
-           ===================================================== */
+        /* Mode chart */
         .rp-chart {
             display: flex;
             align-items: flex-end;
@@ -899,6 +965,10 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             background: linear-gradient(180deg, #f7c95c 0%, #b8893c 100%);
         }
 
+        .rp-chart-bar.house {
+            background: linear-gradient(180deg, #6ecf7c 0%, #2e7d32 100%);
+        }
+
         .rp-chart-bar::after {
             content: "";
             position: absolute;
@@ -933,10 +1003,12 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             display: flex;
             gap: 10px;
             margin-top: 10px;
+            flex-wrap: wrap;
         }
 
         .rp-mode-foot-item {
             flex: 1;
+            min-width: 120px;
             padding: 12px 14px;
             border-radius: 12px;
             background: #fdfaf4;
@@ -960,9 +1032,55 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin-top: 4px;
         }
 
-        /* =====================================================
-           PAYMENT BARS
-           ===================================================== */
+        /* Address type card (new) */
+        .rp-addr-kpis {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .rp-addr-kpi {
+            padding: 14px 16px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #fdf5e8 0%, #fbeed3 100%);
+            border: 1.5px solid #f3dca5;
+        }
+
+        .rp-addr-kpi.house {
+            background: linear-gradient(135deg, #eef7f0 0%, #dbeddf 100%);
+            border-color: #c8e6c9;
+        }
+
+        .rp-addr-kpi-label {
+            font-size: 10px;
+            font-weight: 800;
+            color: #948c82;
+            text-transform: uppercase;
+            letter-spacing: .07em;
+            margin-bottom: 4px;
+        }
+
+        .rp-addr-kpi-value {
+            font-family: "DM Sans", sans-serif;
+            font-size: 20px;
+            font-weight: 800;
+            color: #b8893c;
+            line-height: 1.15;
+        }
+
+        .rp-addr-kpi.house .rp-addr-kpi-value {
+            color: #2e7d32;
+        }
+
+        .rp-addr-kpi-sub {
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 600;
+            margin-top: 3px;
+        }
+
+        /* Payment bars */
         .rp-pay-row {
             display: flex;
             align-items: center;
@@ -1021,18 +1139,20 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             text-align: right;
         }
 
-        /* =====================================================
-           TOP PRODUCTS / BOYS / APARTMENTS (existing)
-           ===================================================== */
+        /* Top products / boys / apts */
         .rp-prod-list,
         .rp-boy-list,
-        .rp-apt-list {
+        .rp-apt-list,
+        .rp-ih-list {
             display: flex;
             flex-direction: column;
             gap: 10px;
         }
 
-        .rp-prod {
+        .rp-prod,
+        .rp-boy,
+        .rp-apt,
+        .rp-ih {
             display: flex;
             align-items: center;
             gap: 12px;
@@ -1045,7 +1165,8 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
 
         .rp-prod:hover,
         .rp-boy:hover,
-        .rp-apt:hover {
+        .rp-apt:hover,
+        .rp-ih:hover {
             border-color: #d98a91;
             background: #fff5f5;
         }
@@ -1079,12 +1200,18 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             color: #fff;
         }
 
-        .rp-prod-info {
+        .rp-prod-info,
+        .rp-boy-info,
+        .rp-apt-info,
+        .rp-ih-info {
             flex: 1;
             min-width: 0;
         }
 
-        .rp-prod-name {
+        .rp-prod-name,
+        .rp-boy-name,
+        .rp-apt-name,
+        .rp-ih-name {
             font-size: 12.5px;
             font-weight: 700;
             color: #302923;
@@ -1094,30 +1221,23 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             text-overflow: ellipsis;
         }
 
-        .rp-prod-meta {
+        .rp-prod-meta,
+        .rp-boy-meta,
+        .rp-apt-meta,
+        .rp-ih-meta {
             font-size: 11px;
             color: #948c82;
             margin: 2px 0 0;
             font-weight: 600;
         }
 
-        .rp-prod-rev {
+        .rp-prod-rev,
+        .rp-ih-rev {
             font-family: "Playfair Display", serif;
             font-size: 13.5px;
             font-weight: 700;
             color: #b51f2c;
             white-space: nowrap;
-        }
-
-        .rp-boy {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border: 1px solid #f0ebe4;
-            border-radius: 11px;
-            background: #fffdf9;
-            transition: .15s ease;
         }
 
         .rp-boy-avatar {
@@ -1135,30 +1255,16 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             box-shadow: 0 4px 12px rgba(181, 31, 44, .2);
         }
 
-        .rp-boy-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .rp-boy-name {
-            font-size: 12.5px;
-            font-weight: 700;
-            color: #302923;
-            margin: 0;
-        }
-
-        .rp-boy-meta {
-            font-size: 11px;
-            color: #948c82;
-            margin: 2px 0 0;
-            font-weight: 600;
-        }
-
-        .rp-boy-stats {
+        .rp-boy-stats,
+        .rp-apt-stats,
+        .rp-ih-stats {
             text-align: right;
+            flex-shrink: 0;
         }
 
-        .rp-boy-count {
+        .rp-boy-count,
+        .rp-apt-count,
+        .rp-ih-count {
             font-family: "Playfair Display", serif;
             font-size: 15px;
             font-weight: 700;
@@ -1173,18 +1279,16 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             margin: 2px 0 0;
         }
 
-        .rp-apt {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 14px;
-            border: 1px solid #f0ebe4;
-            border-radius: 11px;
-            background: #fffdf9;
-            transition: .15s ease;
+        .rp-apt-rev,
+        .rp-ih-paid {
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 700;
+            margin: 2px 0 0;
         }
 
-        .rp-apt-icon {
+        .rp-apt-icon,
+        .rp-ih-icon {
             width: 38px;
             height: 38px;
             border-radius: 11px;
@@ -1197,45 +1301,9 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             flex-shrink: 0;
         }
 
-        .rp-apt-info {
-            flex: 1;
-            min-width: 0;
-        }
-
-        .rp-apt-name {
-            font-size: 12.5px;
-            font-weight: 700;
-            color: #302923;
-            margin: 0;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .rp-apt-meta {
-            font-size: 11px;
-            color: #948c82;
-            margin: 2px 0 0;
-            font-weight: 600;
-        }
-
-        .rp-apt-stats {
-            text-align: right;
-        }
-
-        .rp-apt-count {
-            font-family: "Playfair Display", serif;
-            font-size: 15px;
-            font-weight: 700;
-            color: #b51f2c;
-            margin: 0;
-        }
-
-        .rp-apt-rev {
-            font-size: 10.5px;
-            color: #948c82;
-            font-weight: 700;
-            margin: 2px 0 0;
+        .rp-ih-icon {
+            background: #eef7f0;
+            color: #2e7d32;
         }
 
         /* Responsive */
@@ -1272,7 +1340,8 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 gap: 12px;
             }
 
-            .rp-tax-kpis {
+            .rp-tax-kpis,
+            .rp-addr-kpis {
                 grid-template-columns: 1fr;
             }
         }
@@ -1290,12 +1359,10 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
                 <i class="bi bi-list"></i>
             </button>
-
             <div class="search-box">
                 <i class="bi bi-search"></i>
                 <input type="text" placeholder="Search...">
             </div>
-
             <div class="top-right">
                 <button class="notification">
                     <i class="bi bi-bell"></i>
@@ -1327,7 +1394,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                             GSTIN: <strong><?= htmlspecialchars($gstNumber) ?></strong>
                         </span>
                     <?php endif; ?>
-
                     <span class="rp-range-label">
                         <i class="bi bi-calendar3"></i>
                         <?= htmlspecialchars($activeLabel) ?>
@@ -1336,9 +1402,8 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             </div>
 
 
-            <!-- ================= FILTERS ================= -->
+            <!-- FILTERS -->
             <form class="rp-filters" method="GET" id="rpFilterForm">
-
                 <div class="rp-tabs">
                     <a href="?range=today" class="rp-tab <?= $range === 'today'  ? 'active' : '' ?>">Today</a>
                     <a href="?range=week" class="rp-tab <?= $range === 'week'   ? 'active' : '' ?>">Last 7 Days</a>
@@ -1354,26 +1419,20 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     <input type="date" name="to" value="<?= htmlspecialchars($to) ?>">
                     <button type="submit" class="rp-apply-btn">Apply</button>
                 </div>
-
             </form>
 
 
-            <!-- ================= STAT CARDS ================= -->
+            <!-- STAT CARDS -->
             <div class="rp-stats">
-
                 <div class="rp-stat">
-                    <div class="rp-stat-icon green">
-                        <i class="bi bi-cash-coin"></i>
-                    </div>
+                    <div class="rp-stat-icon green"><i class="bi bi-cash-coin"></i></div>
                     <div class="rp-stat-label">Total Revenue</div>
                     <div class="rp-stat-value green"><?= rupees($stats['revenue']) ?></div>
                     <div class="rp-stat-sub">From <?= $stats['orders'] ?> order<?= $stats['orders'] === 1 ? '' : 's' ?></div>
                 </div>
 
                 <div class="rp-stat">
-                    <div class="rp-stat-icon gold">
-                        <i class="bi bi-receipt"></i>
-                    </div>
+                    <div class="rp-stat-icon gold"><i class="bi bi-receipt"></i></div>
                     <div class="rp-stat-label">GST Collected</div>
                     <div class="rp-stat-value gold"><?= rupees($stats['tax_total']) ?></div>
                     <div class="rp-stat-sub">
@@ -1383,32 +1442,26 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
                 <div class="rp-stat">
-                    <div class="rp-stat-icon">
-                        <i class="bi bi-bag-check"></i>
-                    </div>
+                    <div class="rp-stat-icon"><i class="bi bi-bag-check"></i></div>
                     <div class="rp-stat-label">Total Orders</div>
                     <div class="rp-stat-value"><?= $stats['orders'] ?></div>
                     <div class="rp-stat-sub"><?= $stats['delivered'] ?> delivered · <?= $stats['pending'] ?> pending</div>
                 </div>
 
                 <div class="rp-stat">
-                    <div class="rp-stat-icon blue">
-                        <i class="bi bi-truck"></i>
-                    </div>
+                    <div class="rp-stat-icon blue"><i class="bi bi-truck"></i></div>
                     <div class="rp-stat-label">Delivery / Pickup</div>
                     <div class="rp-stat-value"><?= $stats['delivery'] ?> / <?= $stats['pickup'] ?></div>
                     <div class="rp-stat-sub">
                         <?= rupees($modeStats['delivery']['revenue']) ?> · <?= rupees($modeStats['pickup']['revenue']) ?>
                     </div>
                 </div>
-
             </div>
 
 
-            <!-- ================= GST / TAX BREAKDOWN ================= -->
+            <!-- GST / TAX -->
             <div class="rp-grid">
 
-                <!-- Tax summary card -->
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title gold">
@@ -1425,7 +1478,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                                 From <?= $stats['tax_orders'] ?> taxed order<?= $stats['tax_orders'] === 1 ? '' : 's' ?>
                             </div>
                         </div>
-
                         <div class="rp-tax-kpi green">
                             <div class="rp-tax-kpi-label">Net Sales (excl. GST)</div>
                             <div class="rp-tax-kpi-value"><?= rupees($stats['net_sales']) ?></div>
@@ -1436,8 +1488,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     <?php if ($taxStatus === 1): ?>
                         <div style="padding:10px 12px;border-radius:10px;background:#fdf7ec;border:1px dashed #e8d5a8;margin-bottom:16px;font-size:11px;color:#8a6a1e;font-weight:700;">
                             <i class="bi bi-info-circle"></i>
-                            Tax is currently <strong>ENABLED</strong> at
-                            <strong><?= (int)$taxRate ?>%</strong>
+                            Tax is currently <strong>ENABLED</strong> at <strong><?= (int)$taxRate ?>%</strong>
                             (<strong><?= htmlspecialchars(ucfirst($taxType)) ?></strong>).
                             <?php if ($gstNumber !== ''): ?>
                                 GSTIN: <strong><?= htmlspecialchars($gstNumber) ?></strong>
@@ -1450,7 +1501,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                         </div>
                     <?php endif; ?>
 
-                    <!-- Breakdown by tax type -->
                     <div class="rp-tax-type-list">
                         <div class="rp-tax-type-row">
                             <div style="display:flex;align-items:center;gap:10px;">
@@ -1461,7 +1511,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                             </div>
                             <span class="amt"><?= rupees($taxBreakdown['exclusive']['tax']) ?></span>
                         </div>
-
                         <div class="rp-tax-type-row">
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="rp-tax-type-pill inclusive">
@@ -1475,7 +1524,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
 
-                <!-- Recent taxed orders -->
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title">
@@ -1493,13 +1541,11 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                         <div class="rp-tax-order-list">
                             <?php foreach ($taxedOrders as $t): ?>
                                 <div class="rp-tax-order">
-                                    <div class="rp-tax-order-icon">
-                                        <i class="bi bi-receipt"></i>
-                                    </div>
+                                    <div class="rp-tax-order-icon"><i class="bi bi-receipt"></i></div>
                                     <div class="rp-tax-order-info">
                                         <p class="rp-tax-order-code"><?= htmlspecialchars($t['order_code']) ?></p>
                                         <p class="rp-tax-order-meta">
-                                            <?= htmlspecialchars($t['customer_name']) ?> ·
+                                            <?= htmlspecialchars($t['customer_name'] ?: '—') ?> ·
                                             Subtotal <?= rupees($t['subtotal']) ?> ·
                                             Total <?= rupees($t['total_amount']) ?>
                                         </p>
@@ -1519,10 +1565,9 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             </div>
 
 
-            <!-- ================= MODE + PAYMENT ================= -->
+            <!-- MODE + PAYMENT -->
             <div class="rp-grid">
 
-                <!-- Mode breakdown with animated bar chart -->
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title">
@@ -1534,9 +1579,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     <div class="rp-chart" id="rpModeChart">
                         <div class="rp-chart-col">
                             <div class="rp-chart-value"><?= $modeStats['delivery']['count'] ?></div>
-                            <div class="rp-chart-bar delivery"
-                                data-h="<?= $deliveryH ?>"
-                                style="height: 0;"></div>
+                            <div class="rp-chart-bar delivery" data-h="<?= $deliveryH ?>" style="height: 0;"></div>
                             <div class="rp-chart-label">
                                 <span>Delivery</span>
                                 <span class="sub"><?= rupees($modeStats['delivery']['revenue']) ?></span>
@@ -1544,9 +1587,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                         </div>
                         <div class="rp-chart-col">
                             <div class="rp-chart-value"><?= $modeStats['pickup']['count'] ?></div>
-                            <div class="rp-chart-bar pickup"
-                                data-h="<?= $pickupH ?>"
-                                style="height: 0;"></div>
+                            <div class="rp-chart-bar pickup" data-h="<?= $pickupH ?>" style="height: 0;"></div>
                             <div class="rp-chart-label">
                                 <span>Pickup</span>
                                 <span class="sub"><?= rupees($modeStats['pickup']['revenue']) ?></span>
@@ -1575,7 +1616,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
 
-                <!-- Payment breakdown -->
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title green">
@@ -1585,7 +1625,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     </div>
 
                     <?php
-                    $totalPay = max(1, $stats['paid'] + $stats['unpaid']);
+                    $totalPay  = max(1, $stats['paid'] + $stats['unpaid']);
                     $paidPct   = round(($stats['paid']   / $totalPay) * 100);
                     $unpaidPct = round(($stats['unpaid'] / $totalPay) * 100);
                     ?>
@@ -1605,16 +1645,98 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                         </div>
                         <span class="rp-pay-count"><?= $stats['unpaid'] ?></span>
                     </div>
-
                 </div>
 
             </div>
 
 
-            <!-- ================= TOP PRODUCTS + TOP BOYS ================= -->
+            <!-- ADDRESS TYPE (NEW) -->
             <div class="rp-grid">
 
-                <!-- Top products -->
+                <div class="rp-card">
+                    <div class="rp-card-head">
+                        <h2 class="rp-card-title blue">
+                            <i class="bi bi-pin-map"></i>
+                            Address Types
+                        </h2>
+                    </div>
+
+                    <div class="rp-addr-kpis">
+                        <div class="rp-addr-kpi">
+                            <div class="rp-addr-kpi-label">Apartment Orders</div>
+                            <div class="rp-addr-kpi-value"><?= $addrStats['apartment']['count'] ?></div>
+                            <div class="rp-addr-kpi-sub"><?= rupees($addrStats['apartment']['revenue']) ?> revenue</div>
+                        </div>
+                        <div class="rp-addr-kpi house">
+                            <div class="rp-addr-kpi-label">Individual House</div>
+                            <div class="rp-addr-kpi-value"><?= $addrStats['individual_house']['count'] ?></div>
+                            <div class="rp-addr-kpi-sub"><?= rupees($addrStats['individual_house']['revenue']) ?> revenue</div>
+                        </div>
+                    </div>
+
+                    <div class="rp-chart" style="height:160px;">
+                        <div class="rp-chart-col">
+                            <div class="rp-chart-value"><?= $addrStats['apartment']['count'] ?></div>
+                            <div class="rp-chart-bar delivery" data-h="<?= $aptH ?>" style="height:0;"></div>
+                            <div class="rp-chart-label">
+                                <span>Apartment</span>
+                                <span class="sub"><?= rupees($addrStats['apartment']['revenue']) ?></span>
+                            </div>
+                        </div>
+                        <div class="rp-chart-col">
+                            <div class="rp-chart-value"><?= $addrStats['individual_house']['count'] ?></div>
+                            <div class="rp-chart-bar house" data-h="<?= $indH ?>" style="height:0;"></div>
+                            <div class="rp-chart-label">
+                                <span>Individual</span>
+                                <span class="sub"><?= rupees($addrStats['individual_house']['revenue']) ?></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+
+                <div class="rp-card">
+                    <div class="rp-card-head">
+                        <h2 class="rp-card-title green">
+                            <i class="bi bi-house-door"></i>
+                            Top Individual House Addresses
+                        </h2>
+                    </div>
+
+                    <?php if (empty($topIndividual)): ?>
+                        <div class="rp-empty">
+                            <i class="bi bi-inbox"></i>
+                            No individual house orders in this range.
+                        </div>
+                    <?php else: ?>
+                        <div class="rp-ih-list">
+                            <?php foreach ($topIndividual as $ih): ?>
+                                <div class="rp-ih">
+                                    <div class="rp-ih-icon">
+                                        <i class="bi bi-house-door"></i>
+                                    </div>
+                                    <div class="rp-ih-info">
+                                        <p class="rp-ih-name"><?= htmlspecialchars($ih['full_address'] ?: '—') ?></p>
+                                        <p class="rp-ih-meta">
+                                            <?= (int)$ih['paid_count'] ?> paid · <?= (int)$ih['order_count'] - (int)$ih['paid_count'] ?> unpaid
+                                        </p>
+                                    </div>
+                                    <div class="rp-ih-stats">
+                                        <p class="rp-ih-count"><?= (int)$ih['order_count'] ?></p>
+                                        <p class="rp-ih-paid"><?= rupees($ih['revenue']) ?></p>
+                                    </div>
+                                </div>
+                            <?php endforeach; ?>
+                        </div>
+                    <?php endif; ?>
+                </div>
+
+            </div>
+
+
+            <!-- TOP PRODUCTS + TOP BOYS -->
+            <div class="rp-grid">
+
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title">
@@ -1624,10 +1746,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     </div>
 
                     <?php if (empty($topProducts)): ?>
-                        <div class="rp-empty">
-                            <i class="bi bi-inbox"></i>
-                            No product sales in this range.
-                        </div>
+                        <div class="rp-empty"><i class="bi bi-inbox"></i> No product sales in this range.</div>
                     <?php else: ?>
                         <div class="rp-prod-list">
                             <?php $rank = 1;
@@ -1647,7 +1766,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
 
-                <!-- Top delivery boys -->
                 <div class="rp-card">
                     <div class="rp-card-head">
                         <h2 class="rp-card-title">
@@ -1657,10 +1775,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                     </div>
 
                     <?php if (empty($topBoys)): ?>
-                        <div class="rp-empty">
-                            <i class="bi bi-inbox"></i>
-                            No delivery activity in this range.
-                        </div>
+                        <div class="rp-empty"><i class="bi bi-inbox"></i> No delivery activity in this range.</div>
                     <?php else: ?>
                         <div class="rp-boy-list">
                             <?php foreach ($topBoys as $b):
@@ -1685,7 +1800,7 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             </div>
 
 
-            <!-- ================= TOP APARTMENTS ================= -->
+            <!-- TOP APARTMENTS -->
             <div class="rp-card">
                 <div class="rp-card-head">
                     <h2 class="rp-card-title">
@@ -1695,17 +1810,12 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
                 </div>
 
                 <?php if (empty($topApartments)): ?>
-                    <div class="rp-empty">
-                        <i class="bi bi-inbox"></i>
-                        No delivery activity in this range.
-                    </div>
+                    <div class="rp-empty"><i class="bi bi-inbox"></i> No delivery activity in this range.</div>
                 <?php else: ?>
                     <div class="rp-apt-list">
                         <?php foreach ($topApartments as $a): ?>
                             <div class="rp-apt">
-                                <div class="rp-apt-icon">
-                                    <i class="bi bi-building"></i>
-                                </div>
+                                <div class="rp-apt-icon"><i class="bi bi-building"></i></div>
                                 <div class="rp-apt-info">
                                     <p class="rp-apt-name"><?= htmlspecialchars($a['apartment_name'] ?: '—') ?></p>
                                     <p class="rp-apt-meta">#<?= htmlspecialchars($a['apartment_code'] ?: '') ?></p>
@@ -1726,13 +1836,11 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
 
 
     <script>
-        /* Custom tab toggle */
         (function() {
             var tab = document.getElementById("rpCustomTab");
             var box = document.getElementById("rpCustomBox");
             var rangeInput = document.getElementById("rpRangeInput");
             if (!tab || !box) return;
-
             tab.addEventListener("click", function(e) {
                 e.preventDefault();
                 box.classList.add("show");
@@ -1740,13 +1848,12 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             });
         })();
 
-        /* Animate bar chart when it scrolls into view */
         (function() {
             var chart = document.getElementById("rpModeChart");
             if (!chart) return;
 
             function animate() {
-                chart.querySelectorAll(".rp-chart-bar").forEach(function(bar) {
+                document.querySelectorAll(".rp-chart-bar").forEach(function(bar) {
                     var h = Number(bar.dataset.h || 0);
                     bar.style.height = h + "%";
                 });
@@ -1769,7 +1876,6 @@ $pickupH      = (int)round(($modeStats['pickup']['count']   / $maxModeCount) * 1
             }
         })();
 
-        /* Animate payment bars */
         (function() {
             var bars = document.querySelectorAll(".rp-pay-bar");
             if (!bars.length) return;

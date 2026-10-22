@@ -91,6 +91,62 @@ if (!function_exists('generateProductCode')) {
 
 
 /* -----------------------------------------
+   DECODE DIVISIONS JSON
+   Handles BOTH old and new shapes:
+     Old: { division, charge }
+     New: { block, door_no, floor, charge }
+   Always returns an array.
+----------------------------------------- */
+
+if (!function_exists('decodeDivisions')) {
+
+    function decodeDivisions($json)
+    {
+        if (is_array($json)) {
+            $decoded = $json;
+        } else {
+            $decoded = json_decode((string) $json, true);
+        }
+
+        if (!is_array($decoded)) {
+            return [];
+        }
+
+        $clean = [];
+
+        foreach ($decoded as $d) {
+
+            if (!is_array($d)) continue;
+
+            $block  = isset($d['block'])   ? (string) $d['block']   : '';
+            $doorNo = isset($d['door_no']) ? (string) $d['door_no'] : '';
+            $floor  = isset($d['floor'])   ? (string) $d['floor']   : '';
+            $charge = (float) ($d['charge'] ?? 0);
+
+            /* Legacy shape: {division, charge} → map to door_no */
+            if ($block === '' && $doorNo === '' && $floor === '') {
+                if (isset($d['division'])) {
+                    $doorNo = (string) $d['division'];
+                } else {
+                    continue;
+                }
+            }
+
+            /* Normalize output to NEW shape (always) */
+            $clean[] = [
+                'block'   => $block,
+                'door_no' => $doorNo,
+                'floor'   => $floor,
+                'charge'  => $charge
+            ];
+        }
+
+        return $clean;
+    }
+}
+
+
+/* -----------------------------------------
    FETCH ALL APARTMENTS
    (decodes divisions JSON automatically)
 ----------------------------------------- */
@@ -152,42 +208,6 @@ if (!function_exists('getApartment')) {
 
 
 /* -----------------------------------------
-   DECODE DIVISIONS JSON
-   Always returns an array
------------------------------------------ */
-
-if (!function_exists('decodeDivisions')) {
-
-    function decodeDivisions($json)
-    {
-        if (is_array($json)) {
-            return $json;
-        }
-
-        $decoded = json_decode((string) $json, true);
-
-        if (!is_array($decoded)) {
-            return [];
-        }
-
-        $clean = [];
-
-        foreach ($decoded as $d) {
-
-            if (!isset($d['division'])) continue;
-
-            $clean[] = [
-                'division' => (string) $d['division'],
-                'charge'   => (float) ($d['charge'] ?? 0)
-            ];
-        }
-
-        return $clean;
-    }
-}
-
-
-/* -----------------------------------------
    SANITIZE OUTPUT
 ----------------------------------------- */
 
@@ -220,7 +240,18 @@ if (!function_exists('requireLogin')) {
     }
 }
 
-requireLogin($pdo);
+
+/* =========================================================
+   IMPORTANT: Skip login redirect for AJAX endpoints.
+   AJAX files return JSON — a Location redirect would break
+   the fetch() call and show "Unable to connect to server".
+   ========================================================= */
+
+$__scriptPath = str_replace('\\', '/', $_SERVER['SCRIPT_NAME'] ?? '');
+
+if (strpos($__scriptPath, '/ajax/') === false) {
+    requireLogin($pdo);
+}
 
 
 /* =========================================================
@@ -343,12 +374,6 @@ if (!function_exists('getCategory')) {
    SETTINGS HELPERS
    ========================================================= */
 
-/* -----------------------------------------
-   UPLOAD SETTINGS IMAGE
-   Path: uploads/settings/YYYYMMDD/<random>/file.ext
-   $type: 'favicon' or 'logo'
------------------------------------------ */
-
 if (!function_exists('uploadSettingsImage')) {
     function uploadSettingsImage($file, $baseDir, $type = 'logo')
     {
@@ -378,7 +403,6 @@ if (!function_exists('uploadSettingsImage')) {
         $mime  = finfo_file($finfo, $file['tmp_name']);
         finfo_close($finfo);
 
-        // allow ico extension fallback
         if (!isset($allowed[$mime]) && preg_match('/\.(ico|svg)$/i', $file['name'])) {
             $ext = strtolower(pathinfo($file['name'], PATHINFO_EXTENSION));
             if ($ext === 'ico' || $ext === 'svg') {
@@ -422,10 +446,6 @@ if (!function_exists('uploadSettingsImage')) {
 }
 
 
-/* -----------------------------------------
-   DELETE FILE + EMPTY FOLDER
------------------------------------------ */
-
 if (!function_exists('deleteStoredFile')) {
     function deleteStoredFile($relPath, $baseDir)
     {
@@ -449,10 +469,6 @@ if (!function_exists('deleteStoredFile')) {
 }
 
 
-/* -----------------------------------------
-   GET SETTINGS ROW (single row, id = 1)
------------------------------------------ */
-
 if (!function_exists('getSettings')) {
     function getSettings($pdo)
     {
@@ -461,7 +477,6 @@ if (!function_exists('getSettings')) {
             $row = $stmt->fetch();
 
             if (!$row) {
-                // insert default
                 $pdo->exec("INSERT INTO settings (id) VALUES (1)");
                 $stmt = $pdo->query("SELECT * FROM settings WHERE id = 1 LIMIT 1");
                 $row = $stmt->fetch();
@@ -514,7 +529,6 @@ if (!function_exists('generateDiscountCode')) {
         }
     }
 }
-
 
 
 /* ---------- ACTIVE MENU ---------- */

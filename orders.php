@@ -636,7 +636,10 @@ try {
             background: #fdf1e2;
             color: #a35a0e;
         }
-
+        .mode-house {
+            background: #eef7f0;
+            color: #2e7d32;
+        }
         .amount-cell {
             font-family: "Playfair Display", serif;
             font-weight: 700;

@@ -2,6 +2,11 @@
 /* =========================================================
    MRS MILL@ — AJAX: GET PICKUP ORDERS (admin panel)
    File: ./ajax/get-pickup-orders.php
+
+   Fix:
+   - customer_name / customer_mobile  → JOIN customers
+   - apartment_code / apartment_name  → orders.address_json
+   - division                         → orders.address_json (division_label)
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -64,9 +69,12 @@ if ($to !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
     $params[] = $to;
 }
 
-/* ---------- Search ---------- */
+/* ---------- Search (uses joined columns) ---------- */
 if ($q !== '') {
-    $where[] = "(o.order_code LIKE ? OR o.customer_name LIKE ? OR o.customer_mobile LIKE ? OR o.pickup_branch_name LIKE ?)";
+    $where[] = "(o.order_code LIKE ?
+                 OR c.full_name LIKE ?
+                 OR c.mobile_number LIKE ?
+                 OR o.pickup_branch_name LIKE ?)";
     $like = '%' . $q . '%';
     $params[] = $like;
     $params[] = $like;
@@ -78,14 +86,37 @@ $whereSql = 'WHERE ' . implode(' AND ', $where);
 
 try {
 
-    $sql = "SELECT o.id, o.order_code, o.customer_name, o.customer_mobile,
-                   o.apartment_code, o.apartment_name, o.division,
-                   o.division_charge, o.subtotal, o.total_amount,
-                   o.delivery_mode,
-                   o.pickup_branch_id, o.pickup_branch_name,
-                   o.products_json, o.status, o.delivery_status,
-                   o.payment_status, o.paid_at, o.created_at
+    $sql = "SELECT
+                o.id,
+                o.order_code,
+                o.customer_id,
+                c.full_name       AS customer_name,
+                c.mobile_number   AS customer_mobile,
+
+                CASE WHEN JSON_VALID(o.address_json)
+                     THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code'))
+                     ELSE NULL END AS apartment_code,
+                CASE WHEN JSON_VALID(o.address_json)
+                     THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_name'))
+                     ELSE NULL END AS apartment_name,
+                CASE WHEN JSON_VALID(o.address_json)
+                     THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.division_label'))
+                     ELSE NULL END AS division,
+
+                o.division_charge,
+                o.subtotal,
+                o.total_amount,
+                o.delivery_mode,
+                o.pickup_branch_id,
+                o.pickup_branch_name,
+                o.products_json,
+                o.status,
+                o.delivery_status,
+                o.payment_status,
+                o.paid_at,
+                o.created_at
             FROM orders o
+            LEFT JOIN customers c ON c.customer_id = o.customer_id
             $whereSql
             ORDER BY o.id DESC
             LIMIT 500";
@@ -104,8 +135,9 @@ try {
         $out[] = [
             'id'                 => (int)$r['id'],
             'order_code'         => $r['order_code'],
-            'customer_name'      => $r['customer_name'],
-            'customer_mobile'    => $r['customer_mobile'],
+            'customer_id'        => $r['customer_id'],
+            'customer_name'      => $r['customer_name']   ?: '—',
+            'customer_mobile'    => $r['customer_mobile'] ?: '—',
             'delivery_mode'      => $r['delivery_mode'] ?: 'pickup',
             'apartment_code'     => $r['apartment_code'],
             'apartment_name'     => $r['apartment_name'],

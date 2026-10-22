@@ -1,7 +1,7 @@
 /* =========================================================
    MRS MILL@ — CUSTOMERS LIST
    File: ./js/customers.js
-   Fetch + render customers with search, pagination, per-page
+   Handles both apartment & individual_house customers
    ========================================================= */
 
 (function () {
@@ -79,26 +79,54 @@
     function renderRow(c) {
         const active = Number(c.status) === 1;
         const wallet = Number(c.wallet_balance) || 0;
+        const isHouse = c.address_type === "individual_house";
+
+        /* Customer cell */
+        const custCell = `
+            <div class="cu-cust">
+                <div class="cu-avatar"${isHouse ? ' style="background:linear-gradient(135deg,#2e7d32 0%,#1b5e20 100%);"' : ''}>
+                    ${esc(initials(c.full_name))}
+                </div>
+                <div>
+                    <span class="cu-cust-name">${esc(c.full_name)}</span>
+                    <div class="cu-cust-mobile">${esc(c.mobile_number)}</div>
+                    ${c.customer_id ? `<div class="cu-cust-mobile" style="color:#b51f2c;font-weight:700;">${esc(c.customer_id)}</div>` : ''}
+                </div>
+            </div>
+        `;
+
+        /* Apartment cell */
+        let aptCell;
+        if (isHouse) {
+            aptCell = `
+                <span class="cu-apt"><i class="bi bi-house-door" style="color:#2e7d32;"></i> Individual House</span>
+                <div class="cu-div" style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${esc(c.full_address)}">
+                    ${esc((c.full_address || "").substring(0, 40))}${(c.full_address || "").length > 40 ? '…' : ''}
+                </div>
+            `;
+        } else {
+            aptCell = `
+                <span class="cu-apt">${esc(c.apartment_name || "—")}</span>
+                <div class="cu-div">#${esc(c.apartment_code || "—")}</div>
+            `;
+        }
+
+        /* Division cell */
+        let divCell;
+        if (isHouse) {
+            divCell = `<span class="cu-apt" style="font-weight:600;color:#948c82;">—</span>`;
+        } else {
+            divCell = `
+                <span class="cu-apt" style="font-weight:600;">${esc(c.division || "—")}</span>
+                <div class="cu-div">₹${Number(c.division_charge || 0).toFixed(0)}</div>
+            `;
+        }
 
         return `
             <tr data-id="${c.id}">
-                <td>
-                    <div class="cu-cust">
-                        <div class="cu-avatar">${esc(initials(c.full_name))}</div>
-                        <div>
-                            <span class="cu-cust-name">${esc(c.full_name)}</span>
-                            <div class="cu-cust-mobile">${esc(c.mobile_number)}</div>
-                        </div>
-                    </div>
-                </td>
-                <td>
-                    <span class="cu-apt">${esc(c.apartment_name || "—")}</span>
-                    <div class="cu-div">#${esc(c.apartment_code || "—")}</div>
-                </td>
-                <td>
-                    <span class="cu-apt" style="font-weight:600;">${esc(c.division || "—")}</span>
-                    <div class="cu-div">₹${Number(c.division_charge || 0).toFixed(0)}</div>
-                </td>
+                <td>${custCell}</td>
+                <td>${aptCell}</td>
+                <td>${divCell}</td>
                 <td>
                     <span class="cu-wallet ${wallet > 0 ? 'pos' : 'zero'}">
                         <i class="bi bi-wallet2"></i> ${money(wallet)}
@@ -248,14 +276,17 @@
             filteredRows = allRows.slice();
         } else {
             filteredRows = allRows.filter(function (c) {
-                const n  = (c.full_name || "").toLowerCase();
-                const m  = (c.mobile_number || "").toLowerCase();
-                const a  = (c.apartment_name || "").toLowerCase();
-                const ac = (c.apartment_code || "").toLowerCase();
-                const d  = (c.division || "").toLowerCase();
+                const n   = (c.full_name || "").toLowerCase();
+                const m   = (c.mobile_number || "").toLowerCase();
+                const a   = (c.apartment_name || "").toLowerCase();
+                const ac  = (c.apartment_code || "").toLowerCase();
+                const d   = (c.division || "").toLowerCase();
+                const cid = (c.customer_id || "").toLowerCase();
+                const fa  = (c.full_address || "").toLowerCase();
                 return n.indexOf(q) !== -1 || m.indexOf(q) !== -1 ||
                        a.indexOf(q) !== -1 || ac.indexOf(q) !== -1 ||
-                       d.indexOf(q) !== -1;
+                       d.indexOf(q) !== -1 || cid.indexOf(q) !== -1 ||
+                       fa.indexOf(q) !== -1;
             });
         }
 

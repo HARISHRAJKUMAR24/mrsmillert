@@ -1,7 +1,13 @@
 /* =========================================================
    MRS MILL@ — MANUAL ORDER (admin panel)
    File: ./js/manual-order-taken.js
-   All amounts rounded to whole rupees (no decimals).
+   Apartment + individual house — auto-fetched, read-only.
+   NEW customers blocked.
+
+   Delivery boy override:
+     - Set window.FORCED_DELIVERY_BOY_ID = <id>   (preferred)
+     - Or window.SELECTED_BOY_ID = <id>           (legacy)
+     - Or SEND 0 → server auto-assigns by address
    ========================================================= */
 
 (function () {
@@ -27,6 +33,19 @@
     const walletCust = document.getElementById("moWalletCust");
     const walletStatus = document.getElementById("moWalletStatus");
 
+    /* Apartment/House sub-blocks */
+    const apartmentFields = document.getElementById("moApartmentFields");
+    const houseFields = document.getElementById("moHouseFields");
+    const houseAddressEl = document.getElementById("moHouseAddress");
+    const houseMetaEl = document.getElementById("moHouseMeta");
+
+    /* Apartment read-only vs manual */
+    const aptReadOnly = document.getElementById("moAptReadOnly");
+    const aptReadOnlyAddress = document.getElementById("moAptReadOnlyAddress");
+    const aptReadOnlyMeta = document.getElementById("moAptReadOnlyMeta");
+    const aptManual = document.getElementById("moAptManual");
+
+    /* Apartment dropdown */
     const aptDdWrap = document.getElementById("moAptDdWrap");
     const aptDdToggle = document.getElementById("moAptDdToggle");
     const aptDdLabel = document.getElementById("moAptDdLabel");
@@ -35,6 +54,7 @@
     const aptIdInput = document.getElementById("moApartmentId");
     const aptCodeInput = document.getElementById("moApartmentCode");
 
+    /* Division */
     const divDdWrap = document.getElementById("moDivDdWrap");
     const divDdToggle = document.getElementById("moDivDdToggle");
     const divDdLabel = document.getElementById("moDivDdLabel");
@@ -44,10 +64,12 @@
     const divChargeInput = document.getElementById("moDivisionCharge");
     const divHint = document.getElementById("moDivisionHint");
 
+    /* Products */
     const tabButtons = document.querySelectorAll(".mo-tab");
     const productSearch = document.getElementById("moProductSearch");
     const productGrid = document.getElementById("moProducts");
 
+    /* Cart */
     const cartList = document.getElementById("moCartList");
     const cartCount = document.getElementById("moCartCount");
     const subtotalEl = document.getElementById("moSubtotal");
@@ -61,6 +83,7 @@
     const taxEl = document.getElementById("moTax");
     const taxLabelEl = document.getElementById("moTaxLabel");
 
+    /* Variant modal */
     const varOverlay = document.getElementById("moVarOverlay");
     const varThumb = document.getElementById("moVarThumb");
     const varName = document.getElementById("moVarName");
@@ -69,6 +92,7 @@
     const varCancel = document.getElementById("moVarCancel");
     const varAdd = document.getElementById("moVarAdd");
 
+    /* Popup */
     const popupOverlay = document.getElementById("moPopupOverlay");
     const popupIcon = document.getElementById("moPopupIcon");
     const popupTitle = document.getElementById("moPopupTitle");
@@ -76,6 +100,7 @@
     const popupCode = document.getElementById("moPopupCode");
     const popupClose = document.getElementById("moPopupClose");
 
+    /* QR */
     const qrOverlay = document.getElementById("moQrOverlay");
     const qrCodeLabel = document.getElementById("moQrCode");
     const qrAmount = document.getElementById("moQrAmount");
@@ -97,7 +122,9 @@
     let currentWallet = 0;
     let walletCustomer = null;
 
+    /* { addressType, apartmentId, apartmentCode, apartmentName, division, divisionCharge, fullAddress, mapLink, houseImage } */
     let savedCustomerAddress = null;
+    let customerConfirmed = false;
 
     let pendingQrOrderId = 0;
     let pendingQrOrderCode = "";
@@ -108,7 +135,7 @@
     let lookupReqId = 0;
     let lastMobile = "";
 
-    /* ---------- TAX SETTINGS ---------- */
+    /* ---------- TAX ---------- */
     const TAX = (window.TAX_SETTINGS && typeof window.TAX_SETTINGS === "object")
         ? {
             status: Number(window.TAX_SETTINGS.status) || 0,
@@ -128,9 +155,6 @@
             .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    /* =====================================================
-       TAX — rounds to nearest whole rupee
-    ===================================================== */
     function calcTax(subtotal) {
         if (!TAX || Number(TAX.status) !== 1 || Number(TAX.rate) <= 0) {
             return { amount: 0, rate: 0, type: "exclusive", active: false };
@@ -147,48 +171,140 @@
     }
 
     /* =====================================================
-       RESET CUSTOMER DATA
+       SWITCH UI VIEWS
     ===================================================== */
-    function clearCustomerData() {
-        nameInput.value = "";
+    function showHouseFields(fullAddress, mapLink, houseImage) {
+        if (apartmentFields) apartmentFields.style.display = "none";
+        if (houseFields) houseFields.style.display = "";
 
-        currentWallet = 0;
-        walletCustomer = null;
+        if (houseAddressEl) houseAddressEl.textContent = fullAddress || "No address on file";
 
-        if (currentPayMode === "wallet") {
-            walletBalance.textContent = money(0);
-            walletCust.textContent = "—";
-            updateWalletStatus();
+        if (houseMetaEl) {
+            const bits = [];
+            if (mapLink) {
+                bits.push(`<a href="${esc(mapLink)}" target="_blank" rel="noopener noreferrer" class="map-link">
+                    <i class="bi bi-geo-alt-fill"></i> View on Map
+                </a>`);
+            } else {
+                bits.push(`<span class="no-map"><i class="bi bi-geo"></i> No map saved</span>`);
+            }
+            if (houseImage) {
+                bits.push(`<a href="${esc(BASE_URL + houseImage)}" target="_blank" rel="noopener noreferrer" class="img-link">
+                    <i class="bi bi-image-fill"></i> View House Photo
+                </a>`);
+            }
+            houseMetaEl.innerHTML = bits.join("");
+        }
+    }
+
+    function showApartmentReadOnly(apartmentName, apartmentCode, divisionLabel, divisionCharge, mapLink) {
+        if (apartmentFields) apartmentFields.style.display = "";
+        if (houseFields) houseFields.style.display = "none";
+
+        if (aptReadOnly) aptReadOnly.style.display = "";
+        if (aptManual) aptManual.style.display = "none";
+
+        if (aptReadOnlyAddress) {
+            aptReadOnlyAddress.textContent = apartmentName || "—";
         }
 
-        savedCustomerAddress = null;
+        if (aptReadOnlyMeta) {
+            const bits = [];
+            if (apartmentCode) {
+                bits.push(`<span class="no-map" style="background:#faf7f0;border-color:#e4ddd3;color:#6f5a3f;">
+                    <i class="bi bi-hash"></i> ${esc(apartmentCode)}
+                </span>`);
+            }
+            if (divisionLabel) {
+                bits.push(`<span class="no-map" style="background:#fdf7ec;border-color:#e8d5a8;color:#8a6a1e;">
+                    <i class="bi bi-grid-3x3-gap"></i> ${esc(divisionLabel)}
+                </span>`);
+            }
+            if (divisionCharge > 0) {
+                bits.push(`<span class="no-map" style="background:#e8f6ea;border-color:#a5d6a7;color:#2e7d32;">
+                    <i class="bi bi-truck"></i> Delivery ₹${Math.round(divisionCharge)}
+                </span>`);
+            }
+            if (mapLink) {
+                bits.push(`<a href="${esc(mapLink)}" target="_blank" rel="noopener noreferrer" class="map-link">
+                    <i class="bi bi-geo-alt-fill"></i> View on Map
+                </a>`);
+            }
+            aptReadOnlyMeta.innerHTML = bits.join("");
+        }
+    }
 
-        aptIdInput.value = "";
-        aptCodeInput.value = "";
+    function showApartmentManual() {
+        if (apartmentFields) apartmentFields.style.display = "";
+        if (houseFields) houseFields.style.display = "none";
+
+        if (aptReadOnly) aptReadOnly.style.display = "none";
+        if (aptManual) aptManual.style.display = "";
+    }
+
+    /* =====================================================
+       RESET ADDRESS BLOCK
+    ===================================================== */
+    function resetAddressBlock() {
+        if (aptIdInput) aptIdInput.value = "";
+        if (aptCodeInput) aptCodeInput.value = "";
+
         if (aptDdLabel) {
             aptDdLabel.textContent = "— Select apartment —";
             aptDdLabel.classList.add("placeholder");
             aptDdToggle.classList.remove("has-value");
         }
+        if (aptDdSearch) aptDdSearch.value = "";
 
-        divInput.value = "";
-        divChargeInput.value = 0;
+        if (divInput) divInput.value = "";
+        if (divChargeInput) divChargeInput.value = 0;
         divisionsCache = [];
-        divDdToggle.disabled = true;
-        divDdLabel.textContent = "Select apartment first";
-        divDdLabel.classList.add("placeholder");
-        divDdToggle.classList.remove("has-value");
-        divDdList.innerHTML = "";
-        divHint.textContent = "";
 
-        mobileHint.textContent = "Type a mobile to auto-fill the customer.";
-        mobileHint.classList.remove("success");
+        if (divDdToggle) divDdToggle.disabled = true;
+        if (divDdLabel) {
+            divDdLabel.textContent = "Select apartment first";
+            divDdLabel.classList.add("placeholder");
+            divDdToggle.classList.remove("has-value");
+        }
+        if (divDdList) divDdList.innerHTML = "";
+        if (divHint) divHint.textContent = "";
+
+        if (aptReadOnly) aptReadOnly.style.display = "none";
+        if (aptManual) aptManual.style.display = "none";
+        if (houseFields) houseFields.style.display = "none";
+        if (apartmentFields) apartmentFields.style.display = "";
+
+        customerConfirmed = false;
+    }
+
+    /* =====================================================
+       CLEAR CUSTOMER DATA
+    ===================================================== */
+    function clearCustomerData() {
+        if (nameInput) nameInput.value = "";
+
+        currentWallet = 0;
+        walletCustomer = null;
+
+        if (currentPayMode === "wallet") {
+            if (walletBalance) walletBalance.textContent = money(0);
+            if (walletCust) walletCust.textContent = "—";
+            updateWalletStatus();
+        }
+
+        savedCustomerAddress = null;
+        resetAddressBlock();
+
+        if (mobileHint) {
+            mobileHint.textContent = "Type a mobile to load the customer.";
+            mobileHint.classList.remove("success");
+        }
 
         updateTotals();
     }
 
     /* =====================================================
-       MOBILE LOOKUP
+       MOBILE LOOKUP — blocks new customers
     ===================================================== */
     function lookupMobile(m) {
         if (!m || m.length < 10) return;
@@ -213,14 +329,13 @@
                 if (reqId !== lookupReqId) return;
                 if (mobileInput.value.trim() !== m) return;
 
+                /* NEW CUSTOMER — BLOCK */
                 if (!res || !res.success || !res.data || !res.data.found) {
                     nameInput.value = "";
-                    mobileHint.textContent = "New customer — enter name manually.";
-                    mobileHint.classList.remove("success");
-
                     currentWallet = 0;
                     walletCustomer = null;
                     savedCustomerAddress = null;
+                    customerConfirmed = false;
 
                     if (currentPayMode === "wallet") {
                         walletBalance.textContent = money(0);
@@ -228,31 +343,20 @@
                         updateWalletStatus();
                     }
 
-                    aptIdInput.value = "";
-                    aptCodeInput.value = "";
-                    if (aptDdLabel) {
-                        aptDdLabel.textContent = "— Select apartment —";
-                        aptDdLabel.classList.add("placeholder");
-                        aptDdToggle.classList.remove("has-value");
-                    }
+                    resetAddressBlock();
 
-                    divInput.value = "";
-                    divChargeInput.value = 0;
-                    divisionsCache = [];
-                    divDdToggle.disabled = true;
-                    divDdLabel.textContent = "Select apartment first";
-                    divDdLabel.classList.add("placeholder");
-                    divDdToggle.classList.remove("has-value");
-                    divDdList.innerHTML = "";
-                    divHint.textContent = "";
+                    mobileHint.textContent = "❌ New number — customer must register first.";
+                    mobileHint.style.color = "#b51f2c";
+                    mobileHint.classList.remove("success");
 
                     updateTotals();
                     return;
                 }
 
-                if (res.data.name) {
-                    nameInput.value = res.data.name;
-                }
+                /* FOUND */
+                customerConfirmed = true;
+                mobileHint.style.color = "";
+                if (res.data.name) nameInput.value = res.data.name;
 
                 currentWallet = Number(res.data.wallet_balance || 0);
                 walletCustomer = {
@@ -261,26 +365,55 @@
                     mobile: m
                 };
 
-                if (res.data.apartment_id && res.data.apartment_id > 0) {
-                    const dRadio = document.querySelector('input[name="moMode"][value="delivery"]');
-                    if (dRadio) {
-                        dRadio.checked = true;
-                        setMode("delivery");
-                    }
+                /* Force delivery mode */
+                const dRadio = document.querySelector('input[name="moMode"][value="delivery"]');
+                if (dRadio && !dRadio.checked) {
+                    dRadio.checked = true;
+                    setMode("delivery");
+                }
 
-                    aptIdInput.value = res.data.apartment_id;
-                    aptCodeInput.value = res.data.apartment_code || "";
+                if (res.data.address_type === "individual_house") {
+                    aptIdInput.value = "";
+                    aptCodeInput.value = "";
+                    divInput.value = "";
+                    divChargeInput.value = 0;
+                    divisionsCache = [];
 
-                    if (aptDdLabel) {
-                        aptDdLabel.textContent = res.data.apartment_name || "—";
-                        aptDdLabel.classList.remove("placeholder");
-                        aptDdToggle.classList.add("has-value");
-                    }
-
-                    const apt = apartmentsCache.find(a => Number(a.id) === Number(res.data.apartment_id));
-                    if (apt) populateDivisions(apt, res.data.division || "");
+                    showHouseFields(
+                        res.data.full_address || "",
+                        res.data.map_link || "",
+                        res.data.house_image || ""
+                    );
 
                     savedCustomerAddress = {
+                        addressType: "individual_house",
+                        fullAddress: res.data.full_address || "",
+                        mapLink: res.data.map_link || "",
+                        houseImage: res.data.house_image || ""
+                    };
+
+                    mobileHint.textContent = "🏠 Individual House — address loaded.";
+                    mobileHint.classList.add("success");
+                    updateTotals();
+
+                } else if (res.data.apartment_id > 0) {
+                    /* Apartment read-only */
+                    showApartmentReadOnly(
+                        res.data.apartment_name || "",
+                        res.data.apartment_code || "",
+                        res.data.division || "",
+                        Number(res.data.division_charge || 0),
+                        ""
+                    );
+
+                    /* Store internal values for submit */
+                    aptIdInput.value = res.data.apartment_id;
+                    aptCodeInput.value = res.data.apartment_code || "";
+                    divInput.value = res.data.division || "";
+                    divChargeInput.value = Number(res.data.division_charge || 0);
+
+                    savedCustomerAddress = {
+                        addressType: "apartment",
                         apartmentId: res.data.apartment_id,
                         apartmentCode: res.data.apartment_code || "",
                         apartmentName: res.data.apartment_name || "",
@@ -288,12 +421,18 @@
                         divisionCharge: Number(res.data.division_charge || 0)
                     };
 
-                    mobileHint.textContent = "Welcome back! Details auto-filled.";
+                    mobileHint.textContent = "🏢 Apartment — details loaded (read only).";
                     mobileHint.classList.add("success");
-                } else {
-                    mobileHint.textContent = "Welcome back, " + (res.data.name || "");
-                    mobileHint.classList.add("success");
+                    updateTotals();
 
+                } else {
+                    /* Known but no address */
+                    showApartmentManual();
+                    resetAddressBlock();
+                    customerConfirmed = true;
+                    mobileHint.textContent = "⚠ Customer found but no address on file.";
+                    mobileHint.style.color = "#b8893c";
+                    mobileHint.classList.add("success");
                     savedCustomerAddress = null;
                 }
 
@@ -337,7 +476,6 @@
         const self = this;
         setTimeout(() => {
             self.value = self.value.replace(/[^0-9]/g, "").slice(0, 15);
-
             clearTimeout(lookupTimer);
 
             if (lookupAbort) {
@@ -379,59 +517,41 @@
             divInput.value = "";
             divChargeInput.value = 0;
 
-            if (aptDdLabel) {
-                aptDdLabel.textContent = "— Select apartment —";
-                aptDdLabel.classList.add("placeholder");
-                aptDdToggle.classList.remove("has-value");
-            }
-
             divisionsCache = [];
-            divDdToggle.disabled = true;
-            divDdLabel.textContent = "Select apartment first";
-            divDdLabel.classList.add("placeholder");
-            divDdToggle.classList.remove("has-value");
-            divDdList.innerHTML = "";
-            divHint.textContent = "";
 
         } else {
             deliveryBlock.style.display = "block";
             pickupBlock.style.display = "none";
             branchSelect.value = "";
 
-            if (savedCustomerAddress && savedCustomerAddress.apartmentId) {
-                aptIdInput.value = savedCustomerAddress.apartmentId;
-                aptCodeInput.value = savedCustomerAddress.apartmentCode;
-
-                if (aptDdLabel) {
-                    aptDdLabel.textContent = savedCustomerAddress.apartmentName || "—";
-                    aptDdLabel.classList.remove("placeholder");
-                    aptDdToggle.classList.add("has-value");
-                }
-
-                const apt = apartmentsCache.find(a => Number(a.id) === Number(savedCustomerAddress.apartmentId));
-                if (apt) {
-                    populateDivisions(apt, savedCustomerAddress.division || "");
-                }
-
-            } else {
+            if (savedCustomerAddress && savedCustomerAddress.addressType === "individual_house") {
+                showHouseFields(
+                    savedCustomerAddress.fullAddress || "",
+                    savedCustomerAddress.mapLink || "",
+                    savedCustomerAddress.houseImage || ""
+                );
                 aptIdInput.value = "";
                 aptCodeInput.value = "";
                 divInput.value = "";
                 divChargeInput.value = 0;
-
-                if (aptDdLabel) {
-                    aptDdLabel.textContent = "— Select apartment —";
-                    aptDdLabel.classList.add("placeholder");
-                    aptDdToggle.classList.remove("has-value");
-                }
-
                 divisionsCache = [];
-                divDdToggle.disabled = true;
-                divDdLabel.textContent = "Select apartment first";
-                divDdLabel.classList.add("placeholder");
-                divDdToggle.classList.remove("has-value");
-                divDdList.innerHTML = "";
-                divHint.textContent = "";
+
+            } else if (savedCustomerAddress && savedCustomerAddress.addressType === "apartment") {
+                showApartmentReadOnly(
+                    savedCustomerAddress.apartmentName || "",
+                    savedCustomerAddress.apartmentCode || "",
+                    savedCustomerAddress.division || "",
+                    Number(savedCustomerAddress.divisionCharge || 0),
+                    ""
+                );
+
+                aptIdInput.value = savedCustomerAddress.apartmentId;
+                aptCodeInput.value = savedCustomerAddress.apartmentCode;
+                divInput.value = savedCustomerAddress.division || "";
+                divChargeInput.value = Number(savedCustomerAddress.divisionCharge || 0);
+
+            } else {
+                resetAddressBlock();
             }
         }
 
@@ -482,7 +602,7 @@
 
         if (!walletCustomer || !walletCustomer.id) {
             walletStatus.className = "mo-wallet-status info";
-            walletStatus.innerHTML = '<i class="bi bi-info-circle-fill"></i> Enter mobile number to load wallet.';
+            walletStatus.innerHTML = '<i class="bi bi-info-circle-fill"></i> Enter a valid mobile number to load wallet.';
             return;
         }
 
@@ -512,7 +632,7 @@
     }
 
     /* =====================================================
-       APARTMENTS
+       APARTMENTS (manual picker for fallback)
     ===================================================== */
     function loadApartments() {
         fetch(BASE_URL + "ajax/manual-get-apartments.php", { credentials: "same-origin" })
@@ -520,13 +640,6 @@
             .then(res => {
                 if (res && res.success && Array.isArray(res.data)) {
                     apartmentsCache = res.data;
-
-                    if (savedCustomerAddress && savedCustomerAddress.apartmentId) {
-                        const apt = apartmentsCache.find(a => Number(a.id) === Number(savedCustomerAddress.apartmentId));
-                        if (apt && currentMode === "delivery") {
-                            populateDivisions(apt, savedCustomerAddress.division || "");
-                        }
-                    }
                 }
             })
             .catch(() => { });
@@ -607,11 +720,37 @@
 
         const apt = apartmentsCache.find(a => Number(a.id) === Number(opt.dataset.id));
         if (apt) populateDivisions(apt, "");
+
+        if (savedCustomerAddress) {
+            savedCustomerAddress.addressType = "apartment";
+            savedCustomerAddress.apartmentId = Number(opt.dataset.id);
+            savedCustomerAddress.apartmentCode = opt.dataset.code || "";
+            savedCustomerAddress.apartmentName = opt.dataset.name || "";
+        }
+
+        updateTotals();
     });
 
     /* =====================================================
        DIVISIONS
     ===================================================== */
+    function divLabelText(d) {
+        if (d.division_label) return d.division_label;
+        const parts = [];
+        if (d.block) parts.push("Blk " + d.block);
+        if (d.door_no) parts.push("Door " + d.door_no);
+        if (d.floor) parts.push("Fl " + d.floor);
+        return parts.length ? parts.join(" · ") : ("Division " + (d.division || ""));
+    }
+    function divValueText(d) {
+        if (d.division_value) return d.division_value;
+        const parts = [];
+        if (d.block) parts.push("Blk " + d.block);
+        if (d.door_no) parts.push("Door " + d.door_no);
+        if (d.floor) parts.push("Fl " + d.floor);
+        return parts.length ? parts.join(" / ") : String(d.division || "");
+    }
+
     function populateDivisions(apt, preselect) {
         if (!apt || !Array.isArray(apt.divisions) || !apt.divisions.length) {
             divisionsCache = [];
@@ -631,9 +770,13 @@
         divDdToggle.disabled = false;
 
         if (preselect) {
-            const match = divisionsCache.find(d => String(d.division) === String(preselect));
+            const match = divisionsCache.find(d => divValueText(d) === String(preselect));
             if (match) {
-                selectDivision(match);
+                selectDivision({
+                    division: divValueText(match),
+                    label: divLabelText(match),
+                    charge: Number(match.charge || 0)
+                });
                 return;
             }
         }
@@ -658,9 +801,11 @@
 
         const q = (query || "").trim().toLowerCase();
         const list = q
-            ? divisionsCache.filter(d =>
-                String(d.division).toLowerCase().includes(q) ||
-                ("division " + d.division).toLowerCase().includes(q))
+            ? divisionsCache.filter(d => {
+                const label = divLabelText(d).toLowerCase();
+                const value = divValueText(d).toLowerCase();
+                return label.includes(q) || value.includes(q);
+            })
             : divisionsCache;
 
         if (!list.length) {
@@ -669,14 +814,17 @@
         }
 
         divDdList.innerHTML = list.map(d => {
-            const selected = String(divInput.value) === String(d.division);
+            const v = divValueText(d);
+            const l = divLabelText(d);
+            const selected = String(divInput.value) === v;
             return `
                 <div class="sd-option ${selected ? 'selected' : ''}"
-                     data-division="${esc(d.division)}"
-                     data-charge="${Number(d.charge)}">
+                     data-division="${esc(v)}"
+                     data-label="${esc(l)}"
+                     data-charge="${Number(d.charge || 0)}">
                     <i class="bi bi-grid-3x3-gap"></i>
-                    <div class="name">Division ${esc(d.division)}</div>
-                    <div class="meta">₹${Math.round(Number(d.charge))}</div>
+                    <div class="name">${esc(l)}</div>
+                    <div class="meta">₹${Math.round(Number(d.charge || 0))}</div>
                 </div>
             `;
         }).join("");
@@ -714,6 +862,7 @@
 
         selectDivision({
             division: opt.dataset.division,
+            label: opt.dataset.label || opt.dataset.division,
             charge: Number(opt.dataset.charge || 0)
         });
 
@@ -721,12 +870,19 @@
     });
 
     function selectDivision(d) {
-        divInput.value = String(d.division);
-        divChargeInput.value = Number(d.charge);
-        divDdLabel.textContent = "Division " + d.division + " · ₹" + Math.round(Number(d.charge));
+        divInput.value = String(d.division || "");
+        divChargeInput.value = Number(d.charge || 0);
+        divDdLabel.textContent = (d.label || d.division) + " · ₹" + Math.round(Number(d.charge || 0));
         divDdLabel.classList.remove("placeholder");
         divDdToggle.classList.add("has-value");
-        divHint.textContent = "Charge: ₹" + Math.round(Number(d.charge));
+        divHint.textContent = "Charge: ₹" + Math.round(Number(d.charge || 0));
+
+        if (savedCustomerAddress) {
+            savedCustomerAddress.addressType = "apartment";
+            savedCustomerAddress.division = String(d.division || "");
+            savedCustomerAddress.divisionCharge = Number(d.charge || 0);
+        }
+
         updateTotals();
     }
 
@@ -922,7 +1078,6 @@
                 variant_qty: selectedVariant.quantity + " " + selectedVariant.quantity_unit,
                 price: Number(selectedVariant.price),
                 qty: 1,
-
                 container_enabled: Number(selectedVariant.container_enabled || 0),
                 container_price: Number(selectedVariant.container_price || 0),
             });
@@ -1008,7 +1163,6 @@
 
     /* =====================================================
        TOTALS
-       - Container deposit shown separately, NOT added to total
     ===================================================== */
     function updateTotals() {
         const subtotal = cart.reduce((s, c) => s + c.price * c.qty, 0);
@@ -1082,7 +1236,7 @@
             containerEl.style.display = "none";
         }
 
-        let canPlace = cart.length > 0;
+        let canPlace = cart.length > 0 && customerConfirmed;
 
         if (currentPayMode === "wallet") {
             const walletOk =
@@ -1107,12 +1261,21 @@
         if (!/^[0-9]{10,15}$/.test(mobile)) { showPopup("error", "Invalid Mobile", "Please enter a valid 10-digit mobile."); return; }
         if (name.length < 2) { showPopup("error", "Name Required", "Please enter the customer name."); return; }
         if (!cart.length) { showPopup("error", "Cart Empty", "Please add at least one product."); return; }
+        if (!customerConfirmed) { showPopup("error", "Customer Not Found", "This mobile is not registered. Customer must register first."); return; }
 
         const mode = document.querySelector('input[name="moMode"]:checked')?.value || "delivery";
+        const isIndividualHouse = savedCustomerAddress && savedCustomerAddress.addressType === "individual_house";
 
         if (mode === "delivery") {
-            if (!aptIdInput.value) { showPopup("error", "Apartment Required", "Please select an apartment."); return; }
-            if (!divInput.value) { showPopup("error", "Division Required", "Please select a division."); return; }
+            if (isIndividualHouse) {
+                if (!savedCustomerAddress.fullAddress) {
+                    showPopup("error", "Address Missing", "Individual house address not loaded. Re-enter mobile number.");
+                    return;
+                }
+            } else {
+                if (!aptIdInput.value) { showPopup("error", "Apartment Required", "Please select an apartment."); return; }
+                if (!divInput.value) { showPopup("error", "Division Required", "Please select a division."); return; }
+            }
         } else {
             if (!branchSelect.value) { showPopup("error", "Branch Required", "Please select a pickup branch."); return; }
         }
@@ -1148,12 +1311,43 @@
         fd.append("customer_name", name);
         fd.append("customer_mobile", mobile);
         fd.append("delivery_mode", mode);
-        fd.append("apartment_id", aptIdInput.value || 0);
-        fd.append("apartment_code", aptCodeInput.value || "");
-        fd.append("division", divInput.value || "");
-        fd.append("division_charge", charge);
+
+        if (isIndividualHouse && mode === "delivery") {
+            fd.append("address_type", "individual_house");
+            fd.append("apartment_id", "0");
+            fd.append("apartment_code", "");
+            fd.append("division", "");
+            fd.append("division_charge", "0");
+            fd.append("full_address", savedCustomerAddress.fullAddress || "");
+            fd.append("map_link", savedCustomerAddress.mapLink || "");
+        } else {
+            fd.append("address_type", "apartment");
+            fd.append("apartment_id", aptIdInput.value || 0);
+            fd.append("apartment_code", aptCodeInput.value || "");
+            fd.append("division", divInput.value || "");
+            fd.append("division_charge", charge);
+            fd.append("full_address", "");
+            fd.append("map_link", "");
+        }
+
         fd.append("pickup_branch_id", branchSelect.value || 0);
         fd.append("payment_method", currentPayMode);
+
+        /* =========================================================
+           DELIVERY BOY ID — send the real primary key from
+           delivery_boys.id (e.g. 3 = DB000002)
+
+           Priority:
+             1. window.FORCED_DELIVERY_BOY_ID   (preferred)
+             2. window.SELECTED_BOY_ID          (legacy)
+             3. 0 → server auto-assigns by address
+           ========================================================= */
+        const forcedBoyId =
+            Number(window.FORCED_DELIVERY_BOY_ID || 0) ||
+            Number(window.SELECTED_BOY_ID || 0) ||
+            0;
+
+        fd.append("delivery_boy_id", forcedBoyId);
 
         fd.append("products", JSON.stringify(cart.map(c => ({
             product_id: c.product_id,
@@ -1219,25 +1413,7 @@
         mobileInput.value = "";
         nameInput.value = "";
 
-        aptIdInput.value = "";
-        aptCodeInput.value = "";
-        if (aptDdLabel) {
-            aptDdLabel.textContent = "— Select apartment —";
-            aptDdLabel.classList.add("placeholder");
-            aptDdToggle.classList.remove("has-value");
-        }
-        if (aptDdSearch) aptDdSearch.value = "";
-
-        divInput.value = "";
-        divChargeInput.value = 0;
-        divDdList.innerHTML = "";
-        divisionsCache = [];
-        divDdToggle.disabled = true;
-        divDdLabel.textContent = "Select apartment first";
-        divDdLabel.classList.add("placeholder");
-        divDdToggle.classList.remove("has-value");
-        divHint.textContent = "";
-
+        resetAddressBlock();
         branchSelect.value = "";
 
         cart = [];
@@ -1250,6 +1426,7 @@
         currentWallet = 0;
         walletCustomer = null;
         savedCustomerAddress = null;
+        customerConfirmed = false;
         document.querySelector('input[name="moPayMode"][value="qr"]').checked = true;
         setPayMode("qr");
 
@@ -1257,60 +1434,16 @@
         walletCust.textContent = "—";
         walletStatus.className = "mo-wallet-status";
 
-        mobileHint.textContent = "Type a mobile to auto-fill the customer.";
+        mobileHint.textContent = "Type a mobile to load the customer.";
         mobileHint.classList.remove("success");
+        mobileHint.style.color = "";
 
         lastMobile = "";
         lookupReqId++;
     }
 
     function resetFormFieldsOnly() {
-        mobileInput.value = "";
-        nameInput.value = "";
-
-        aptIdInput.value = "";
-        aptCodeInput.value = "";
-        if (aptDdLabel) {
-            aptDdLabel.textContent = "— Select apartment —";
-            aptDdLabel.classList.add("placeholder");
-            aptDdToggle.classList.remove("has-value");
-        }
-        if (aptDdSearch) aptDdSearch.value = "";
-
-        divInput.value = "";
-        divChargeInput.value = 0;
-        divDdList.innerHTML = "";
-        divisionsCache = [];
-        divDdToggle.disabled = true;
-        divDdLabel.textContent = "Select apartment first";
-        divDdLabel.classList.add("placeholder");
-        divDdToggle.classList.remove("has-value");
-        divHint.textContent = "";
-
-        branchSelect.value = "";
-
-        cart = [];
-        renderCart();
-
-        document.querySelector('input[name="moMode"][value="delivery"]').checked = true;
-        setMode("delivery");
-
-        currentPayMode = "qr";
-        currentWallet = 0;
-        walletCustomer = null;
-        savedCustomerAddress = null;
-        document.querySelector('input[name="moPayMode"][value="qr"]').checked = true;
-        setPayMode("qr");
-
-        walletBalance.textContent = "₹0";
-        walletCust.textContent = "—";
-        walletStatus.className = "mo-wallet-status";
-
-        mobileHint.textContent = "Type a mobile to auto-fill the customer.";
-        mobileHint.classList.remove("success");
-
-        lastMobile = "";
-        lookupReqId++;
+        resetForm();
     }
 
     /* =====================================================
@@ -1344,7 +1477,7 @@
     });
 
     /* =====================================================
-       QR POPUP — amount in whole rupees
+       QR POPUP
     ===================================================== */
     function openQrPopup(orderId, orderCode, total, upiString) {
         pendingQrOrderId = orderId;

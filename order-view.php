@@ -17,43 +17,75 @@ if ($id <= 0) {
 
 $order    = null;
 $products = [];
-$custOrders              = [];
-$custTotalAmount         = 0;
-$custTotalOrderCount     = 0;
-$custTotalPaidOrders     = 0;
-$custTotalUnpaidOrders   = 0;
+$custOrders            = [];
+$custTotalAmount       = 0;
+$custTotalOrderCount   = 0;
+$custTotalPaidOrders   = 0;
+$custTotalUnpaidOrders = 0;
 
-/* ---------- 1. Fetch order ---------- */
+/* ---------- 1. Fetch order (with customers join + JSON extraction) ---------- */
 try {
     $stmt = $pdo->prepare(
-        "SELECT o.*, b.full_name AS boy_name, b.delivery_code AS boy_code
+        "SELECT
+            o.*,
+            b.full_name     AS boy_name,
+            b.delivery_code AS boy_code,
+            c.full_name     AS customer_name,
+            c.mobile_number AS customer_mobile,
+
+            CASE WHEN JSON_VALID(o.address_json)
+                 THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code'))
+                 ELSE NULL END AS apartment_code,
+            CASE WHEN JSON_VALID(o.address_json)
+                 THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_name'))
+                 ELSE NULL END AS apartment_name,
+            CASE WHEN JSON_VALID(o.address_json)
+                 THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.division_label'))
+                 ELSE NULL END AS division,
+            CASE WHEN JSON_VALID(o.address_json)
+                 THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.full_address'))
+                 ELSE NULL END AS full_address
          FROM orders o
-         LEFT JOIN delivery_boys b ON b.id = o.delivery_boy_id
+         LEFT JOIN delivery_boys b ON b.id          = o.delivery_boy_id
+         LEFT JOIN customers     c ON c.customer_id = o.customer_id
          WHERE o.id = ? LIMIT 1"
     );
     $stmt->execute([$id]);
     $order = $stmt->fetch();
 
+    /* If join failed (e.g. tables missing), fall back to bare SELECT */
     if (!$order) {
-        /* Try without delivery_boys join in case table missing */
         $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
         $stmt->execute([$id]);
         $order = $stmt->fetch();
 
         if ($order) {
-            $order['boy_name'] = '—';
-            $order['boy_code'] = '';
+            $order['boy_name']        = '—';
+            $order['boy_code']        = '';
+            $order['customer_name']   = '';
+            $order['customer_mobile'] = '';
+            $order['apartment_code']  = null;
+            $order['apartment_name']  = null;
+            $order['division']        = null;
+            $order['full_address']    = null;
         }
     }
 } catch (PDOException $e) {
-    /* Last resort — try bare SELECT */
+    /* Last resort — bare SELECT */
     try {
         $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
         $stmt->execute([$id]);
         $order = $stmt->fetch();
+
         if ($order) {
-            $order['boy_name'] = '—';
-            $order['boy_code'] = '';
+            $order['boy_name']        = '—';
+            $order['boy_code']        = '';
+            $order['customer_name']   = '';
+            $order['customer_mobile'] = '';
+            $order['apartment_code']  = null;
+            $order['apartment_name']  = null;
+            $order['division']        = null;
+            $order['full_address']    = null;
         }
     } catch (PDOException $e2) {
         $order = null;
@@ -69,18 +101,19 @@ if (!$order) {
 $products = json_decode($order['products_json'] ?? '[]', true);
 if (!is_array($products)) $products = [];
 
-/* ---------- 3. Customer summary ---------- */
-$customerMobile = $order['customer_mobile'] ?? '';
+/* ---------- 3. Customer summary (join-based, uses customer_id) ---------- */
+$customerId = $order['customer_id'] ?? '';
 
 try {
     $custOrdersStmt = $pdo->prepare(
-        "SELECT id, order_code, customer_name, created_at,
-                total_amount, payment_status, status
-         FROM orders
-         WHERE customer_mobile = ?
-         ORDER BY id DESC"
+        "SELECT o.id, o.order_code, c.full_name AS customer_name,
+                o.created_at, o.total_amount, o.payment_status, o.status
+         FROM orders o
+         LEFT JOIN customers c ON c.customer_id = o.customer_id
+         WHERE o.customer_id = ?
+         ORDER BY o.id DESC"
     );
-    $custOrdersStmt->execute([$customerMobile]);
+    $custOrdersStmt->execute([$customerId]);
     $custOrders = $custOrdersStmt->fetchAll();
 } catch (PDOException $e) {
     $custOrders = [];
@@ -559,7 +592,6 @@ function fmtNoDec($n)
             position: sticky;
             bottom: 0;
             margin-top: 20px;
-           
             padding: 16px 0 4px;
             display: flex;
             justify-content: flex-end;
@@ -708,7 +740,12 @@ function fmtNoDec($n)
                                 <i class="bi bi-people-fill"></i>
                             </div>
                             <div>
-                                <h3><?= htmlspecialchars($order['customer_name']) ?> · <?= htmlspecialchars($customerMobile) ?></h3>
+                                <h3>
+                                    <?= htmlspecialchars($order['customer_name'] ?: '—') ?>
+                                    <?php if (!empty($order['customer_mobile'])): ?>
+                                        · <?= htmlspecialchars($order['customer_mobile']) ?>
+                                    <?php endif; ?>
+                                </h3>
                                 <p>Total <?= $custTotalOrderCount ?> order<?= $custTotalOrderCount !== 1 ? 's' : '' ?> from this customer</p>
                             </div>
                         </div>
@@ -740,45 +777,51 @@ function fmtNoDec($n)
                             </div>
 
                             <div id="orderHistoryList">
-                                <?php foreach ($custOrders as $co):
-                                    $isCurrent = ((int)$co['id'] === (int)$order['id']);
-                                    $badgeCls  = 'ov-cust-order-badge ' . strtolower($co['payment_status']);
-                                ?>
-                                    <a href="order-view.php?id=<?= (int)$co['id'] ?>"
-                                       class="ov-cust-order-row <?= $isCurrent ? 'current' : '' ?>"
-                                       data-order-row>
+                                <?php if (empty($custOrders)): ?>
+                                    <div style="padding:18px;text-align:center;color:#948c82;font-size:12px;">
+                                        No other orders from this customer.
+                                    </div>
+                                <?php else: ?>
+                                    <?php foreach ($custOrders as $co):
+                                        $isCurrent = ((int)$co['id'] === (int)$order['id']);
+                                        $badgeCls  = 'ov-cust-order-badge ' . strtolower($co['payment_status']);
+                                    ?>
+                                        <a href="order-view.php?id=<?= (int)$co['id'] ?>"
+                                           class="ov-cust-order-row <?= $isCurrent ? 'current' : '' ?>"
+                                           data-order-row>
 
-                                        <div class="ov-cust-order-code">
-                                            #<?= htmlspecialchars($co['order_code']) ?>
-                                            <?php if ($isCurrent): ?>
-                                                <span style="font-size:9px;color:#b8893c;">· Current</span>
-                                            <?php endif; ?>
-                                            <small>
-                                                <?= date('d M Y · h:i A', strtotime($co['created_at'])) ?>
-                                            </small>
-                                        </div>
+                                            <div class="ov-cust-order-code">
+                                                #<?= htmlspecialchars($co['order_code']) ?>
+                                                <?php if ($isCurrent): ?>
+                                                    <span style="font-size:9px;color:#b8893c;">· Current</span>
+                                                <?php endif; ?>
+                                                <small>
+                                                    <?= date('d M Y · h:i A', strtotime($co['created_at'])) ?>
+                                                </small>
+                                            </div>
 
-                                        <div class="ov-cust-order-stat green">
-                                            <span>Payment</span>
-                                            <strong>
-                                                <span class="<?= $badgeCls ?>">
-                                                    <?= ucfirst($co['payment_status']) ?>
-                                                </span>
-                                            </strong>
-                                        </div>
+                                            <div class="ov-cust-order-stat green">
+                                                <span>Payment</span>
+                                                <strong>
+                                                    <span class="<?= $badgeCls ?>">
+                                                        <?= ucfirst($co['payment_status']) ?>
+                                                    </span>
+                                                </strong>
+                                            </div>
 
-                                        <div class="ov-cust-order-stat">
-                                            <span>Status</span>
-                                            <strong><?= ucfirst($co['status']) ?></strong>
-                                        </div>
+                                            <div class="ov-cust-order-stat">
+                                                <span>Status</span>
+                                                <strong><?= ucfirst($co['status']) ?></strong>
+                                            </div>
 
-                                        <div class="ov-cust-order-stat">
-                                            <span>Total ₹</span>
-                                            <strong>₹<?= fmtNoDec($co['total_amount']) ?></strong>
-                                        </div>
+                                            <div class="ov-cust-order-stat">
+                                                <span>Total ₹</span>
+                                                <strong>₹<?= fmtNoDec($co['total_amount']) ?></strong>
+                                            </div>
 
-                                    </a>
-                                <?php endforeach; ?>
+                                        </a>
+                                    <?php endforeach; ?>
+                                <?php endif; ?>
                             </div>
 
                             <!-- PAGINATION -->
@@ -807,37 +850,54 @@ function fmtNoDec($n)
                         <div class="ov-cust">
                             <div class="ov-cust-item">
                                 <span>Name</span>
-                                <strong><?= htmlspecialchars($order['customer_name']) ?></strong>
+                                <strong><?= htmlspecialchars($order['customer_name'] ?: '—') ?></strong>
                             </div>
                             <div class="ov-cust-item">
                                 <span>Mobile</span>
-                                <strong><?= htmlspecialchars($order['customer_mobile']) ?></strong>
+                                <strong><?= htmlspecialchars($order['customer_mobile'] ?: '—') ?></strong>
                             </div>
-                            <div class="ov-cust-item">
-                                <span><?= ($order['delivery_mode'] === 'pickup') ? 'Pickup Branch' : 'Apartment' ?></span>
-                                <strong>
-                                    <?php if ($order['delivery_mode'] === 'pickup'): ?>
-                                        <?= htmlspecialchars($order['pickup_branch_name'] ?: '—') ?>
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($order['apartment_name'] ?: '—') ?>
-                                        <?php if (!empty($order['apartment_code'])): ?>
-                                            (<?= htmlspecialchars($order['apartment_code']) ?>)
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                </strong>
-                            </div>
-                            <div class="ov-cust-item">
-                                <span><?= ($order['delivery_mode'] === 'pickup') ? 'Order Mode' : 'Division' ?></span>
-                                <strong>
-                                    <?php if ($order['delivery_mode'] === 'pickup'): ?>
+
+                            <?php if ($order['delivery_mode'] === 'pickup'): ?>
+                                <div class="ov-cust-item">
+                                    <span>Pickup Branch</span>
+                                    <strong><?= htmlspecialchars($order['pickup_branch_name'] ?: '—') ?></strong>
+                                </div>
+                                <div class="ov-cust-item">
+                                    <span>Order Mode</span>
+                                    <strong>
                                         <span style="background:#fdf1e2;color:#a35a0e;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
                                             <i class="bi bi-shop"></i> Pickup
                                         </span>
-                                    <?php else: ?>
-                                        <?= htmlspecialchars($order['division'] ?: '—') ?>
-                                    <?php endif; ?>
-                                </strong>
-                            </div>
+                                    </strong>
+                                </div>
+                            <?php else: ?>
+                                <div class="ov-cust-item">
+                                    <span><?= ($order['address_type'] ?? '') === 'individual_house' ? 'Address Type' : 'Apartment' ?></span>
+                                    <strong>
+                                        <?php if (($order['address_type'] ?? '') === 'individual_house'): ?>
+                                            <span style="background:#eef7f0;color:#2e7d32;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
+                                                <i class="bi bi-house-door"></i> Individual House
+                                            </span>
+                                        <?php else: ?>
+                                            <?= htmlspecialchars($order['apartment_name'] ?: '—') ?>
+                                            <?php if (!empty($order['apartment_code'])): ?>
+                                                (<?= htmlspecialchars($order['apartment_code']) ?>)
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </strong>
+                                </div>
+                                <div class="ov-cust-item">
+                                    <span><?= ($order['address_type'] ?? '') === 'individual_house' ? 'Address' : 'Division' ?></span>
+                                    <strong>
+                                        <?php if (($order['address_type'] ?? '') === 'individual_house'): ?>
+                                            <?= htmlspecialchars($order['full_address'] ?: '—') ?>
+                                        <?php else: ?>
+                                            <?= htmlspecialchars($order['division'] ?: '—') ?>
+                                        <?php endif; ?>
+                                    </strong>
+                                </div>
+                            <?php endif; ?>
+
                             <div class="ov-cust-item">
                                 <span>Delivery Boy</span>
                                 <strong>

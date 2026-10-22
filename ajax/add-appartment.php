@@ -2,8 +2,8 @@
 /* =========================================================
    MRS MILL@ — AJAX: ADD APARTMENT
    File: ./ajax/add-appartment.php
-   Saves divisions as JSON: [{division, charge}, ...]
-   Also saves branch_id.
+   Saves variants as JSON:
+     [{block, door_no, floor, charge}, ...]
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -48,36 +48,48 @@ if ($address === '') {
 }
 
 if (!is_array($divisions) || count($divisions) === 0) {
-    jsonResponse(false, 'Please add at least one division with a charge.');
+    jsonResponse(false, 'Please add at least one variant with a charge.');
 }
 
-/* Clean + validate each division */
+/* Clean + validate each variant */
 
 $cleanDivisions = [];
 $seen           = [];
 
 foreach ($divisions as $d) {
 
-    $division = isset($d['division']) ? trim((string) $d['division']) : '';
-    $charge   = isset($d['charge'])   ? trim((string) $d['charge'])   : '';
+    $block    = isset($d['block'])   ? trim((string) $d['block'])   : '';
+    $doorNo   = isset($d['door_no']) ? trim((string) $d['door_no']) : '';
+    $floor    = isset($d['floor'])   ? trim((string) $d['floor'])   : '';
+    $charge   = isset($d['charge'])  ? trim((string) $d['charge'])  : '';
 
-    if ($division === '') {
-        jsonResponse(false, 'Each division must have a name.');
+    if ($block === '') {
+        jsonResponse(false, 'Each variant must have a Block name.');
+    }
+
+    if ($doorNo === '') {
+        jsonResponse(false, 'Each variant must have a Door No.');
+    }
+
+    if ($floor === '') {
+        jsonResponse(false, 'Each variant must have a Floor.');
     }
 
     if ($charge === '' || !is_numeric($charge) || (float) $charge < 0) {
-        jsonResponse(false, 'Each division must have a valid delivery charge.');
+        jsonResponse(false, 'Each variant must have a valid delivery charge.');
     }
 
-    $key = strtolower($division);
+    $key = strtolower($block . '|' . $doorNo . '|' . $floor);
     if (isset($seen[$key])) {
-        jsonResponse(false, 'Duplicate division "' . $division . '" found.');
+        jsonResponse(false, 'Duplicate variant: Block "' . $block . '", Door No "' . $doorNo . '", Floor "' . $floor . '".');
     }
     $seen[$key] = true;
 
     $cleanDivisions[] = [
-        'division' => $division,
-        'charge'   => (float) $charge
+        'block'   => $block,
+        'door_no' => $doorNo,
+        'floor'   => $floor,
+        'charge'  => (float) $charge
     ];
 }
 

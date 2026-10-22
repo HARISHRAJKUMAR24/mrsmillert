@@ -1,5 +1,5 @@
 /* =========================================================
-   MRS MILL@ — REASSIGN ORDERS (Boy → Boy)
+   MRS MILL@ — REASSIGN ORDERS (Boy → Boy, per division)
    File: ./js/urgency-assign-orders.js
    ========================================================= */
 
@@ -11,46 +11,46 @@
         : "./";
 
     const MENUS = Array.isArray(window.MENUS) ? window.MENUS : [];
-    const BOYS = Array.isArray(window.DELIVERY_BOYS) ? window.DELIVERY_BOYS : [];
+    const BOYS  = Array.isArray(window.DELIVERY_BOYS) ? window.DELIVERY_BOYS : [];
 
     /* ---------- DOM: Menu ---------- */
-    const menuWrap = document.getElementById("menuDdWrap");
+    const menuWrap   = document.getElementById("menuDdWrap");
     const menuToggle = document.getElementById("menuDdToggle");
-    const menuLabel = document.getElementById("menuDdLabel");
+    const menuLabel  = document.getElementById("menuDdLabel");
     const menuSearch = document.getElementById("menuDdSearch");
-    const menuList = document.getElementById("menuDdList");
-    const menuInput = document.getElementById("asMenu");
+    const menuList   = document.getElementById("menuDdList");
+    const menuInput  = document.getElementById("asMenu");
 
     /* ---------- DOM: From Boy ---------- */
-    const fromBoyWrap = document.getElementById("fromBoyDdWrap");
+    const fromBoyWrap   = document.getElementById("fromBoyDdWrap");
     const fromBoyToggle = document.getElementById("fromBoyDdToggle");
-    const fromBoyLabel = document.getElementById("fromBoyDdLabel");
+    const fromBoyLabel  = document.getElementById("fromBoyDdLabel");
     const fromBoySearch = document.getElementById("fromBoyDdSearch");
-    const fromBoyList = document.getElementById("fromBoyDdList");
-    const fromBoyInput = document.getElementById("asFromBoy");
+    const fromBoyList   = document.getElementById("fromBoyDdList");
+    const fromBoyInput  = document.getElementById("asFromBoy");
 
     /* ---------- DOM: To Boy ---------- */
-    const boyWrap = document.getElementById("boyDdWrap");
+    const boyWrap   = document.getElementById("boyDdWrap");
     const boyToggle = document.getElementById("boyDdToggle");
-    const boyLabel = document.getElementById("boyDdLabel");
+    const boyLabel  = document.getElementById("boyDdLabel");
     const boySearch = document.getElementById("boyDdSearch");
-    const boyList = document.getElementById("boyDdList");
-    const boyInput = document.getElementById("asBoy");
+    const boyList   = document.getElementById("boyDdList");
+    const boyInput  = document.getElementById("asBoy");
 
     /* ---------- DOM: Other ---------- */
-    const aptList = document.getElementById("asAptList");
-    const aptCountEl = document.getElementById("asAptCount");
+    const aptList     = document.getElementById("asAptList");
+    const aptCountEl  = document.getElementById("asAptCount");
     const selectAllBtn = document.getElementById("asSelectAll");
-    const clearAllBtn = document.getElementById("asClearAll");
+    const clearAllBtn  = document.getElementById("asClearAll");
 
-    const previewHead = document.getElementById("asPreviewHead");
-    const previewSub = document.getElementById("asPreviewSub");
-    const countBadge = document.getElementById("asCountBadge");
-    const previewWrap = document.getElementById("asPreviewWrap");
+    const previewHead  = document.getElementById("asPreviewHead");
+    const previewSub   = document.getElementById("asPreviewSub");
+    const countBadge   = document.getElementById("asCountBadge");
+    const previewWrap  = document.getElementById("asPreviewWrap");
 
-    const resetBtn = document.getElementById("asReset");
-    const assignBtn = document.getElementById("asAssign");
-    const assignText = document.getElementById("asAssignText");
+    const resetBtn    = document.getElementById("asReset");
+    const assignBtn   = document.getElementById("asAssign");
+    const assignText  = document.getElementById("asAssignText");
 
     const toastWrap = document.getElementById("asToastWrap");
 
@@ -58,9 +58,9 @@
     let currentOrders = [];
     let selectedMenuId = 0;
     let selectedMenuCode = "";
-    let selectedApts = new Set();
-    let apartmentsCache = [];
-    let isAssigning = false;
+    let selectedRows = new Set();     // row_key strings
+    let rowsCache    = [];            // { row_key, apartment_code, apartment_name, division_label, pending_count, is_individual }
+    let isAssigning  = false;
 
     /* ---------- Helpers ---------- */
     function esc(s) {
@@ -69,9 +69,7 @@
             .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
     }
 
-    function money(n) {
-        return "₹" + Math.round(Number(n) || 0);
-    }
+    function money(n) { return "₹" + Math.round(Number(n) || 0); }
 
     function formatDate(s) {
         if (!s) return "—";
@@ -83,49 +81,29 @@
         } catch (e) { return s; }
     }
 
-    /* =====================================================
-       ADMIN PANEL TOAST
-       ===================================================== */
+    /* ---------- Toast ---------- */
     function showToast(type, message, timeout) {
         if (!toastWrap) return;
-
-        const icons = {
-            success: "bi-check-lg",
-            error: "bi-x-lg",
-            info: "bi-info-lg"
-        };
-
+        const icons = { success: "bi-check-lg", error: "bi-x-lg", info: "bi-info-lg" };
         const el = document.createElement("div");
         el.className = "as-toast " + type;
         el.innerHTML = `
             <div class="as-toast-icon"><i class="bi ${icons[type] || icons.info}"></i></div>
             <div class="as-toast-body">${esc(message)}</div>
-            <button type="button" class="as-toast-close" aria-label="Close">
-                <i class="bi bi-x"></i>
-            </button>
+            <button type="button" class="as-toast-close" aria-label="Close"><i class="bi bi-x"></i></button>
         `;
-
         toastWrap.appendChild(el);
         requestAnimationFrame(() => el.classList.add("show"));
-
-        const close = () => {
-            el.classList.remove("show");
-            setTimeout(() => el.remove(), 300);
-        };
-
+        const close = () => { el.classList.remove("show"); setTimeout(() => el.remove(), 300); };
         el.querySelector(".as-toast-close").addEventListener("click", close);
         setTimeout(close, timeout || 3200);
     }
 
-    /* =====================================================
-       ASSIGN BUTTON LOADING
-       ===================================================== */
+    /* ---------- Assign loading state ---------- */
     function setAssignLoading(isLoading) {
         isAssigning = !!isLoading;
         if (!assignBtn) return;
-
         assignBtn.disabled = isLoading;
-
         if (isLoading) {
             assignText.innerHTML = '<span class="btn-spinner"></span> Assigning…';
         } else {
@@ -135,7 +113,7 @@
 
     function updateAptCount() {
         if (!aptCountEl) return;
-        aptCountEl.textContent = selectedApts.size + " selected";
+        aptCountEl.textContent = selectedRows.size + " selected";
     }
 
     function resetPreview() {
@@ -147,8 +125,8 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
-                <h3>Pick a menu, a from-boy and apartments</h3>
-                <p>This boy's pending orders will show up here for review before moving them.</p>
+                <h3>Pick a menu, a from-boy and blocks</h3>
+                <p>Each apartment block (or individual house) with this boy's pending orders will appear here.</p>
             </div>`;
     }
 
@@ -157,24 +135,20 @@
        ===================================================== */
     function renderMenuList(query) {
         if (!menuList) return;
-
-        if (MENUS.length === 0) {
+        if (!MENUS.length) {
             menuList.innerHTML = `<div class="sd-empty">No menus available.</div>`;
             return;
         }
-
         const q = (query || "").trim().toLowerCase();
         const list = q
             ? MENUS.filter(m =>
                 (m.menu_name || "").toLowerCase().includes(q) ||
                 (m.menu_code || "").toLowerCase().includes(q))
             : MENUS;
-
-        if (list.length === 0) {
+        if (!list.length) {
             menuList.innerHTML = `<div class="sd-empty">No matches.</div>`;
             return;
         }
-
         menuList.innerHTML = list.map(m => {
             const selected = Number(m.id) === Number(selectedMenuId);
             return `
@@ -182,40 +156,28 @@
                     <i class="bi bi-list-ul"></i>
                     <div class="name">${esc(m.menu_name)}</div>
                     <div class="meta">#${esc(m.menu_code)}</div>
-                </div>
-            `;
+                </div>`;
         }).join("");
     }
 
     function openMenuDd() {
         menuWrap.classList.add("open");
-        closeFromBoyDd();
-        closeBoyDd();
-        if (menuSearch) {
-            menuSearch.value = "";
-            setTimeout(() => menuSearch.focus(), 60);
-        }
+        closeFromBoyDd(); closeBoyDd();
+        if (menuSearch) { menuSearch.value = ""; setTimeout(() => menuSearch.focus(), 60); }
         renderMenuList("");
     }
-
-    function closeMenuDd() {
-        menuWrap.classList.remove("open");
-    }
+    function closeMenuDd() { menuWrap.classList.remove("open"); }
 
     menuToggle?.addEventListener("click", function (e) {
         e.stopPropagation();
         if (menuWrap.classList.contains("open")) closeMenuDd();
         else openMenuDd();
     });
-
-    menuSearch?.addEventListener("input", function () {
-        renderMenuList(this.value);
-    });
+    menuSearch?.addEventListener("input", function () { renderMenuList(this.value); });
 
     menuList?.addEventListener("click", function (e) {
         const opt = e.target.closest(".sd-option");
         if (!opt) return;
-
         const id = Number(opt.dataset.id);
         const menu = MENUS.find(m => Number(m.id) === id);
         if (!menu) return;
@@ -229,7 +191,7 @@
         menuToggle.classList.add("has-value");
 
         closeMenuDd();
-        maybeLoadApartments();
+        maybeLoadGroups();
     });
 
     /* =====================================================
@@ -237,12 +199,10 @@
        ===================================================== */
     function renderFromBoyList(query) {
         if (!fromBoyList) return;
-
-        if (BOYS.length === 0) {
+        if (!BOYS.length) {
             fromBoyList.innerHTML = `<div class="sd-empty">No delivery boys available.</div>`;
             return;
         }
-
         const q = (query || "").trim().toLowerCase();
         const list = q
             ? BOYS.filter(b =>
@@ -250,14 +210,11 @@
                 (b.delivery_code || "").toLowerCase().includes(q) ||
                 (b.mobile_number || "").toLowerCase().includes(q))
             : BOYS;
-
-        if (list.length === 0) {
+        if (!list.length) {
             fromBoyList.innerHTML = `<div class="sd-empty">No matches.</div>`;
             return;
         }
-
         const currentVal = String(fromBoyInput.value || "");
-
         fromBoyList.innerHTML = list.map(b => {
             const selected = String(b.id) === currentVal;
             return `
@@ -265,40 +222,27 @@
                     <i class="bi bi-person-dash"></i>
                     <div class="name">${esc(b.full_name)}</div>
                     <div class="meta">#${esc(b.delivery_code || '')} · ${esc(b.mobile_number || '')}</div>
-                </div>
-            `;
+                </div>`;
         }).join("");
     }
-
     function openFromBoyDd() {
         fromBoyWrap.classList.add("open");
-        closeMenuDd();
-        closeBoyDd();
-        if (fromBoySearch) {
-            fromBoySearch.value = "";
-            setTimeout(() => fromBoySearch.focus(), 60);
-        }
+        closeMenuDd(); closeBoyDd();
+        if (fromBoySearch) { fromBoySearch.value = ""; setTimeout(() => fromBoySearch.focus(), 60); }
         renderFromBoyList("");
     }
-
-    function closeFromBoyDd() {
-        if (fromBoyWrap) fromBoyWrap.classList.remove("open");
-    }
+    function closeFromBoyDd() { if (fromBoyWrap) fromBoyWrap.classList.remove("open"); }
 
     fromBoyToggle?.addEventListener("click", function (e) {
         e.stopPropagation();
         if (fromBoyWrap.classList.contains("open")) closeFromBoyDd();
         else openFromBoyDd();
     });
-
-    fromBoySearch?.addEventListener("input", function () {
-        renderFromBoyList(this.value);
-    });
+    fromBoySearch?.addEventListener("input", function () { renderFromBoyList(this.value); });
 
     fromBoyList?.addEventListener("click", function (e) {
         const opt = e.target.closest(".sd-option");
         if (!opt) return;
-
         const id = Number(opt.dataset.id);
         const boy = BOYS.find(b => Number(b.id) === id);
         if (!boy) return;
@@ -310,18 +254,17 @@
 
         closeFromBoyDd();
 
-        selectedApts.clear();
-        apartmentsCache = [];
+        selectedRows.clear();
+        rowsCache = [];
         updateAptCount();
         resetPreview();
-
         aptList.innerHTML = `
             <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
-                <h3 style="font-size:14px;">Loading apartments…</h3>
+                <h3 style="font-size:14px;">Loading blocks…</h3>
                 <p style="font-size:11.5px;">Please wait.</p>
             </div>`;
 
-        maybeLoadApartments();
+        maybeLoadGroups();
     });
 
     /* =====================================================
@@ -329,12 +272,10 @@
        ===================================================== */
     function renderBoyList(query) {
         if (!boyList) return;
-
-        if (BOYS.length === 0) {
+        if (!BOYS.length) {
             boyList.innerHTML = `<div class="sd-empty">No delivery boys available.</div>`;
             return;
         }
-
         const q = (query || "").trim().toLowerCase();
         const list = q
             ? BOYS.filter(b =>
@@ -342,60 +283,43 @@
                 (b.delivery_code || "").toLowerCase().includes(q) ||
                 (b.mobile_number || "").toLowerCase().includes(q))
             : BOYS;
-
-        if (list.length === 0) {
+        if (!list.length) {
             boyList.innerHTML = `<div class="sd-empty">No matches.</div>`;
             return;
         }
-
         const fromId = Number(fromBoyInput.value || 0);
-
         boyList.innerHTML = list.map(b => {
             const selected = Number(b.id) === Number(boyInput.value || 0);
-            const isSameAsFrom = fromId > 0 && Number(b.id) === fromId;
+            const isSame = fromId > 0 && Number(b.id) === fromId;
             return `
                 <div class="sd-option ${selected ? 'selected' : ''}" data-id="${b.id}">
                     <i class="bi bi-person-badge"></i>
                     <div class="name">${esc(b.full_name)}</div>
                     <div class="meta">
-                        ${isSameAsFrom
-                    ? '<span style="color:#b51f2c;">same as from</span>'
-                    : '#' + esc(b.delivery_code || '') + ' · ' + esc(b.mobile_number || '')}
+                        ${isSame ? '<span style="color:#b51f2c;">same as from</span>'
+                                 : '#' + esc(b.delivery_code || '') + ' · ' + esc(b.mobile_number || '')}
                     </div>
-                </div>
-            `;
+                </div>`;
         }).join("");
     }
-
     function openBoyDd() {
         boyWrap.classList.add("open");
-        closeMenuDd();
-        closeFromBoyDd();
-        if (boySearch) {
-            boySearch.value = "";
-            setTimeout(() => boySearch.focus(), 60);
-        }
+        closeMenuDd(); closeFromBoyDd();
+        if (boySearch) { boySearch.value = ""; setTimeout(() => boySearch.focus(), 60); }
         renderBoyList("");
     }
-
-    function closeBoyDd() {
-        boyWrap.classList.remove("open");
-    }
+    function closeBoyDd() { boyWrap.classList.remove("open"); }
 
     boyToggle?.addEventListener("click", function (e) {
         e.stopPropagation();
         if (boyWrap.classList.contains("open")) closeBoyDd();
         else openBoyDd();
     });
-
-    boySearch?.addEventListener("input", function () {
-        renderBoyList(this.value);
-    });
+    boySearch?.addEventListener("input", function () { renderBoyList(this.value); });
 
     boyList?.addEventListener("click", function (e) {
         const opt = e.target.closest(".sd-option");
         if (!opt) return;
-
         const id = Number(opt.dataset.id);
         const boy = BOYS.find(b => Number(b.id) === id);
         if (!boy) return;
@@ -410,29 +334,25 @@
     });
 
     document.addEventListener("click", function (e) {
-        if (!e.target.closest("#menuDdWrap")) closeMenuDd();
+        if (!e.target.closest("#menuDdWrap"))    closeMenuDd();
         if (!e.target.closest("#fromBoyDdWrap")) closeFromBoyDd();
-        if (!e.target.closest("#boyDdWrap")) closeBoyDd();
+        if (!e.target.closest("#boyDdWrap"))     closeBoyDd();
     });
 
-    renderMenuList("");
-    renderFromBoyList("");
-    renderBoyList("");
+    renderMenuList(""); renderFromBoyList(""); renderBoyList("");
 
     /* =====================================================
-       LOAD APARTMENTS
+       LOAD BLOCK GROUPS
        ===================================================== */
-    function maybeLoadApartments() {
+    function maybeLoadGroups() {
         if (!selectedMenuId) return;
-        const fromBoyId = Number(fromBoyInput.value || 0);
-        if (fromBoyId <= 0) return;
-
-        loadApartmentsForMenu();
+        if (Number(fromBoyInput.value || 0) <= 0) return;
+        loadGroups();
     }
 
-    function loadApartmentsForMenu() {
-        selectedApts.clear();
-        apartmentsCache = [];
+    function loadGroups() {
+        selectedRows.clear();
+        rowsCache = [];
         updateAptCount();
         resetPreview();
 
@@ -444,7 +364,7 @@
         aptList.innerHTML = `
             <div style="text-align:center;padding:30px 20px;color:#948c82;font-size:12px;">
                 <span class="btn-spinner" style="border-color:#ece5da;border-top-color:#b51f2c;"></span>
-                Loading apartments…
+                Loading blocks…
             </div>`;
 
         const params = new URLSearchParams();
@@ -459,14 +379,14 @@
                 if (!res || !res.success || !Array.isArray(res.data)) {
                     aptList.innerHTML = `
                         <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
-                            <h3 style="font-size:14px;color:#b51f2c;">Failed to load apartments</h3>
+                            <h3 style="font-size:14px;color:#b51f2c;">Failed to load blocks</h3>
                             <p style="font-size:11.5px;">${esc((res && res.message) || "Please try again.")}</p>
                         </div>`;
                     return;
                 }
 
-                apartmentsCache = res.data;
-                renderApartmentList();
+                rowsCache = res.data;
+                renderGroupList();
             })
             .catch(() => {
                 aptList.innerHTML = `
@@ -477,10 +397,10 @@
             });
     }
 
-    function renderApartmentList() {
+    function renderGroupList() {
         if (!aptList) return;
 
-        if (apartmentsCache.length === 0) {
+        if (!rowsCache.length) {
             aptList.innerHTML = `
                 <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
                     <h3 style="font-size:14px;">No pending orders</h3>
@@ -489,25 +409,74 @@
             return;
         }
 
-        aptList.innerHTML = apartmentsCache.map(a => {
-            const checked = selectedApts.has(a.apartment_code);
-            return `
-                <div class="as-apt-item ${checked ? 'is-checked' : ''}"
-                     data-code="${esc(a.apartment_code)}"
-                     data-name="${esc(a.apartment_name)}">
-                    <div class="as-apt-check"></div>
-                    <div class="as-apt-info">
-                        <p class="as-apt-name">${esc(a.apartment_name)}</p>
-                        <p class="as-apt-meta">#${esc(a.apartment_code)}</p>
-                    </div>
-                    <span class="as-apt-pill">
-                        <i class="bi bi-hourglass-split"></i>
-                        ${a.pending_count} pending
-                    </span>
-                </div>
-            `;
-        }).join("");
+        /* Group apartment rows by code so divisions stack under one heading */
+        const groups = {};
+        const order  = [];
 
+        rowsCache.forEach(r => {
+            const code = r.apartment_code || '';
+            if (!groups[code]) {
+                groups[code] = [];
+                order.push(code);
+            }
+            groups[code].push(r);
+        });
+
+        let html = '';
+
+        order.forEach(code => {
+            const rows = groups[code];
+            const first = rows[0];
+            const isIH = first.is_individual;
+
+            if (isIH) {
+                /* Individual House section header */
+                html += `
+                    <div style="margin:12px 2px 6px;font-size:10.5px;font-weight:800;color:#2e7d32;text-transform:uppercase;letter-spacing:.08em;">
+                        <i class="bi bi-house-door"></i> Individual Houses (${rows.length})
+                    </div>`;
+            } else {
+                html += `
+                    <div style="margin:12px 2px 6px;font-size:10.5px;font-weight:800;color:#948c82;text-transform:uppercase;letter-spacing:.08em;">
+                        <i class="bi bi-building"></i> ${esc(first.apartment_name)} · #${esc(code)}
+                    </div>`;
+            }
+
+            html += rows.map(r => {
+                const checked = selectedRows.has(r.row_key);
+                const isIhRow = r.is_individual;
+
+                const primaryLabel = isIhRow
+                    ? r.apartment_name
+                    : (r.division_label || 'Default block');
+
+                const secondary = isIhRow
+                    ? 'Individual House'
+                    : ('#' + code + ' · ' + (r.division_label || ''));
+
+                const icon = isIhRow ? 'bi-house-door' : 'bi-grid-3x3-gap';
+
+                return `
+                    <div class="as-apt-item ${checked ? 'is-checked' : ''}"
+                         data-row-key="${esc(r.row_key)}"
+                         style="${isIhRow ? 'border-left:3px solid #2e7d32;' : ''}">
+                        <div class="as-apt-check"></div>
+                        <div class="as-apt-info">
+                            <p class="as-apt-name">
+                                <i class="bi ${icon}" style="font-size:11px;${isIhRow ? 'color:#2e7d32;' : 'color:#b0a79c;'}margin-right:4px;"></i>
+                                ${esc(primaryLabel)}
+                            </p>
+                            <p class="as-apt-meta">${esc(secondary)}</p>
+                        </div>
+                        <span class="as-apt-pill" style="${isIhRow ? 'background:#eef7f0;color:#2e7d32;' : ''}">
+                            <i class="bi bi-hourglass-split"></i>
+                            ${r.pending_count} pending
+                        </span>
+                    </div>`;
+            }).join('');
+        });
+
+        aptList.innerHTML = html;
         updateAptCount();
     }
 
@@ -515,52 +484,48 @@
         const item = e.target.closest(".as-apt-item");
         if (!item) return;
 
-        const code = item.dataset.code;
-        if (!code) return;
+        const key = item.dataset.rowKey;
+        if (!key) return;
 
-        if (selectedApts.has(code)) {
-            selectedApts.delete(code);
+        if (selectedRows.has(key)) {
+            selectedRows.delete(key);
             item.classList.remove("is-checked");
         } else {
-            selectedApts.add(code);
+            selectedRows.add(key);
             item.classList.add("is-checked");
         }
 
         updateAptCount();
-        loadOrdersForSelectedApts();
+        loadOrdersForSelectedRows();
     });
 
     selectAllBtn?.addEventListener("click", () => {
-        apartmentsCache.forEach(a => selectedApts.add(a.apartment_code));
+        rowsCache.forEach(r => selectedRows.add(r.row_key));
         aptList.querySelectorAll(".as-apt-item").forEach(el => el.classList.add("is-checked"));
         updateAptCount();
-        loadOrdersForSelectedApts();
+        loadOrdersForSelectedRows();
     });
 
     clearAllBtn?.addEventListener("click", () => {
-        selectedApts.clear();
+        selectedRows.clear();
         aptList.querySelectorAll(".as-apt-item").forEach(el => el.classList.remove("is-checked"));
         updateAptCount();
         resetPreview();
     });
 
     /* =====================================================
-       LOAD ORDERS
+       LOAD ORDERS (by row_keys)
        ===================================================== */
-    function loadOrdersForSelectedApts() {
-        if (selectedApts.size === 0 || !selectedMenuId) {
+    function loadOrdersForSelectedRows() {
+        if (selectedRows.size === 0 || !selectedMenuId) {
             resetPreview();
             return;
         }
-
         const fromBoyId = Number(fromBoyInput.value || 0);
-        if (fromBoyId <= 0) {
-            resetPreview();
-            return;
-        }
+        if (fromBoyId <= 0) { resetPreview(); return; }
 
         previewHead.style.display = "flex";
-        previewSub.textContent = `Loading ${selectedApts.size} apartment(s)…`;
+        previewSub.textContent = `Loading ${selectedRows.size} block(s)…`;
         countBadge.textContent = "…";
         previewWrap.innerHTML = `
             <div class="as-empty">
@@ -571,8 +536,8 @@
 
         const params = new URLSearchParams();
         params.set("menu_id", selectedMenuId);
-        params.set("apartment_codes", JSON.stringify([...selectedApts]));
         params.set("from_boy_id", String(fromBoyId));
+        params.set("row_keys", JSON.stringify([...selectedRows]));
 
         fetch(BASE_URL + "ajax/get-orders-for-menu-apartment.php?" + params.toString(), {
             credentials: "same-origin"
@@ -587,7 +552,6 @@
                         </div>`;
                     return;
                 }
-
                 currentOrders = res.data;
                 renderPreview();
             })
@@ -604,16 +568,16 @@
         const count = currentOrders.length;
         countBadge.textContent = count + (count === 1 ? " order" : " orders");
 
-        const fromBoy = BOYS.find(b => String(b.id) === String(fromBoyInput.value));
+        const fromBoy  = BOYS.find(b => String(b.id) === String(fromBoyInput.value));
         const fromName = fromBoy ? fromBoy.full_name : "this boy";
 
-        previewSub.textContent = `${selectedApts.size} apartment${selectedApts.size === 1 ? "" : "s"} · ${count} pending order${count === 1 ? "" : "s"} from ${fromName}`;
+        previewSub.textContent = `${selectedRows.size} block${selectedRows.size === 1 ? "" : "s"} · ${count} pending order${count === 1 ? "" : "s"} from ${fromName}`;
 
         if (count === 0) {
             previewWrap.innerHTML = `
                 <div class="as-empty">
                     <h3>No pending orders</h3>
-                    <p>${esc(fromName)} has no pending orders in the selected apartments.</p>
+                    <p>${esc(fromName)} has no pending orders in the selected blocks.</p>
                 </div>`;
             assignBtn.disabled = true;
             return;
@@ -626,14 +590,25 @@
                         <tr>
                             <th>Order</th>
                             <th>Customer</th>
-                            <th>Apartment</th>
+                            <th>Address / Block</th>
                             <th>Current Boy</th>
                             <th>Amount</th>
                         </tr>
                     </thead>
                     <tbody>
                         ${currentOrders.map(o => {
-            return `
+                            const isIH = (o.address_type || '') === 'individual_house';
+                            const addrCell = isIH
+                                ? `<span class="as-name" style="font-size:12px;">
+                                       <span style="background:#eef7f0;color:#2e7d32;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:800;">
+                                           <i class="bi bi-house-door"></i> Individual House
+                                       </span>
+                                   </span>
+                                   <span class="as-mobile">${esc(o.full_address || '—')}</span>`
+                                : `<span class="as-name" style="font-size:12px;">${esc(o.apartment_name || '—')}</span>
+                                   <span class="as-mobile">${esc(o.division || '—')}</span>`;
+
+                            return `
                                 <tr>
                                     <td>
                                         <span class="as-code">#${esc(o.order_code)}</span>
@@ -643,10 +618,7 @@
                                         <span class="as-name">${esc(o.customer_name)}</span>
                                         <span class="as-mobile">${esc(o.customer_mobile)}</span>
                                     </td>
-                                    <td>
-                                        <span class="as-name" style="font-size:12px;">${esc(o.apartment_name || "—")}</span>
-                                        <span class="as-mobile">Div ${esc(o.division || "—")}</span>
-                                    </td>
+                                    <td>${addrCell}</td>
                                     <td>
                                         <span class="as-boy has">
                                             <i class="bi bi-person-fill"></i> ${esc(o.boy_name || "Assigned")}
@@ -654,7 +626,7 @@
                                     </td>
                                     <td><span class="as-amount">${money(o.total_amount)}</span></td>
                                 </tr>`;
-        }).join("")}
+                        }).join("")}
                     </tbody>
                 </table>
             </div>`;
@@ -666,7 +638,7 @@
         if (isAssigning) return;
 
         const fromId = Number(fromBoyInput.value || 0);
-        const toId = Number(boyInput.value || 0);
+        const toId   = Number(boyInput.value || 0);
         const hasOrder = currentOrders.length > 0;
 
         if (fromId > 0 && toId > 0 && hasOrder) {
@@ -708,46 +680,32 @@
         boyLabel.classList.add("placeholder");
         boyToggle.classList.remove("has-value");
 
-        selectedApts.clear();
-        apartmentsCache = [];
+        selectedRows.clear();
+        rowsCache = [];
         updateAptCount();
         aptList.innerHTML = `
             <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
                 <h3 style="font-size:14px;">Select a menu and from-boy first</h3>
-                <p style="font-size:11.5px;">Apartments with this boy's pending orders will appear here.</p>
+                <p style="font-size:11.5px;">Blocks with this boy's pending orders will appear here.</p>
             </div>`;
 
         resetPreview();
-        renderMenuList("");
-        renderFromBoyList("");
-        renderBoyList("");
+        renderMenuList(""); renderFromBoyList(""); renderBoyList("");
     });
 
     /* =====================================================
-       ASSIGN / REASSIGN
+       ASSIGN
        ===================================================== */
     assignBtn?.addEventListener("click", () => {
         if (isAssigning) return;
 
         const fromId = Number(fromBoyInput.value || 0);
-        const toId = Number(boyInput.value || 0);
+        const toId   = Number(boyInput.value || 0);
 
-        if (fromId <= 0) {
-            showToast("error", "Please select a current delivery boy.");
-            return;
-        }
-        if (toId <= 0) {
-            showToast("error", "Please select a new delivery boy.");
-            return;
-        }
-        if (fromId === toId) {
-            showToast("error", "From and To boy cannot be the same.");
-            return;
-        }
-        if (currentOrders.length === 0) {
-            showToast("error", "No orders to assign.");
-            return;
-        }
+        if (fromId <= 0) { showToast("error", "Please select a current delivery boy."); return; }
+        if (toId <= 0)   { showToast("error", "Please select a new delivery boy."); return; }
+        if (fromId === toId) { showToast("error", "From and To boy cannot be the same."); return; }
+        if (currentOrders.length === 0) { showToast("error", "No orders to assign."); return; }
 
         setAssignLoading(true);
 
@@ -755,7 +713,7 @@
         fd.append("delivery_boy_id", toId);
         fd.append("from_boy_id", fromId);
         fd.append("menu_id", selectedMenuId);
-        fd.append("apartment_codes", JSON.stringify([...selectedApts]));
+        fd.append("row_keys", JSON.stringify([...selectedRows]));
         fd.append("order_ids", JSON.stringify(currentOrders.map(o => o.id)));
 
         fetch(BASE_URL + "ajax/reassign-orders.php", {
@@ -765,18 +723,13 @@
         })
             .then(r => r.json().catch(() => null))
             .then(res => {
-                /* ALWAYS reset loading — even on success */
                 setAssignLoading(false);
-
                 if (!res || !res.success) {
                     showToast("error", (res && res.message) || "Failed to reassign.");
                     return;
                 }
-
                 showToast("success", res.message || "Orders reassigned successfully.");
-
-                /* Reload apartments so the moved orders disappear */
-                loadApartmentsForMenu();
+                loadGroups();
             })
             .catch(() => {
                 setAssignLoading(false);

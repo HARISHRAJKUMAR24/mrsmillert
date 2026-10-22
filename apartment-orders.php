@@ -88,6 +88,62 @@ $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin
         }
         .ao-field label .req { color: #b51f2c; }
 
+        /* =============================
+           SEGMENTED TOGGLE
+           ============================= */
+        .ao-seg {
+            display: inline-flex;
+            background: #fdfaf4;
+            border: 1.5px solid #ece5da;
+            border-radius: 12px;
+            padding: 4px;
+            gap: 4px;
+            margin-bottom: 10px;
+            width: 100%;
+        }
+        .ao-seg button {
+            flex: 1;
+            height: 36px;
+            border: none;
+            background: transparent;
+            border-radius: 9px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            color: #6f675f;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: .18s ease;
+        }
+        .ao-seg button:hover:not(.active) {
+            color: #b51f2c;
+        }
+        .ao-seg button.active {
+            background: #fff;
+            color: #b51f2c;
+            box-shadow: 0 4px 12px rgba(48,41,35,.08);
+        }
+        .ao-seg button i { font-size: 13px; }
+
+        /* IH summary card shown when Individual House is active */
+        .ao-ih-note {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #eef7f0;
+            border: 1.5px solid #c9e3ce;
+            color: #2e7d32;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-top: 6px;
+        }
+        .ao-ih-note i { font-size: 15px; }
+
         /* Searchable dropdown */
         .sd-wrap { position: relative; }
         .sd-toggle {
@@ -666,7 +722,7 @@ $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin
             <div class="ao-header">
                 <div>
                     <h1>Menu Apartment Orders</h1>
-                    <p>Pick a menu and apartment to see what products were ordered.</p>
+                    <p>Pick a menu and an address type to see what products were ordered.</p>
                 </div>
             </div>
 
@@ -705,23 +761,44 @@ $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin
                     </div>
 
                     <div class="ao-field">
-                        <label>Apartment <span class="req">*</span></label>
+                        <label>Address Type <span class="req">*</span></label>
 
-                        <div class="sd-wrap" id="aoAptDdWrap">
-                            <button type="button" class="sd-toggle" id="aoAptDdToggle" disabled>
-                                <i class="bi bi-building lead"></i>
-                                <span class="placeholder" id="aoAptDdLabel">— Select menu first —</span>
-                                <i class="bi bi-chevron-down caret"></i>
+                        <!-- SEGMENTED TOGGLE -->
+                        <div class="ao-seg" id="aoAddressSeg">
+                            <button type="button" class="active" data-type="apartment">
+                                <i class="bi bi-building"></i> Apartment
                             </button>
+                            <button type="button" data-type="individual_house">
+                                <i class="bi bi-house-door"></i> Individual House
+                            </button>
+                        </div>
 
-                            <div class="sd-menu">
-                                <div class="sd-search">
-                                    <i class="bi bi-search"></i>
-                                    <input type="text" id="aoAptDdSearch"
-                                           placeholder="Search apartment..." autocomplete="off">
+                        <!-- Apartment dropdown (hidden when IH active) -->
+                        <div id="aoAptWrap">
+
+                            <div class="sd-wrap" id="aoAptDdWrap">
+                                <button type="button" class="sd-toggle" id="aoAptDdToggle" disabled>
+                                    <i class="bi bi-building lead"></i>
+                                    <span class="placeholder" id="aoAptDdLabel">— Select menu first —</span>
+                                    <i class="bi bi-chevron-down caret"></i>
+                                </button>
+
+                                <div class="sd-menu">
+                                    <div class="sd-search">
+                                        <i class="bi bi-search"></i>
+                                        <input type="text" id="aoAptDdSearch"
+                                               placeholder="Search apartment..." autocomplete="off">
+                                    </div>
+                                    <div class="sd-list" id="aoAptDdList"></div>
                                 </div>
-                                <div class="sd-list" id="aoAptDdList"></div>
                             </div>
+
+                        </div>
+
+                        <!-- IH note (shown when IH active) -->
+                        <div class="ao-ih-note" id="aoIHNote" style="display:none;">
+                            <i class="bi bi-info-circle-fill"></i>
+                            Showing all <strong>Individual House</strong> delivery orders in this menu.
                         </div>
 
                         <input type="hidden" id="aoApartmentId">
@@ -784,7 +861,7 @@ $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin
             <div id="aoResultsWrap">
                 <div class="ao-empty">
                     <i class="bi bi-funnel"></i>
-                    <h3>Pick a menu and apartment</h3>
+                    <h3>Pick a menu and address type</h3>
                     <p>Orders will appear here grouped by product.</p>
                 </div>
             </div>

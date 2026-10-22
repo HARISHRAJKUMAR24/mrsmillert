@@ -4,6 +4,11 @@
    File: ./ajax/get-apartment.php
    Accepts: ?id=1  OR  ?code=APT001
    Returns JSON: { success, message, data: {...} }
+
+   NOTE: Divisions are normalized to the new variant shape:
+         { block, door_no, floor, charge }
+   Legacy rows { division, charge } are auto-migrated:
+         division -> door_no
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -50,19 +55,60 @@ try {
         jsonResponse(false, 'Apartment not found.');
     }
 
-    /* Decode divisions */
-    $divisions = [];
+    /* -----------------------------------------
+       DECODE divisions JSON (raw)
+    ----------------------------------------- */
+
+    $rawDivisions = [];
     if (!empty($row['divisions'])) {
         if (function_exists('decodeDivisions')) {
             $decoded = decodeDivisions($row['divisions']);
-            if (is_array($decoded)) $divisions = $decoded;
+            if (is_array($decoded)) $rawDivisions = $decoded;
         } else {
             $decoded = json_decode($row['divisions'], true);
-            if (is_array($decoded)) $divisions = $decoded;
+            if (is_array($decoded)) $rawDivisions = $decoded;
         }
     }
 
-    /* Build clean response */
+    /* -----------------------------------------
+       NORMALIZE each variant to:
+         { block, door_no, floor, charge }
+       Old shape: { division, charge } -> door_no
+    ----------------------------------------- */
+
+    $divisions = [];
+
+    foreach ($rawDivisions as $d) {
+
+        if (!is_array($d)) continue;
+
+        $block  = isset($d['block'])   ? trim((string) $d['block'])   : '';
+        $doorNo = isset($d['door_no']) ? trim((string) $d['door_no']) : '';
+        $floor  = isset($d['floor'])   ? trim((string) $d['floor'])   : '';
+        $charge = isset($d['charge'])  ? (float) $d['charge']         : 0.0;
+
+        /* Legacy: if no block/door_no/floor but has "division",
+           treat division as door_no */
+        $hasNewShape = (
+            $block !== '' || $doorNo !== '' || $floor !== ''
+        );
+
+        if (!$hasNewShape && isset($d['division'])) {
+            $doorNo = trim((string) $d['division']);
+        }
+
+        $divisions[] = [
+            'block'   => $block,
+            'door_no' => $doorNo,
+            'floor'   => $floor,
+            'charge'  => $charge,
+        ];
+    }
+
+    /* -----------------------------------------
+       BUILD CLEAN RESPONSE
+    ----------------------------------------- */
+
     $payload = [
         'id'                => (int) $row['id'],
         'apartment_code'    => (string) $row['apartment_code'],

@@ -5,11 +5,16 @@
 
    Actions:
      - menus                     → list all menus
-     - apartments_with_orders    → apartments that have orders in a menu
-     - summary                   → products + orders for menu + apartment
+     - apartments_with_orders    → apartments (+ Individual House bucket)
+                                    that have orders in a menu
+     - summary                   → products + orders for menu + apt/IH
 
-   NOTE: orders.products_json does NOT reliably contain "menu_code",
-         so we scope orders by the menu's start_at/end_at window only.
+   NOTE:
+   - orders has NO customer_name / customer_mobile / apartment_* / division
+     columns. All of these live either in `customers` or inside
+     `orders.address_json`.
+   - Individual-house orders are NOT in `apartments` table. We treat them
+     as a virtual apartment with id = -1 and code = "INDIVIDUAL".
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -23,7 +28,13 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
 
 $action = trim($_GET['action'] ?? '');
 
+/* Virtual pseudo-apartment for individual houses */
+const IH_APARTMENT_ID   = -1;
+const IH_APARTMENT_CODE = 'INDIVIDUAL';
+const IH_APARTMENT_NAME = 'Individual House';
+
 try {
+
     /* =========================================================
        ACTION: menus
        ========================================================= */
@@ -65,31 +76,71 @@ try {
         $menu = $mStmt->fetch(PDO::FETCH_ASSOC);
         if (!$menu) jsonResponse(false, 'Menu not found.');
 
-        // Scope only by menu time window + apartment + not cancelled.
-        $stmt = $pdo->prepare(
-            "SELECT o.apartment_id,
-                    o.apartment_code,
-                    o.apartment_name,
+        /* Extract apartment fields from address_json for grouping */
+        $sql = "SELECT
+                    CASE WHEN JSON_VALID(o.address_json)
+                         THEN CAST(JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_id')) AS UNSIGNED)
+                         ELSE 0 END AS apartment_id,
+                    CASE WHEN JSON_VALID(o.address_json)
+                         THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code'))
+                         ELSE NULL END AS apartment_code,
+                    CASE WHEN JSON_VALID(o.address_json)
+                         THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_name'))
+                         ELSE NULL END AS apartment_name,
+                    o.address_type,
                     COUNT(DISTINCT o.id) AS order_count
-             FROM orders o
-             WHERE o.apartment_id IS NOT NULL
-               AND o.apartment_id > 0
-               AND o.status <> 'cancelled'
-               AND o.created_at BETWEEN ? AND ?
-             GROUP BY o.apartment_id, o.apartment_code, o.apartment_name
-             ORDER BY o.apartment_name ASC"
-        );
+                FROM orders o
+                WHERE o.status <> 'cancelled'
+                  AND o.created_at BETWEEN ? AND ?
+                  AND (
+                        o.address_type IN ('apartment', 'individual_house')
+                        OR o.delivery_mode = 'delivery'
+                      )
+                GROUP BY apartment_id, apartment_code, apartment_name, o.address_type
+                ORDER BY apartment_name ASC";
+
+        $stmt = $pdo->prepare($sql);
         $stmt->execute([$menu['start_at'], $menu['end_at']]);
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-        $out = array_map(function ($r) {
-            return [
-                'id'             => (int)$r['apartment_id'],
-                'apartment_code' => $r['apartment_code'] ?? '',
-                'apartment_name' => $r['apartment_name'] ?? '',
-                'order_count'    => (int)$r['order_count'],
+        $apartments   = [];
+        $ihOrderCount = 0;
+
+        foreach ($rows as $r) {
+            $count = (int)$r['order_count'];
+
+            /* Individual house bucket */
+            if (($r['address_type'] ?? '') === 'individual_house'
+                || (int)$r['apartment_id'] <= 0
+                || empty($r['apartment_name'])) {
+                $ihOrderCount += $count;
+                continue;
+            }
+
+            $key = (int)$r['apartment_id'];
+            if (!isset($apartments[$key])) {
+                $apartments[$key] = [
+                    'id'             => (int)$r['apartment_id'],
+                    'apartment_code' => $r['apartment_code'] ?? '',
+                    'apartment_name' => $r['apartment_name'] ?? '',
+                    'order_count'    => 0,
+                ];
+            }
+            $apartments[$key]['order_count'] += $count;
+        }
+
+        $out = array_values($apartments);
+
+        /* Put Individual House at the end */
+        if ($ihOrderCount > 0) {
+            $out[] = [
+                'id'             => IH_APARTMENT_ID,
+                'apartment_code' => IH_APARTMENT_CODE,
+                'apartment_name' => IH_APARTMENT_NAME,
+                'order_count'    => $ihOrderCount,
+                'is_individual'  => true,
             ];
-        }, $rows);
+        }
 
         jsonResponse(true, 'OK', $out);
     }
@@ -105,17 +156,22 @@ try {
         $from        = trim($_GET['from'] ?? '');
         $to          = trim($_GET['to']   ?? '');
 
-        if ($apartmentId <= 0) jsonResponse(false, 'Invalid apartment.');
-        if ($menuCode === '')  jsonResponse(false, 'Menu required.');
+        if ($apartmentId === 0) jsonResponse(false, 'Invalid apartment.');
+        if ($menuCode === '')   jsonResponse(false, 'Menu required.');
 
-        /* Apartment */
-        $aStmt = $pdo->prepare(
-            "SELECT id, apartment_code, apartment_name
-             FROM apartments WHERE id = ? LIMIT 1"
-        );
-        $aStmt->execute([$apartmentId]);
-        $apt = $aStmt->fetch(PDO::FETCH_ASSOC);
-        if (!$apt) jsonResponse(false, 'Apartment not found.');
+        $isIndividual = ($apartmentId === IH_APARTMENT_ID);
+
+        /* Apartment (for real apartments only) */
+        $apt = null;
+        if (!$isIndividual) {
+            $aStmt = $pdo->prepare(
+                "SELECT id, apartment_code, apartment_name
+                 FROM apartments WHERE id = ? LIMIT 1"
+            );
+            $aStmt->execute([$apartmentId]);
+            $apt = $aStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$apt) jsonResponse(false, 'Apartment not found.');
+        }
 
         /* Menu */
         $mStmt = $pdo->prepare(
@@ -126,14 +182,32 @@ try {
         $menu = $mStmt->fetch(PDO::FETCH_ASSOC);
         if (!$menu) jsonResponse(false, 'Menu not found.');
 
-        /* Build WHERE — scope by menu window, apartment, not cancelled */
+        /* WHERE base */
         $where = [
-            "o.apartment_id = ?",
             "o.status <> 'cancelled'",
             "o.created_at BETWEEN ? AND ?"
         ];
-        $params = [$apartmentId, $menu['start_at'], $menu['end_at']];
+        $params = [$menu['start_at'], $menu['end_at']];
 
+        if ($isIndividual) {
+            $where[] = "(
+                o.address_type = 'individual_house'
+                OR (
+                    JSON_VALID(o.address_json)
+                    AND (
+                        JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_id')) IS NULL
+                        OR JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_name')) IS NULL
+                    )
+                    AND o.delivery_mode = 'delivery'
+                )
+            )";
+        } else {
+            $where[] = "o.address_type = 'apartment'";
+            $where[] = "CAST(JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_id')) AS UNSIGNED) = ?";
+            $params[] = $apartmentId;
+        }
+
+        /* Date filter */
         if ($date === 'today') {
             $where[] = "DATE(o.created_at) = CURDATE()";
         } elseif ($date === 'yesterday') {
@@ -156,10 +230,22 @@ try {
 
         $whereSql = 'WHERE ' . implode(' AND ', $where);
 
-        $sql = "SELECT o.id, o.order_code, o.customer_name, o.customer_mobile,
-                       o.division, o.subtotal, o.total_amount,
-                       o.products_json, o.status, o.payment_status, o.created_at
+        $sql = "SELECT
+                    o.id, o.order_code,
+                    o.customer_id,
+                    c.full_name       AS customer_name,
+                    c.mobile_number   AS customer_mobile,
+                    o.address_type,
+                    CASE WHEN JSON_VALID(o.address_json)
+                         THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.division_label'))
+                         ELSE NULL END AS division,
+                    CASE WHEN JSON_VALID(o.address_json)
+                         THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.full_address'))
+                         ELSE NULL END AS full_address,
+                    o.subtotal, o.total_amount,
+                    o.products_json, o.status, o.payment_status, o.created_at
                 FROM orders o
+                LEFT JOIN customers c ON c.customer_id = o.customer_id
                 $whereSql
                 ORDER BY o.created_at DESC, o.id DESC
                 LIMIT 500";
@@ -216,12 +302,18 @@ try {
 
             $totalAmount += (float)$r['total_amount'];
 
+            $divisionLabel = $r['division'] ?: '';
+            if (!$divisionLabel && !empty($r['full_address'])) {
+                $divisionLabel = $r['full_address'];
+            }
+
             $orders[] = [
                 'id'              => (int)$r['id'],
                 'order_code'      => $r['order_code'],
-                'customer_name'   => $r['customer_name'],
-                'customer_mobile' => $r['customer_mobile'],
-                'division'        => $r['division'],
+                'customer_name'   => $r['customer_name']   ?: '—',
+                'customer_mobile' => $r['customer_mobile'] ?: '—',
+                'address_type'    => $r['address_type'] ?: 'apartment',
+                'division'        => $divisionLabel,
                 'status'          => $r['status'],
                 'payment_status'  => $r['payment_status'],
                 'total_amount'    => (float)$r['total_amount'],
@@ -252,9 +344,10 @@ try {
         usort($products, fn($a, $b) => $b['qty'] - $a['qty']);
 
         jsonResponse(true, 'OK', [
-            'apartment_id'   => (int)$apt['id'],
-            'apartment_code' => $apt['apartment_code'],
-            'apartment_name' => $apt['apartment_name'],
+            'apartment_id'   => $isIndividual ? IH_APARTMENT_ID : (int)$apt['id'],
+            'apartment_code' => $isIndividual ? IH_APARTMENT_CODE : $apt['apartment_code'],
+            'apartment_name' => $isIndividual ? IH_APARTMENT_NAME : $apt['apartment_name'],
+            'is_individual'  => $isIndividual,
             'menu_code'      => $menu['menu_code'],
             'menu_name'      => $menu['menu_name'],
             'kpis' => [

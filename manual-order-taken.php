@@ -417,6 +417,116 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
             color: #948c82;
         }
 
+        /* =====================================================
+           INDIVIDUAL HOUSE — READ-ONLY CARD
+        ===================================================== */
+        .mo-house-card {
+            background: linear-gradient(135deg, #f7fbf7 0%, #eef7f0 100%);
+            border: 1.5px solid #c8e2ca;
+            border-radius: 16px;
+            padding: 18px 20px;
+        }
+
+        .mo-house-head {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .mo-house-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            background: #e8f6ea;
+            color: #2e7d32;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .mo-house-label {
+            font-size: 11.5px;
+            font-weight: 800;
+            color: #2e7d32;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+
+        .mo-house-hint {
+            font-size: 10.5px;
+            color: #6b8b6d;
+            margin-top: 3px;
+            font-weight: 600;
+        }
+
+        .mo-house-address {
+            background: #fff;
+            border: 1px solid #e2efe3;
+            border-radius: 11px;
+            padding: 14px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #302923;
+            line-height: 1.6;
+            margin-bottom: 12px;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .mo-house-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .mo-house-meta a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11.5px;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 9px;
+            text-decoration: none;
+            transition: .15s ease;
+        }
+
+        .mo-house-meta a.map-link {
+            background: #fff5f5;
+            border: 1.5px solid #f1c8cc;
+            color: #b51f2c;
+        }
+
+        .mo-house-meta a.map-link:hover {
+            background: #fbe8e9;
+        }
+
+        .mo-house-meta a.img-link {
+            background: #fdf7ec;
+            border: 1.5px solid #e8d5a8;
+            color: #8a6a1e;
+        }
+
+        .mo-house-meta a.img-link:hover {
+            background: #fbf0da;
+        }
+
+        .mo-house-meta span.no-map {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 8px 14px;
+            border-radius: 9px;
+            background: #f4efe8;
+            border: 1.5px solid #e4ddd3;
+            color: #948c82;
+        }
+
         /* MODE TOGGLE */
         .mo-mode-wrap {
             display: grid;
@@ -1332,7 +1442,6 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
             display: flex;
         }
 
-        /* TAX ROW */
         .mo-totals-row.tax-row strong {
             color: #b8893c;
         }
@@ -1472,60 +1581,98 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
                             </label>
                         </div>
 
-                        <!-- Address (delivery) -->
+                        <!-- ADDRESS (delivery) -->
                         <div id="moDeliveryBlock" style="margin-top:16px;">
-                            <div class="mo-grid-2">
 
-                                <div class="mo-field">
-                                    <label>Apartment <span class="req">*</span></label>
+                            <!-- ============ APARTMENT MODE ============ -->
+                            <div id="moApartmentFields">
 
-                                    <div class="sd-wrap" id="moAptDdWrap">
-                                        <button type="button" class="sd-toggle" id="moAptDdToggle">
-                                            <i class="bi bi-building lead"></i>
-                                            <span class="placeholder" id="moAptDdLabel">— Select apartment —</span>
-                                            <i class="bi bi-chevron-down caret"></i>
-                                        </button>
-
-                                        <div class="sd-menu">
-                                            <div class="sd-search">
-                                                <i class="bi bi-search"></i>
-                                                <input type="text" id="moAptDdSearch"
-                                                    placeholder="Search apartment..." autocomplete="off">
+                                <!-- Auto-filled apartment (read-only) — shown when customer is found -->
+                                <div id="moAptReadOnly" style="display:none;">
+                                    <div class="mo-house-card" style="background:linear-gradient(135deg,#fbe9ea 0%,#fdf1f1 100%);border-color:#f1c8cc;">
+                                        <div class="mo-house-head">
+                                            <div class="mo-house-icon" style="background:#fbe8e9;color:#b51f2c;">
+                                                <i class="bi bi-building"></i>
                                             </div>
-                                            <div class="sd-list" id="moAptDdList"></div>
+                                            <div style="flex:1;min-width:0;">
+                                                <div class="mo-house-label" style="color:#b51f2c;">Apartment</div>
+                                                <div class="mo-house-hint" style="color:#8a6a6e;">Auto-filled from customer profile — read only</div>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <input type="hidden" id="moApartmentId">
-                                    <input type="hidden" id="moApartmentCode">
+                                        <div class="mo-house-address" id="moAptReadOnlyAddress" style="border-color:#f4d8db;">—</div>
+
+                                        <div class="mo-house-meta" id="moAptReadOnlyMeta"></div>
+                                    </div>
                                 </div>
 
-                                <div class="mo-field">
-                                    <label>Division <span class="req">*</span></label>
-
-                                    <div class="sd-wrap" id="moDivDdWrap">
-                                        <button type="button" class="sd-toggle" id="moDivDdToggle" disabled>
-                                            <i class="bi bi-grid-3x3-gap lead"></i>
-                                            <span class="placeholder" id="moDivDdLabel">Select apartment first</span>
-                                            <i class="bi bi-chevron-down caret"></i>
-                                        </button>
-
-                                        <div class="sd-menu">
-                                            <div class="sd-search">
-                                                <i class="bi bi-search"></i>
-                                                <input type="text" id="moDivDdSearch"
-                                                    placeholder="Search division..." autocomplete="off">
+                                <!-- Manual selection (shown for new customers or manual override) -->
+                                <div id="moAptManual" style="display:none;">
+                                    <div class="mo-grid-2">
+                                        <div class="mo-field">
+                                            <label>Apartment <span class="req">*</span></label>
+                                            <div class="sd-wrap" id="moAptDdWrap">
+                                                <button type="button" class="sd-toggle" id="moAptDdToggle">
+                                                    <i class="bi bi-building lead"></i>
+                                                    <span class="placeholder" id="moAptDdLabel">— Select apartment —</span>
+                                                    <i class="bi bi-chevron-down caret"></i>
+                                                </button>
+                                                <div class="sd-menu">
+                                                    <div class="sd-search">
+                                                        <i class="bi bi-search"></i>
+                                                        <input type="text" id="moAptDdSearch" placeholder="Search apartment..." autocomplete="off">
+                                                    </div>
+                                                    <div class="sd-list" id="moAptDdList"></div>
+                                                </div>
                                             </div>
-                                            <div class="sd-list" id="moDivDdList"></div>
+                                            <input type="hidden" id="moApartmentId">
+                                            <input type="hidden" id="moApartmentCode">
+                                        </div>
+
+                                        <div class="mo-field">
+                                            <label>Division <span class="req">*</span></label>
+                                            <div class="sd-wrap" id="moDivDdWrap">
+                                                <button type="button" class="sd-toggle" id="moDivDdToggle" disabled>
+                                                    <i class="bi bi-grid-3x3-gap lead"></i>
+                                                    <span class="placeholder" id="moDivDdLabel">Select apartment first</span>
+                                                    <i class="bi bi-chevron-down caret"></i>
+                                                </button>
+                                                <div class="sd-menu">
+                                                    <div class="sd-search">
+                                                        <i class="bi bi-search"></i>
+                                                        <input type="text" id="moDivDdSearch" placeholder="Search division..." autocomplete="off">
+                                                    </div>
+                                                    <div class="sd-list" id="moDivDdList"></div>
+                                                </div>
+                                            </div>
+                                            <input type="hidden" id="moDivision">
+                                            <input type="hidden" id="moDivisionCharge" value="0">
+                                            <p class="mo-hint" id="moDivisionHint"></p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+
+                            <!-- ============ INDIVIDUAL HOUSE MODE (read-only) ============ -->
+                            <div id="moHouseFields" style="display:none;">
+                                <div class="mo-house-card">
+                                    <div class="mo-house-head">
+                                        <div class="mo-house-icon">
+                                            <i class="bi bi-house-door"></i>
+                                        </div>
+                                        <div style="flex:1;min-width:0;">
+                                            <div class="mo-house-label">Individual House</div>
+                                            <div class="mo-house-hint">Auto-filled from customer profile — read only</div>
                                         </div>
                                     </div>
 
-                                    <input type="hidden" id="moDivision">
-                                    <input type="hidden" id="moDivisionCharge" value="0">
+                                    <div class="mo-house-address" id="moHouseAddress">—</div>
 
-                                    <p class="mo-hint" id="moDivisionHint"></p>
+                                    <div class="mo-house-meta" id="moHouseMeta"></div>
                                 </div>
                             </div>
+
                         </div>
 
                         <!-- Branch (pickup) -->
@@ -1577,7 +1724,6 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
                             </label>
                         </div>
 
-                        <!-- WALLET PANEL -->
                         <div class="mo-wallet-box" id="moWalletPanel" style="display:none;">
                             <div class="mo-wallet-row">
                                 <div>
@@ -1648,7 +1794,6 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
                             <strong id="moCharge">₹0</strong>
                         </div>
 
-                        <!-- Tax row (only shown when tax enabled) -->
                         <div class="mo-totals-row tax-row" id="moTaxRow" style="display:none;">
                             <span id="moTaxLabel">Tax</span>
                             <strong id="moTax">₹0</strong>
@@ -1786,9 +1931,7 @@ $taxType   = $settings['tax_type'] ?? 'exclusive';
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/manual-order-taken.js"></script>
-<script>
-    
-    </script>
+
 </body>
 
 </html>

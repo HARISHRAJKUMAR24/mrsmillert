@@ -1,6 +1,8 @@
 /* =========================================================
    MRS MILL@ — MENU + APARTMENT ORDERS
-   File: ./js/menu-apartment-orders.js
+   File: ./js/apartment-orders.js
+   - Apartment vs Individual House segmented toggle
+   - IH queries summary with apartment_id = -1
    ========================================================= */
 
 (function () {
@@ -10,13 +12,21 @@
         ? window.ADMIN_URL
         : "./";
 
+    const IH_ID = "-1";
+
     /* DOM — Menu */
-    const menuDdWrap   = document.getElementById("aoMenuDdWrap");
-    const menuDdToggle = document.getElementById("aoMenuDdToggle");
-    const menuDdLabel  = document.getElementById("aoMenuDdLabel");
-    const menuDdSearch = document.getElementById("aoMenuDdSearch");
-    const menuDdList   = document.getElementById("aoMenuDdList");
+    const menuDdWrap    = document.getElementById("aoMenuDdWrap");
+    const menuDdToggle  = document.getElementById("aoMenuDdToggle");
+    const menuDdLabel   = document.getElementById("aoMenuDdLabel");
+    const menuDdSearch  = document.getElementById("aoMenuDdSearch");
+    const menuDdList    = document.getElementById("aoMenuDdList");
     const menuCodeInput = document.getElementById("aoMenuCode");
+
+    /* DOM — Address type toggle */
+    const segWrap   = document.getElementById("aoAddressSeg");
+    const segBtns   = segWrap ? segWrap.querySelectorAll("button[data-type]") : [];
+    const aptWrap   = document.getElementById("aoAptWrap");
+    const ihNote    = document.getElementById("aoIHNote");
 
     /* DOM — Apartment */
     const aptDdWrap    = document.getElementById("aoAptDdWrap");
@@ -28,23 +38,24 @@
     const aptCodeInput = document.getElementById("aoApartmentCode");
 
     /* DOM — Date */
-    const dateFilter   = document.getElementById("aoDateFilter");
-    const customWrap   = document.getElementById("aoCustomWrap");
-    const dateFrom     = document.getElementById("aoDateFrom");
-    const dateTo       = document.getElementById("aoDateTo");
+    const dateFilter = document.getElementById("aoDateFilter");
+    const customWrap = document.getElementById("aoCustomWrap");
+    const dateFrom   = document.getElementById("aoDateFrom");
+    const dateTo     = document.getElementById("aoDateTo");
 
     /* DOM — KPIs + Results */
-    const kpisWrap     = document.getElementById("aoKpis");
-    const kpiOrders    = document.getElementById("kpiOrders");
-    const kpiProducts  = document.getElementById("kpiProducts");
-    const kpiQty       = document.getElementById("kpiQty");
-    const kpiAmount    = document.getElementById("kpiAmount");
-    const resultsWrap  = document.getElementById("aoResultsWrap");
+    const kpisWrap    = document.getElementById("aoKpis");
+    const kpiOrders   = document.getElementById("kpiOrders");
+    const kpiProducts = document.getElementById("kpiProducts");
+    const kpiQty      = document.getElementById("kpiQty");
+    const kpiAmount   = document.getElementById("kpiAmount");
+    const resultsWrap = document.getElementById("aoResultsWrap");
 
     /* STATE */
     let menusCache      = [];
     let apartmentsCache = [];
     let loading         = false;
+    let activeType      = "apartment"; /* 'apartment' | 'individual_house' */
 
     /* HELPERS */
     function esc(s) {
@@ -90,6 +101,58 @@
     function payClass(s) {
         return s === "paid" ? "ao-pay-paid" : "ao-pay-unpaid";
     }
+
+    /* =========================================
+       ADDRESS TYPE TOGGLE
+       ========================================= */
+    function setActiveType(type) {
+        activeType = type;
+
+        segBtns.forEach(b => {
+            b.classList.toggle("active", b.dataset.type === type);
+        });
+
+        if (type === "individual_house") {
+            /* Hide apartment dropdown, show IH note */
+            if (aptWrap) aptWrap.style.display = "none";
+            if (ihNote)  ihNote.style.display = "flex";
+            closeAptDd();
+
+            /* Clear apartment selection; use sentinel */
+            aptIdInput.value   = IH_ID;
+            aptCodeInput.value = "INDIVIDUAL";
+
+            /* If menu is selected → load results immediately */
+            if (menuCodeInput.value) {
+                loadOrders();
+            } else {
+                resetResults();
+            }
+        } else {
+            /* Apartment mode → show dropdown */
+            if (aptWrap) aptWrap.style.display = "";
+            if (ihNote)  ihNote.style.display = "none";
+
+            /* Reset selection */
+            aptIdInput.value   = "";
+            aptCodeInput.value = "";
+            aptDdLabel.textContent = menuCodeInput.value
+                ? "— Select apartment —"
+                : "— Select menu first —";
+            aptDdLabel.classList.add("placeholder");
+            aptDdToggle.classList.remove("has-value");
+            aptDdToggle.disabled = !menuCodeInput.value;
+
+            resetResults();
+        }
+    }
+
+    segBtns.forEach(btn => {
+        btn.addEventListener("click", function () {
+            if (btn.classList.contains("active")) return;
+            setActiveType(btn.dataset.type);
+        });
+    });
 
     /* =========================================
        MENU DROPDOWN
@@ -164,18 +227,24 @@
 
         closeMenuDd();
 
+        /* Reset apartment side */
+        apartmentsCache    = [];
         aptDdToggle.disabled = false;
 
-        aptIdInput.value = "";
+        aptIdInput.value   = "";
         aptCodeInput.value = "";
         aptDdLabel.textContent = "— Select apartment —";
         aptDdLabel.classList.add("placeholder");
         aptDdToggle.classList.remove("has-value");
 
-        /* Reset apartment cache and force reload */
-        apartmentsCache = [];
-
-        resetResults();
+        /* If IH is active, immediately load */
+        if (activeType === "individual_house") {
+            aptIdInput.value   = IH_ID;
+            aptCodeInput.value = "INDIVIDUAL";
+            loadOrders();
+        } else {
+            resetResults();
+        }
     });
 
     /* =========================================
@@ -201,8 +270,8 @@
             return;
         }
 
-        aptDdList.innerHTML = list.slice(0, 60).map(a => {
-            const selected = Number(aptIdInput.value) === Number(a.id);
+        aptDdList.innerHTML = list.slice(0, 80).map(a => {
+            const selected = String(aptIdInput.value) === String(a.id);
             const count    = a.order_count || 0;
             return `
                 <div class="sd-option ${selected ? 'selected' : ''}"
@@ -228,7 +297,6 @@
             setTimeout(() => aptDdSearch.focus(), 60);
         }
 
-        /* If cache empty → fetch apartments via the single endpoint */
         if (!apartmentsCache.length) {
             aptDdList.innerHTML = `<div class="sd-empty">Loading apartments…</div>`;
 
@@ -237,10 +305,11 @@
             })
                 .then(res => {
                     if (!res || !res.success || !Array.isArray(res.data)) {
-                        aptDdList.innerHTML = `<div class="sd-empty">Failed to load.</div>`;
+                        aptDdList.innerHTML = `<div class="sd-empty">${esc((res && res.message) || 'Failed to load.')}</div>`;
                         return;
                     }
-                    apartmentsCache = res.data;
+                    /* Keep only real apartments — IH is a toggle now */
+                    apartmentsCache = res.data.filter(a => !a.is_individual && Number(a.id) > 0);
                     renderAptOptions("");
                 })
                 .catch(() => {
@@ -278,7 +347,6 @@
         aptDdToggle.classList.add("has-value");
 
         closeAptDd();
-
         loadOrders();
     });
 
@@ -288,7 +356,7 @@
     });
 
     /* =========================================
-       SINGLE AJAX CALL
+       AJAX
        ========================================= */
     function ajaxCall(action, params) {
         const p = new URLSearchParams();
@@ -332,14 +400,14 @@
     });
 
     /* =========================================
-       RESET RESULTS
+       RESET
        ========================================= */
     function resetResults() {
         kpisWrap.style.display = "none";
         resultsWrap.innerHTML = `
             <div class="ao-empty">
                 <i class="bi bi-funnel"></i>
-                <h3>Pick a menu and apartment</h3>
+                <h3>Pick a menu and address type</h3>
                 <p>Orders will appear here grouped by product.</p>
             </div>`;
     }
@@ -414,6 +482,7 @@
         const aptCode  = data.apartment_code || "";
         const menuName = data.menu_name || "";
         const menuCode = data.menu_code || "";
+        const isIH     = data.is_individual === true;
 
         if (data.kpis) {
             kpiOrders.textContent   = data.kpis.order_count   || 0;
@@ -430,12 +499,12 @@
                 <div class="ao-empty">
                     <i class="bi bi-inbox"></i>
                     <h3>No orders found</h3>
-                    <p>No orders for <strong>${esc(aptName)}</strong> in menu <strong>#${esc(menuCode)}</strong> during this date range.</p>
+                    <p>No ${isIH ? '<strong>Individual House</strong>' : '<strong>' + esc(aptName) + '</strong>'} orders in menu <strong>#${esc(menuCode)}</strong> during this date range.</p>
                 </div>`;
             return;
         }
 
-        /* ---- Products table (row-style) ---- */
+        /* ---- Products table ---- */
         const productsHtml = products.map(p => {
             const thumb = p.image
                 ? `<img src="${esc(p.image)}" alt="" onerror="this.style.display='none';this.parentElement.innerHTML='📦';">`
@@ -473,38 +542,51 @@
         }).join("");
 
         /* ---- Orders table ---- */
-        const ordersHtml = orders.map(o => `
-            <tr>
-                <td>
-                    <div class="ao-order-code">#${esc(o.order_code)}</div>
-                    <div class="ao-order-time">${esc(fmtDate(o.created_at))}</div>
-                </td>
-                <td>
-                    <div class="ao-order-name">${esc(o.customer_name)}</div>
-                    <div class="ao-order-time">${esc(o.customer_mobile)}</div>
-                </td>
-                <td>
-                    <div class="ao-order-name">Div ${esc(o.division || '—')}</div>
-                    <div class="ao-order-time">${esc(o.items_summary || '—')}</div>
-                </td>
-                <td>
-                    <span class="ao-status-badge ${statusClass(o.status)}">${esc(o.status)}</span>
-                </td>
-                <td>
-                    <span class="ao-pay-badge ${payClass(o.payment_status)}">${esc(o.payment_status)}</span>
-                </td>
-                <td style="text-align:right;">
-                    <div class="ao-order-amt">${money(o.total_amount)}</div>
-                </td>
-            </tr>
-        `).join("");
+        const ordersHtml = orders.map(o => {
+            const isOrderIH = (o.address_type || '') === 'individual_house';
+            const addrCell  = isOrderIH
+                ? `<div class="ao-order-name">
+                        <span style="background:#eef7f0;color:#2e7d32;padding:3px 8px;border-radius:999px;font-size:10px;font-weight:800;display:inline-flex;align-items:center;gap:4px;">
+                            <i class="bi bi-house-door"></i> Individual House
+                        </span>
+                   </div>
+                   <div class="ao-order-time">${esc(o.division || '—')}</div>`
+                : `<div class="ao-order-name">Div ${esc(o.division || '—')}</div>
+                   <div class="ao-order-time">${esc(o.items_summary || '—')}</div>`;
+
+            return `
+                <tr>
+                    <td>
+                        <div class="ao-order-code">#${esc(o.order_code)}</div>
+                        <div class="ao-order-time">${esc(fmtDate(o.created_at))}</div>
+                    </td>
+                    <td>
+                        <div class="ao-order-name">${esc(o.customer_name)}</div>
+                        <div class="ao-order-time">${esc(o.customer_mobile)}</div>
+                    </td>
+                    <td>${addrCell}</td>
+                    <td>
+                        <span class="ao-status-badge ${statusClass(o.status)}">${esc(o.status)}</span>
+                    </td>
+                    <td>
+                        <span class="ao-pay-badge ${payClass(o.payment_status)}">${esc(o.payment_status)}</span>
+                    </td>
+                    <td style="text-align:right;">
+                        <div class="ao-order-amt">${money(o.total_amount)}</div>
+                    </td>
+                </tr>
+            `;
+        }).join("");
+
+        const titleIcon = isIH ? 'bi-house-door' : 'bi-box-seam';
+        const titleCode = (!isIH && aptCode) ? '· #' + esc(aptCode) : '';
 
         resultsWrap.innerHTML = `
             <div class="ao-card">
                 <div class="ao-card-head">
                     <h2 class="ao-card-title">
-                        <i class="bi bi-box-seam"></i>
-                        ${esc(aptName)} ${aptCode ? '· #' + esc(aptCode) : ''}
+                        <i class="bi ${titleIcon}"></i>
+                        ${esc(aptName)} ${titleCode}
                         ${menuName ? ' · ' + esc(menuName) : ''}
                     </h2>
                     <span class="ao-badge">
@@ -550,7 +632,7 @@
                             <tr>
                                 <th>Order</th>
                                 <th>Customer</th>
-                                <th>Division / Items</th>
+                                <th>Address / Items</th>
                                 <th>Status</th>
                                 <th>Payment</th>
                                 <th style="text-align:right;">Amount</th>
@@ -566,7 +648,7 @@
     }
 
     /* =========================================
-       INIT — load menus via single endpoint
+       INIT
        ========================================= */
     (function init() {
         menuDdList.innerHTML = `<div class="sd-empty">Loading menus…</div>`;

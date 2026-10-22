@@ -1,8 +1,7 @@
 <?php
 /* =========================================================
    MRS MILL@ — AJAX: DELETE APARTMENT
-   File: ./ajax/delete.php
-   Returns JSON: { success, message }
+   File: ./ajax/delete-apartment.php
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -20,26 +19,19 @@ if ($id <= 0) {
 }
 
 try {
-
     $pdo->beginTransaction();
-
-    /* Delete the apartment */
     $delApt = $pdo->prepare("DELETE FROM apartments WHERE id = ?");
     $delApt->execute([$id]);
 
     if ($delApt->rowCount() < 1) {
-        throw new PDOException('Apartment not found.');
+        $pdo->rollBack();
+        jsonResponse(false, 'Apartment not found.');
     }
 
     $pdo->commit();
-
     jsonResponse(true, 'Apartment deleted successfully.');
 
 } catch (PDOException $e) {
-
-    if ($pdo->inTransaction()) {
-        $pdo->rollBack();
-    }
-
+    if ($pdo->inTransaction()) $pdo->rollBack();
     jsonResponse(false, 'Failed to delete apartment: ' . $e->getMessage());
 }

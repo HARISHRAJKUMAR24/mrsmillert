@@ -1,6 +1,8 @@
 /* =========================================================
    MRS MILL@ — EDIT APARTMENT UX
    File: ./js/edit-apartment.js
+   Variant rows: Block + Door No + Floor + Delivery Charge
+   Backward-compatible with old {division, charge} rows.
    ========================================================= */
 
 (function () {
@@ -35,7 +37,6 @@
 
     if (!form) return;
 
-    /* Always fetch fresh at call time — never cache */
     function getBranchSelect() {
         return document.getElementById("branch_id");
     }
@@ -84,7 +85,6 @@
         `;
 
         document.body.appendChild(errorOverlay);
-
         errorText = errorOverlay.querySelector("#errorText");
 
         errorOverlay.addEventListener("click", function (e) {
@@ -102,25 +102,16 @@
             .addEventListener("click", closeErrorPopup);
 
         if (!document.getElementById("mmErrorStyles")) {
-
             const style = document.createElement("style");
             style.id = "mmErrorStyles";
             style.textContent = `
-                .mm-modal-icon-error {
-                    background: #fdecec;
-                    color: #b51f2c;
-                }
-
+                .mm-modal-icon-error { background: #fdecec; color: #b51f2c; }
                 .mm-btn-danger {
                     background: #b51f2c;
                     color: #fff;
                     box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
                 }
-
-                .mm-btn-danger:hover {
-                    background: #8e1722;
-                    color: #fff;
-                }
+                .mm-btn-danger:hover { background: #8e1722; color: #fff; }
             `;
             document.head.appendChild(style);
         }
@@ -214,40 +205,78 @@
             .replace(/>/g, "&gt;");
     }
 
-    function getFirstDivisionCharge() {
-        const firstCharge = divisionRows.querySelector(".division-charge");
+    function getFirstVariantCharge() {
+        const firstCharge = divisionRows.querySelector(".variant-charge");
         if (!firstCharge) return "";
         const val = firstCharge.value.trim();
         return val === "" ? "" : val;
     }
 
     /* =========================================
-       DIVISION ROW
+       VARIANT ROW
+       data = { block, door_no, floor, charge }
+       Legacy fallback: if only {division, charge} exists,
+       treat division as door_no.
     ========================================= */
 
-    function createDivisionRow(division, charge) {
+    function createDivisionRow(data) {
+
+        data = data || {};
+
+        /* Migrate old shape: {division, charge} → door_no */
+        if (
+            (data.block === undefined) &&
+            (data.door_no === undefined) &&
+            (data.floor === undefined) &&
+            (data.division !== undefined)
+        ) {
+            data = {
+                block: "",
+                door_no: String(data.division || ""),
+                floor: "",
+                charge: data.charge
+            };
+        }
 
         const row = document.createElement("div");
         row.className = "division-row";
 
         row.innerHTML = `
             <div class="division-field">
-                <i class="bi bi-grid-3x3-gap"></i>
+                <i class="bi bi-signpost-2"></i>
                 <input type="text"
-                       class="division-name"
-                       placeholder="Division (Eg: A, B, 101)"
+                       class="variant-block"
+                       placeholder="Block (Eg: A, B)"
                        maxlength="30"
-                       value="${escapeAttr(division || "")}">
+                       value="${escapeAttr(data.block || "")}">
+            </div>
+
+            <div class="division-field">
+                <i class="bi bi-door-closed"></i>
+                <input type="text"
+                       class="variant-door"
+                       placeholder="Door No (Eg: 101)"
+                       maxlength="30"
+                       value="${escapeAttr(data.door_no || "")}">
+            </div>
+
+            <div class="division-field">
+                <i class="bi bi-layers"></i>
+                <input type="text"
+                       class="variant-floor"
+                       placeholder="Floor (Eg: 1, G)"
+                       maxlength="30"
+                       value="${escapeAttr(data.floor || "")}">
             </div>
 
             <div class="division-field charge">
                 <span class="rupee">₹</span>
                 <input type="number"
-                       class="division-charge"
+                       class="variant-charge"
                        placeholder="0.00"
                        min="0"
                        step="0.01"
-                       value="${escapeAttr(charge || "")}">
+                       value="${escapeAttr(data.charge || "")}">
             </div>
 
             <button type="button"
@@ -266,19 +295,16 @@
         return row;
     }
 
-    function addDivisionRow(division, charge, skipAutoFill) {
+    function addDivisionRow(data, skipAutoFill) {
 
-        let finalCharge = charge;
+        data = data || {};
 
         if (!skipAutoFill &&
-            (finalCharge === undefined || finalCharge === null || finalCharge === "")) {
-            finalCharge = getFirstDivisionCharge();
+            (data.charge === undefined || data.charge === null || data.charge === "")) {
+            data.charge = getFirstVariantCharge();
         }
 
-        divisionRows.appendChild(
-            createDivisionRow(division || "", finalCharge || "")
-        );
-
+        divisionRows.appendChild(createDivisionRow(data));
         refreshEmptyState();
     }
 
@@ -292,13 +318,13 @@
     if (addDivBtn) {
         addDivBtn.addEventListener("click", function () {
             addDivisionRow();
-            const inputs = divisionRows.querySelectorAll(".division-name");
+            const inputs = divisionRows.querySelectorAll(".variant-block");
             if (inputs.length) inputs[inputs.length - 1].focus();
         });
     }
 
     /* =========================================
-       COLLECT DIVISIONS
+       COLLECT VARIANTS
     ========================================= */
 
     function collectDivisions() {
@@ -309,25 +335,40 @@
 
         for (let i = 0; i < rows.length; i++) {
 
-            const row      = rows[i];
-            const division = row.querySelector(".division-name").value.trim();
-            const charge   = row.querySelector(".division-charge").value.trim();
+            const row    = rows[i];
+            const block  = row.querySelector(".variant-block").value.trim();
+            const door   = row.querySelector(".variant-door").value.trim();
+            const floor  = row.querySelector(".variant-floor").value.trim();
+            const charge = row.querySelector(".variant-charge").value.trim();
 
-            if (!division) {
-                return { ok: false, message: "Division name is required for row " + (i + 1) + "." };
+            if (!block) {
+                return { ok: false, message: "Block name is required for variant row " + (i + 1) + "." };
+            }
+
+            if (!door) {
+                return { ok: false, message: "Door No is required for variant row " + (i + 1) + "." };
+            }
+
+            if (!floor) {
+                return { ok: false, message: "Floor is required for variant row " + (i + 1) + "." };
             }
 
             if (charge === "" || isNaN(charge) || Number(charge) < 0) {
-                return { ok: false, message: "Valid delivery charge is required for row " + (i + 1) + "." };
+                return { ok: false, message: "Valid delivery charge is required for variant row " + (i + 1) + "." };
             }
 
-            const key = division.toLowerCase();
+            const key = (block + "|" + door + "|" + floor).toLowerCase();
             if (seen[key]) {
-                return { ok: false, message: 'Duplicate division "' + division + '".' };
+                return { ok: false, message: 'Duplicate variant: Block "' + block + '", Door No "' + door + '", Floor "' + floor + '".' };
             }
             seen[key] = true;
 
-            out.push({ division: division, charge: Number(charge) });
+            out.push({
+                block: block,
+                door_no: door,
+                floor: floor,
+                charge: Number(charge)
+            });
         }
 
         return { ok: true, divisions: out };
@@ -370,23 +411,16 @@
                 document.getElementById("apartment_address").value = apt.apartment_address || "";
                 document.getElementById("status").value            = String(apt.status ?? 1);
 
-                /* ✅ Set branch dropdown — robust */
+                /* Set branch dropdown */
                 const sel = getBranchSelect();
                 if (sel) {
                     const bid = (apt.branch_id === null || apt.branch_id === undefined)
                         ? ""
                         : String(apt.branch_id).trim();
 
-                    console.log("[edit-apartment] Setting branch to:", bid);
-
                     if (bid !== "" && bid !== "0") {
                         const exists = Array.from(sel.options).some(o => o.value === bid);
-                        if (exists) {
-                            sel.value = bid;
-                            console.log("[edit-apartment] Branch select value is now:", sel.value);
-                        } else {
-                            console.warn("[edit-apartment] Branch id " + bid + " not in dropdown.");
-                        }
+                        if (exists) sel.value = bid;
                     }
                 }
 
@@ -394,15 +428,15 @@
                     aptCodeBadge.textContent = "#" + (apt.apartment_code || "");
                 }
 
-                /* Fill divisions */
+                /* Fill variants */
                 divisionRows.innerHTML = "";
                 const divs = Array.isArray(apt.divisions) ? apt.divisions : [];
 
                 if (divs.length === 0) {
-                    addDivisionRow("", "", true);
+                    addDivisionRow({}, true);
                 } else {
                     divs.forEach(function (d) {
-                        addDivisionRow(d.division, d.charge, true);
+                        addDivisionRow(d, true);
                     });
                 }
 
@@ -431,7 +465,6 @@
 
         e.preventDefault();
 
-        /* ✅ Always read branch fresh from DOM */
         const sel = getBranchSelect();
 
         const id       = Number(document.getElementById("apartment_id").value || 0);
@@ -439,13 +472,6 @@
         const name     = document.getElementById("apartment_name").value.trim();
         const address  = document.getElementById("apartment_address").value.trim();
         const status   = document.getElementById("status").value;
-
-        console.log("[edit-apartment] Submit:", {
-            id, branchId, name, address, status,
-            selectElement: sel,
-            selectValue: sel ? sel.value : null,
-            selectSelectedIndex: sel ? sel.selectedIndex : null
-        });
 
         if (id <= 0)       return showError("Invalid apartment ID.");
         if (!branchId)     return showError("Please select a branch.");
@@ -459,7 +485,7 @@
         }
 
         if (collected.divisions.length === 0) {
-            return showError("Please add at least one division with a charge.");
+            return showError("Please add at least one variant with a charge.");
         }
 
         setLoading(true);

@@ -1,4 +1,19 @@
 <?php
+/* =========================================================
+   MRS MILL@ — AJAX: PLACE MANUAL ORDER
+   File: ./ajax/manual-place-order.php
+   Orders table stores customer_id as VARCHAR (MRSMCxxxxx).
+   Customer must already be registered.
+
+   Delivery boy resolution (priority order):
+     1. POST delivery_boy_id  → if valid & active, use it (manual override)
+     2. Auto-assign:
+         - Apartment delivery        → lookup APTxxx in apartment_delivery_boys
+         - Individual House delivery → lookup IH_<md5(trim(full_address))>
+         - Pickup                    → null
+     3. null
+   ========================================================= */
+
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/function.php';
 
@@ -11,145 +26,211 @@ if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     jsonResponse(false, 'Not logged in.');
 }
 
-$name           = trim($_POST['customer_name'] ?? '');
 $mobile         = trim($_POST['customer_mobile'] ?? '');
 $mode           = trim($_POST['delivery_mode'] ?? 'delivery');
+$addressType    = trim($_POST['address_type'] ?? 'apartment');
 $apartmentId    = (int)($_POST['apartment_id'] ?? 0);
 $division       = trim($_POST['division'] ?? '');
 $divisionCharge = (float)($_POST['division_charge'] ?? 0);
+$fullAddress    = trim($_POST['full_address'] ?? '');
+$mapLink        = trim($_POST['map_link'] ?? '');
 $branchId       = (int)($_POST['pickup_branch_id'] ?? 0);
 $productsJson   = $_POST['products'] ?? '[]';
 $products       = json_decode($productsJson, true);
 $paymentMethod  = trim($_POST['payment_method'] ?? 'qr');
+$forcedBoyId    = (int)($_POST['delivery_boy_id'] ?? 0);   // ← manual override
 
-if (!in_array($paymentMethod, ['qr', 'wallet'], true)) {
-    $paymentMethod = 'qr';
-}
-
-if ($name === '' || mb_strlen($name) < 2) {
-    jsonResponse(false, 'Customer name is required.');
-}
-if (!preg_match('/^[0-9]{10,15}$/', $mobile)) {
-    jsonResponse(false, 'Invalid mobile number.');
-}
-if (!in_array($mode, ['delivery', 'pickup'], true)) {
-    $mode = 'delivery';
-}
-if (!is_array($products) || count($products) === 0) {
-    jsonResponse(false, 'Please add at least one product.');
-}
+if (!in_array($paymentMethod, ['qr', 'wallet'], true)) $paymentMethod = 'qr';
+if (!in_array($addressType, ['apartment', 'individual_house'], true)) $addressType = 'apartment';
+if (!in_array($mode, ['delivery', 'pickup'], true)) $mode = 'delivery';
+if (!preg_match('/^[0-9]{10,15}$/', $mobile)) jsonResponse(false, 'Invalid mobile number.');
+if (!is_array($products) || count($products) === 0) jsonResponse(false, 'Please add at least one product.');
 
 try {
-    /* Ensure wallet column exists */
-    try {
-        $pdo->exec("ALTER TABLE customers ADD COLUMN wallet_balance DECIMAL(10,2) NOT NULL DEFAULT 0.00 AFTER division_charge");
-    } catch (PDOException $e) { /* ignore */
+    /* Lookup customer by mobile */
+    $cStmt = $pdo->prepare(
+        "SELECT id, customer_id, full_name, mobile_number, wallet_balance, address_json
+         FROM customers WHERE mobile_number = ? LIMIT 1"
+    );
+    $cStmt->execute([$mobile]);
+    $customer = $cStmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$customer) {
+        jsonResponse(false, 'Customer not found. Customer must register first.');
     }
 
-    /* Ensure simplified container table exists */
-    try {
-        $pdo->exec("CREATE TABLE IF NOT EXISTS order_containers (
-            id INT(11) NOT NULL AUTO_INCREMENT,
-            order_id INT(11) NOT NULL,
-            customer_id INT(11) DEFAULT NULL,
-            total_containers INT(11) NOT NULL DEFAULT 0,
-            container_amount DECIMAL(10,2) NOT NULL DEFAULT 0.00,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP(),
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP() ON UPDATE CURRENT_TIMESTAMP(),
-            PRIMARY KEY (id),
-            UNIQUE KEY order_unique (order_id),
-            KEY customer_id (customer_id)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci");
-    } catch (PDOException $e) { /* ignore */
-    }
+    $customerRowId = (int)$customer['id'];              // integer primary key
+    $customerId    = (string)$customer['customer_id'];  // varchar MRSMCxxxxx
 
+    /* ---------- Address JSON ---------- */
+    $addressJson   = [];
+    $branchName    = '';
     $apartmentCode = '';
     $apartmentName = '';
-    $branchName    = '';
 
     if ($mode === 'delivery') {
-        if ($apartmentId <= 0 || $division === '') {
-            jsonResponse(false, 'Please choose apartment + division.');
-        }
+        if ($addressType === 'apartment') {
+            if ($apartmentId <= 0 || $division === '') {
+                jsonResponse(false, 'Please choose apartment + division.');
+            }
 
-        $aStmt = $pdo->prepare(
-            "SELECT apartment_code, apartment_name, divisions
-             FROM apartments
-             WHERE id = ? AND status = 1
-             LIMIT 1"
-        );
-        $aStmt->execute([$apartmentId]);
-        $apt = $aStmt->fetch(PDO::FETCH_ASSOC);
-        if (!$apt) jsonResponse(false, 'Apartment not found.');
+            $aStmt = $pdo->prepare(
+                "SELECT apartment_code, apartment_name, divisions
+                 FROM apartments WHERE id = ? AND status = 1 LIMIT 1"
+            );
+            $aStmt->execute([$apartmentId]);
+            $apt = $aStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$apt) jsonResponse(false, 'Apartment not found.');
 
-        $apartmentCode = $apt['apartment_code'];
-        $apartmentName = $apt['apartment_name'];
+            $apartmentCode = $apt['apartment_code'];
+            $apartmentName = $apt['apartment_name'];
 
-        $divs = json_decode($apt['divisions'] ?? '[]', true);
-        $matched = null;
-        if (is_array($divs)) {
-            foreach ($divs as $d) {
-                if (strcasecmp(trim($d['division'] ?? ''), $division) === 0) {
-                    $matched = (float)($d['charge'] ?? 0);
-                    break;
+            $block = ''; $door = ''; $floor = '';
+            foreach (array_map('trim', explode('/', $division)) as $p) {
+                if (stripos($p, 'Blk ') === 0) $block = trim(substr($p, 4));
+                elseif (stripos($p, 'Door ') === 0) $door = trim(substr($p, 5));
+                elseif (stripos($p, 'Fl ') === 0) $floor = trim(substr($p, 3));
+            }
+
+            $divs = json_decode($apt['divisions'] ?? '[]', true);
+            $matched = null;
+            if (is_array($divs)) {
+                foreach ($divs as $d) {
+                    $parts = [];
+                    if (!empty($d['block']))   $parts[] = "Blk " . $d['block'];
+                    if (!empty($d['door_no'])) $parts[] = "Door " . $d['door_no'];
+                    if (!empty($d['floor']))   $parts[] = "Fl " . $d['floor'];
+                    $label = $parts ? implode(" / ", $parts) : (string)($d['division'] ?? "");
+
+                    if (strcasecmp($label, $division) === 0 ||
+                        strcasecmp((string)($d['division'] ?? ''), $division) === 0) {
+                        $matched = (float)($d['charge'] ?? 0);
+                        break;
+                    }
                 }
             }
+            if ($matched === null) jsonResponse(false, 'Division is not valid for this apartment.');
+            $divisionCharge = $matched;
+
+            $addressJson = [
+                'apartment_id'   => $apartmentId,
+                'apartment_code' => $apartmentCode,
+                'apartment_name' => $apartmentName,
+                'block'          => $block,
+                'door_no'        => $door,
+                'floor'          => $floor,
+                'division_label' => $division,
+                'charge'         => $divisionCharge,
+            ];
+
+        } else {
+            /* individual_house */
+            if ($fullAddress === '') jsonResponse(false, 'Full address is required for individual house delivery.');
+
+            $apartmentId    = 0;
+            $apartmentCode  = '';
+            $apartmentName  = '';
+            $division       = '';
+            $divisionCharge = 0;
+
+            $houseImage = '';
+            $custAddr = json_decode($customer['address_json'] ?? '{}', true);
+            if (is_array($custAddr) && !empty($custAddr['house_image'])) {
+                $houseImage = $custAddr['house_image'];
+            }
+
+            $addressJson = [
+                'full_address' => $fullAddress,
+                'house_image'  => $houseImage,
+            ];
         }
-        if ($matched === null) {
-            jsonResponse(false, 'Division is not valid for this apartment.');
-        }
-        $divisionCharge = $matched;
+
     } else {
+        /* pickup */
         $apartmentId    = 0;
         $apartmentCode  = '';
         $apartmentName  = '';
         $division       = '';
         $divisionCharge = 0;
 
-        if ($branchId <= 0) {
-            jsonResponse(false, 'Please select a pickup branch.');
-        }
+        if ($branchId <= 0) jsonResponse(false, 'Please select a pickup branch.');
         $bStmt = $pdo->prepare("SELECT branch_name FROM settings_branches WHERE id = ? LIMIT 1");
         $bStmt->execute([$branchId]);
         $branchName = $bStmt->fetchColumn() ?: '';
-        if ($branchName === '') {
-            jsonResponse(false, 'Invalid pickup branch.');
-        }
+        if ($branchName === '') jsonResponse(false, 'Invalid pickup branch.');
+
+        $addressJson = [
+            'branch_id'   => $branchId,
+            'branch_name' => $branchName,
+        ];
+
+        $addressType = 'pickup';
     }
 
-    /* Auto-assign delivery boy */
+    $addressJsonFinal = json_encode($addressJson, JSON_UNESCAPED_UNICODE);
+
+    /* =========================================================
+       DELIVERY BOY RESOLUTION
+       1) Manual override (POST delivery_boy_id) if valid + active
+       2) Auto-assign by address
+       3) null
+       ========================================================= */
     $deliveryBoyId = null;
-    if ($mode === 'delivery' && $apartmentCode !== '') {
-        try {
-            $dBoyStmt = $pdo->prepare(
-                "SELECT adb.delivery_boy_id
-                 FROM apartment_delivery_boys adb
-                 INNER JOIN delivery_boys db ON db.id = adb.delivery_boy_id
-                 WHERE adb.apartment_code = ?
-                   AND db.status = 1
-                 LIMIT 1"
-            );
-            $dBoyStmt->execute([$apartmentCode]);
-            $row = $dBoyStmt->fetch(PDO::FETCH_ASSOC);
-            if ($row) $deliveryBoyId = (int)$row['delivery_boy_id'];
-        } catch (PDOException $e) {
+
+    if ($mode === 'delivery') {
+
+        /* ---- 1) Manual override ---- */
+        if ($forcedBoyId > 0) {
+            try {
+                $chk = $pdo->prepare(
+                    "SELECT id FROM delivery_boys WHERE id = ? AND status = 1 LIMIT 1"
+                );
+                $chk->execute([$forcedBoyId]);
+                if ($chk->fetch()) {
+                    $deliveryBoyId = $forcedBoyId;
+                }
+            } catch (PDOException $e) {
+                /* fall through to auto-assign */
+            }
+        }
+
+        /* ---- 2) Auto-assign by address (only if override didn't stick) ---- */
+        if ($deliveryBoyId === null) {
+
+            $lookupCode = '';
+
+            if ($addressType === 'apartment' && $apartmentCode !== '') {
+                $lookupCode = $apartmentCode;
+            } elseif ($addressType === 'individual_house' && $fullAddress !== '') {
+                $lookupCode = 'IH_' . substr(md5(trim($fullAddress)), 0, 12);
+            }
+
+            if ($lookupCode !== '') {
+                try {
+                    $dBoyStmt = $pdo->prepare(
+                        "SELECT adb.delivery_boy_id
+                         FROM apartment_delivery_boys adb
+                         INNER JOIN delivery_boys db ON db.id = adb.delivery_boy_id
+                         WHERE adb.apartment_code = ?
+                           AND db.status = 1
+                         ORDER BY adb.id ASC
+                         LIMIT 1"
+                    );
+                    $dBoyStmt->execute([$lookupCode]);
+                    $row = $dBoyStmt->fetch(PDO::FETCH_ASSOC);
+                    if ($row) {
+                        $deliveryBoyId = (int)$row['delivery_boy_id'];
+                    }
+                } catch (PDOException $e) {
+                    /* silent */
+                }
+            }
         }
     }
 
-    /* Find customer id (for container mapping) */
-    $customerId = null;
-    try {
-        $ccStmt = $pdo->prepare("SELECT id FROM customers WHERE mobile_number = ? LIMIT 1");
-        $ccStmt->execute([$mobile]);
-        $cid = $ccStmt->fetchColumn();
-        if ($cid) $customerId = (int)$cid;
-    } catch (PDOException $e) {
-    }
-
-    /* ---------- Build items ---------- */
+    /* Build items */
     $items = [];
     $subtotal = 0;
-
     $totalContainers = 0;
     $containerAmount = 0;
 
@@ -186,127 +267,83 @@ try {
         ];
     }
 
-    /* =====================================================
-       APPLY TAX (from settings) — ROUNDED TO WHOLE RUPEE
-       - Exclusive : tax = subtotal × rate%   (added on top)
-       - Inclusive : tax is inside subtotal   (back-calculated)
-       - Delivery charge is NOT taxed
-       - Container deposit is NOT taxed
-       - Everything rounded to nearest rupee (no decimals)
-    ===================================================== */
+    /* Tax */
     $settings   = getSettings($pdo);
     $taxStatus  = (int)($settings['tax_status'] ?? 0);
     $taxRate    = (float)($settings['tax_rate'] ?? 0);
     $taxType    = strtolower($settings['tax_type'] ?? 'exclusive');
+    if (!in_array($taxType, ['inclusive', 'exclusive'], true)) $taxType = 'exclusive';
 
-    if (!in_array($taxType, ['inclusive', 'exclusive'], true)) {
-        $taxType = 'exclusive';
-    }
-
-    $taxAmount           = 0.0;
+    $taxAmount = 0.0;
     $deliveryChargeToAdd = ($mode === 'delivery' ? $divisionCharge : 0);
 
     if ($taxStatus === 1 && $taxRate > 0) {
         if ($taxType === 'inclusive') {
-            $rawTax    = $subtotal - ($subtotal / (1 + ($taxRate / 100)));
-            $taxAmount = round($rawTax);
-            $total     = $subtotal + $deliveryChargeToAdd;
+            $taxAmount = round($subtotal - ($subtotal / (1 + ($taxRate / 100))));
+            $total = $subtotal + $deliveryChargeToAdd;
         } else {
-            $rawTax    = $subtotal * ($taxRate / 100);
-            $taxAmount = round($rawTax);
-            $total     = $subtotal + $deliveryChargeToAdd + $taxAmount;
+            $taxAmount = round($subtotal * ($taxRate / 100));
+            $total = $subtotal + $deliveryChargeToAdd + $taxAmount;
         }
     } else {
-        $taxRate   = 0.0;
+        $taxRate = 0.0;
         $taxAmount = 0.0;
-        $total     = $subtotal + $deliveryChargeToAdd;
+        $total = $subtotal + $deliveryChargeToAdd;
     }
-
-    /* Round the total to a whole rupee (drives QR + wallet + DB) */
     $total = round($total);
 
-    /* ---------- Order code ---------- */
+    /* Order code */
     $last = $pdo->query("SELECT order_code FROM orders ORDER BY id DESC LIMIT 1")->fetchColumn();
     $nextNum = 1;
-    if ($last && preg_match('/(\d+)$/', $last, $m)) {
-        $nextNum = (int)$m[1] + 1;
-    }
+    if ($last && preg_match('/(\d+)$/', $last, $m)) $nextNum = (int)$m[1] + 1;
     $orderCode = 'ORD' . str_pad((string)$nextNum, 6, '0', STR_PAD_LEFT);
 
-    /* ---------- Wallet or QR ---------- */
+    /* Payment */
     $paymentStatus = 'unpaid';
     $paidAt        = null;
     $walletInfo    = null;
     $upiString     = '';
 
     if ($paymentMethod === 'wallet') {
-
         $pdo->beginTransaction();
-
         try {
-            $cStmt = $pdo->prepare(
-                "SELECT id, full_name, wallet_balance
-                 FROM customers
-                 WHERE mobile_number = ?
-                 LIMIT 1
-                 FOR UPDATE"
+            $wStmt = $pdo->prepare(
+                "SELECT id, full_name, wallet_balance FROM customers
+                 WHERE id = ? LIMIT 1 FOR UPDATE"
             );
-            $cStmt->execute([$mobile]);
-            $cust = $cStmt->fetch(PDO::FETCH_ASSOC);
-
-            if (!$cust) {
-                $pdo->rollBack();
-                jsonResponse(false, 'No wallet account found for this mobile. Please use QR payment.');
-            }
+            $wStmt->execute([$customerRowId]);
+            $cust = $wStmt->fetch(PDO::FETCH_ASSOC);
 
             $walletBalance = (float)$cust['wallet_balance'];
-
             if ($walletBalance < $total) {
                 $pdo->rollBack();
-                jsonResponse(
-                    false,
-                    'Insufficient wallet balance. Available: ₹' . number_format($walletBalance, 0) .
-                        ' · Required: ₹' . number_format($total, 0)
-                );
+                jsonResponse(false, 'Insufficient wallet. Available: ₹' . number_format($walletBalance, 0) .
+                    ' · Required: ₹' . number_format($total, 0));
             }
 
             $newBalance = $walletBalance - $total;
 
-            $upd = $pdo->prepare(
-                "UPDATE customers
-                 SET wallet_balance = ?, updated_at = NOW()
-                 WHERE id = ?"
-            );
-            $upd->execute([$newBalance, (int)$cust['id']]);
+            $pdo->prepare("UPDATE customers SET wallet_balance = ?, updated_at = NOW() WHERE id = ?")
+                ->execute([$newBalance, $customerRowId]);
 
             try {
                 $txnCode = 'TXN' . date('ymd') . str_pad((string)random_int(1, 9999), 4, '0', STR_PAD_LEFT);
-
-                $log = $pdo->prepare(
+                $pdo->prepare(
                     "INSERT INTO customer_wallet_transactions
                         (customer_id, customer_name, customer_mobile, txn_code,
                          txn_type, amount, balance_before, balance_after,
                          source, note, created_by_id, created_by_name, created_at)
                      VALUES (?, ?, ?, ?, 'debit', ?, ?, ?, 'admin', ?, ?, ?, NOW())"
-                );
-                $log->execute([
-                    (int)$cust['id'],
-                    $name,
-                    $mobile,
-                    $txnCode,
-                    $total,
-                    $walletBalance,
-                    $newBalance,
+                )->execute([
+                    $customerRowId, $customer['full_name'], $customer['mobile_number'], $txnCode,
+                    $total, $walletBalance, $newBalance,
                     'Manual order ' . $orderCode,
-                    (int)$_SESSION['admin_id'],
-                    $_SESSION['admin_name'] ?? 'Admin'
+                    (int)$_SESSION['admin_id'], $_SESSION['admin_name'] ?? 'Admin',
                 ]);
-            } catch (PDOException $e) { /* ignore */
-            }
+            } catch (PDOException $e) {}
 
             $paymentStatus = 'paid';
             $paidAt        = date('Y-m-d H:i:s');
-            $customerId    = (int)$cust['id'];
             $walletInfo = [
                 'balance_before' => $walletBalance,
                 'balance_after'  => $newBalance,
@@ -317,62 +354,56 @@ try {
             jsonResponse(false, 'Wallet deduction failed.');
         }
     } else {
-        /* QR — build UPI string with WHOLE-RUPEE amount */
         $upiId    = trim($settings['upi_id'] ?? '');
         $siteName = trim($settings['username'] ?? 'Mrs Mill@');
 
-        if ($upiId === '') {
-            jsonResponse(false, 'UPI ID is not configured. Please contact admin.');
-        }
+        if ($upiId === '') jsonResponse(false, 'UPI ID is not configured.');
 
         $upiParams = [
             'pa' => $upiId,
             'pn' => $siteName,
-            'am' => (string)round($total),   // ← whole rupee (no ".00")
+            'am' => (string)round($total),
             'cu' => 'INR',
-            'tn' => 'Order ' . $orderCode
+            'tn' => 'Order ' . $orderCode,
         ];
         $upiString = 'upi://pay?' . http_build_query($upiParams);
     }
 
-    /* ---------- Insert order ---------- */
+    /* Insert order */
     $ins = $pdo->prepare(
         "INSERT INTO orders
-            (order_code, delivery_boy_id, customer_name, customer_mobile,
-             apartment_id, apartment_code, apartment_name,
-             division, division_charge,
-             tax_amount, tax_rate, tax_type,
+            (order_code, customer_id, delivery_boy_id,
+             address_type, address_json,
              delivery_mode,
              pickup_branch_id, pickup_branch_name,
+             division_charge,
+             tax_amount, tax_rate, tax_type,
              subtotal, total_amount, products_json,
              status, delivery_status, payment_status, payment_upi_string, paid_at, created_at)
          VALUES
-            (?, ?, ?, ?,
-             ?, ?, ?,
+            (?, ?, ?,
              ?, ?,
-             ?, ?, ?,
              ?,
              ?, ?,
+             ?,
+             ?, ?, ?,
              ?, ?, ?,
              'pending', 'disabled', ?, ?, ?, NOW())"
     );
 
     $ins->execute([
         $orderCode,
+        $customerId,
         $deliveryBoyId,
-        $name,
-        $mobile,
-        $apartmentId > 0 ? $apartmentId : null,
-        $apartmentCode,
-        $apartmentName,
-        $division,
+        $addressType,
+        $addressJsonFinal,
+        $mode,
+        $branchId > 0 ? $branchId : null,
+        $branchName !== '' ? $branchName : null,
         $divisionCharge,
         $taxAmount,
         $taxRate,
         $taxType,
-        $mode,
-        $branchId > 0 ? $branchId : null,
-        $branchName !== '' ? $branchName : null,
         $subtotal,
         $total,
         json_encode($items, JSON_UNESCAPED_UNICODE),
@@ -383,31 +414,25 @@ try {
 
     $orderId = (int)$pdo->lastInsertId();
 
-    /* ---------- Insert container row ---------- */
+    /* Containers */
     if ($totalContainers > 0) {
         try {
-            $cIns = $pdo->prepare(
+            $pdo->prepare(
                 "INSERT INTO order_containers
                     (order_id, customer_id, total_containers, container_amount, created_at)
                  VALUES (?, ?, ?, ?, NOW())"
-            );
-            $cIns->execute([
-                $orderId,
-                $customerId,
-                $totalContainers,
-                $containerAmount,
-            ]);
-        } catch (PDOException $e) { /* ignore */
-        }
+            )->execute([$orderId, $customerRowId, $totalContainers, $containerAmount]);
+        } catch (PDOException $e) {}
     }
 
-    if ($pdo->inTransaction()) {
-        $pdo->commit();
-    }
+    if ($pdo->inTransaction()) $pdo->commit();
 
     jsonResponse(true, 'Order placed.', [
         'order_id'         => $orderId,
         'order_code'       => $orderCode,
+        'customer_id'      => $customerId,
+        'customer_name'    => $customer['full_name'],
+        'customer_mobile'  => $customer['mobile_number'],
         'subtotal'         => $subtotal,
         'tax_amount'       => $taxAmount,
         'tax_rate'         => $taxRate,
@@ -415,6 +440,7 @@ try {
         'tax_status'       => $taxStatus,
         'total'            => $total,
         'mode'             => $mode,
+        'address_type'     => $addressType,
         'payment_method'   => $paymentMethod,
         'payment_status'   => $paymentStatus,
         'upi_string'       => $upiString,
@@ -422,8 +448,13 @@ try {
         'total_containers' => $totalContainers,
         'container_amount' => $containerAmount,
         'has_containers'   => $totalContainers > 0,
+        'delivery_boy_id'  => $deliveryBoyId,
+        'delivery_boy_source' => $forcedBoyId > 0 && $deliveryBoyId === $forcedBoyId
+                                  ? 'manual'
+                                  : ($deliveryBoyId !== null ? 'auto' : 'none'),
     ]);
+
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) $pdo->rollBack();
-    jsonResponse(false, 'Server error placing order.');
+    if ($pdo->inTransaction()) $pdo->rollback();
+    jsonResponse(false, 'Server error placing order: ' . $e->getMessage());
 }

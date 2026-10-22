@@ -195,7 +195,7 @@ $settings = getSettings($pdo);
                         <thead>
                             <tr>
                                 <th>Customer</th>
-                                <th>Apartment</th>
+                               <th>Address</th>
                                 <th>Division</th>
                                 <th>Wallet</th>
                                 <th>Status</th>

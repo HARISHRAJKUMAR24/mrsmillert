@@ -1,4 +1,11 @@
 <?php
+/* =========================================================
+   MRS MILL@ — AJAX: GET APARTMENTS + DIVISIONS
+   File: ./ajax/manual-get-apartments.php
+   Returns variants normalized for the searchable dropdowns
+   (Add Customer / Edit Customer).
+   ========================================================= */
+
 require_once __DIR__ . '/../config/config.php';
 require_once __DIR__ . '/../config/function.php';
 
@@ -18,16 +25,57 @@ try {
     $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
     $out = [];
+
     foreach ($rows as $r) {
+
         $divs = json_decode($r['divisions'] ?? '[]', true);
         if (!is_array($divs)) $divs = [];
 
         $clean = [];
+
         foreach ($divs as $d) {
-            if (!isset($d['division'])) continue;
+
+            if (!is_array($d)) continue;
+
+            /* ---------- Normalize ---------- */
+            $block  = isset($d['block'])   ? (string)$d['block']   : '';
+            $doorNo = isset($d['door_no']) ? (string)$d['door_no'] : '';
+            $floor  = isset($d['floor'])   ? (string)$d['floor']   : '';
+            $charge = (float)($d['charge'] ?? 0);
+
+            /* Legacy: {division, charge} only */
+            if ($block === '' && $doorNo === '' && $floor === '') {
+                if (isset($d['division'])) {
+                    $doorNo = (string)$d['division'];
+                } else {
+                    continue;
+                }
+            }
+
+            /* ---------- Build human label ---------- */
+            $labelParts = [];
+            if ($block !== '')  $labelParts[] = "Blk " . $block;
+            if ($doorNo !== '') $labelParts[] = "Door " . $doorNo;
+            if ($floor !== '')  $labelParts[] = "Fl " . $floor;
+
+            $label = $labelParts ? implode(" · ", $labelParts) : "—";
+
+            /* ---------- Build value (used for matching on save) ---------- */
+            $valueParts = [];
+            if ($block !== '')  $valueParts[] = "Blk " . $block;
+            if ($doorNo !== '') $valueParts[] = "Door " . $doorNo;
+            if ($floor !== '')  $valueParts[] = "Fl " . $floor;
+
+            $value = $valueParts ? implode(" / ", $valueParts) : $doorNo;
+
             $clean[] = [
-                'division' => (string)$d['division'],
-                'charge'   => (float)($d['charge'] ?? 0),
+                'block'          => $block,
+                'door_no'        => $doorNo,
+                'floor'          => $floor,
+                'charge'         => $charge,
+                'division_label' => $label,     // "Blk A · Door 101 · Fl 1"
+                'division_value' => $value,     // "Blk A / Door 101 / Fl 1"
+                'division'       => $value,     // legacy key for old JS fallbacks
             ];
         }
 
@@ -41,6 +89,7 @@ try {
     }
 
     jsonResponse(true, 'OK', $out);
+
 } catch (PDOException $e) {
     jsonResponse(false, 'Failed to load apartments.');
 }

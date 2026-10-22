@@ -229,7 +229,7 @@ $branches = $branchStmt->fetchAll();
 
 
         /* =====================================================
-           DIVISIONS SECTION
+           VARIANTS SECTION (was: divisions)
         ===================================================== */
 
         .divisions-section {
@@ -325,9 +325,10 @@ $branches = $branchStmt->fetchAll();
             gap: 10px;
         }
 
+        /* Variant row: Block | Door No | Floor | Charge | Remove */
         .division-row {
             display: grid;
-            grid-template-columns: 1fr 200px 42px;
+            grid-template-columns: 1.4fr 1fr 1fr 160px 42px;
             gap: 10px;
             align-items: center;
             background: #fffdf9;
@@ -457,13 +458,24 @@ $branches = $branchStmt->fetchAll();
             margin-bottom: 10px;
         }
 
-        @media (max-width: 620px) {
+        @media (max-width: 760px) {
+            .division-row {
+                grid-template-columns: 1fr 1fr;
+            }
+
+            .remove-division {
+                width: 100%;
+                grid-column: span 2;
+            }
+        }
+
+        @media (max-width: 520px) {
             .division-row {
                 grid-template-columns: 1fr;
             }
 
             .remove-division {
-                width: 100%;
+                grid-column: auto;
             }
         }
 
@@ -727,7 +739,7 @@ $branches = $branchStmt->fetchAll();
 
                 <div class="apartment-title">
                     <h1>Edit Apartment</h1>
-                    <p>Update apartment info, divisions and delivery charges.</p>
+                    <p>Update apartment info, variants (Block / Door No / Floor) and delivery charges.</p>
                 </div>
 
             </div>
@@ -741,7 +753,7 @@ $branches = $branchStmt->fetchAll();
                     </div>
                     <div>
                         <h3>Apartment Details</h3>
-                        <span>Edit info then update each division's delivery charge.</span>
+                        <span>Edit info then update each variant's delivery charge.</span>
                     </div>
                     <span class="apt-code-badge" id="aptCodeBadge">—</span>
                 </div>
@@ -829,7 +841,7 @@ $branches = $branchStmt->fetchAll();
                     </div>
 
 
-                    <!-- DIVISIONS -->
+                    <!-- VARIANTS -->
 
                     <div class="divisions-section">
 
@@ -838,8 +850,8 @@ $branches = $branchStmt->fetchAll();
                             <div class="divisions-header-title">
                                 <i class="bi bi-grid-3x3-gap"></i>
                                 <div class="title-text">
-                                    <h4>Apartment Divisions <span class="required">*</span></h4>
-                                    <span class="subtitle">Each division has its own delivery charge.</span>
+                                    <h4>Apartment Variants <span class="required">*</span></h4>
+                                    <span class="subtitle">Each variant = Block + Door No + Floor, with its own delivery charge.</span>
                                 </div>
                             </div>
 
@@ -847,7 +859,7 @@ $branches = $branchStmt->fetchAll();
                                 class="add-division-btn"
                                 id="addDivisionBtn">
                                 <i class="bi bi-plus-lg"></i>
-                                Add Division
+                                Add Variant
                             </button>
 
                         </div>
@@ -856,7 +868,7 @@ $branches = $branchStmt->fetchAll();
 
                         <div class="divisions-empty" id="divisionsEmpty" style="display:none;">
                             <i class="bi bi-grid"></i>
-                            No divisions. Click <strong>Add Division</strong> to begin.
+                            No variants. Click <strong>Add Variant</strong> to begin.
                         </div>
 
                     </div>

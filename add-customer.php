@@ -17,10 +17,6 @@ $settings = getSettings($pdo);
     <?php include './includes/head.php'; ?>
 
     <style>
-        /* =====================================================
-           CUSTOMER ADD PAGE
-        ===================================================== */
-
         .customer-page {
             padding: 30px 32px 40px;
         }
@@ -45,26 +41,6 @@ $settings = getSettings($pdo);
             margin: 0;
             color: #817a71;
             font-size: 13px;
-        }
-
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #e4ddd3;
-            background: #fff;
-            color: #6f675f;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 700;
-            text-decoration: none;
-            transition: .2s;
-        }
-
-        .back-btn:hover {
-            background: #faf7f0;
-            color: #302923;
         }
 
         .customer-form-card {
@@ -139,6 +115,11 @@ $settings = getSettings($pdo);
             height: 45px;
         }
 
+        .customer-textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
         .customer-select {
             appearance: none;
             -webkit-appearance: none;
@@ -174,7 +155,8 @@ $settings = getSettings($pdo);
         }
 
         .input-icon-wrap .customer-input,
-        .input-icon-wrap .customer-select {
+        .input-icon-wrap .customer-select,
+        .input-icon-wrap .customer-textarea {
             padding-left: 40px;
         }
 
@@ -209,11 +191,44 @@ $settings = getSettings($pdo);
             }
         }
 
+        /* Address type toggle */
+        .addr-type-toggle {
+            display: inline-flex;
+            gap: 6px;
+            background: #faf7f0;
+            border: 1px solid #eee7dc;
+            border-radius: 14px;
+            padding: 5px;
+            margin-bottom: 20px;
+        }
 
-        /* =====================================================
-           SEARCHABLE DROPDOWN
-        ===================================================== */
+        .addr-type-btn {
+            border: none;
+            background: transparent;
+            color: #817a71;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            transition: .15s ease;
+            font-family: inherit;
+        }
 
+        .addr-type-btn:hover {
+            color: #302923;
+        }
+
+        .addr-type-btn.active {
+            background: #b51f2c;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
+        }
+
+        /* Dropdown */
         .sd-wrap {
             position: relative;
         }
@@ -224,7 +239,7 @@ $settings = getSettings($pdo);
             border: 1px solid #e8e1d8;
             background: #fffdf9;
             border-radius: 11px;
-            padding: 0 40px 0 40px;
+            padding: 0 40px;
             font-family: "DM Sans", sans-serif;
             font-size: 12px;
             font-weight: 600;
@@ -353,15 +368,6 @@ $settings = getSettings($pdo);
             padding: 6px;
         }
 
-        .sd-list::-webkit-scrollbar {
-            width: 6px;
-        }
-
-        .sd-list::-webkit-scrollbar-thumb {
-            background: #e0d8cd;
-            border-radius: 4px;
-        }
-
         .sd-option {
             display: flex;
             align-items: center;
@@ -402,16 +408,15 @@ $settings = getSettings($pdo);
             flex: 1;
             min-width: 0;
             font-weight: 700;
-            white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
+            white-space: nowrap;
         }
 
         .sd-option .meta {
             font-size: 10px;
             color: #948c82;
             font-weight: 600;
-            white-space: nowrap;
         }
 
         .sd-empty {
@@ -421,11 +426,80 @@ $settings = getSettings($pdo);
             color: #948c82;
         }
 
+        /* Map + Image */
+        .loc-btn {
+            margin-top: 10px;
+            width: 100%;
+            padding: 11px 14px;
+            background: #fff5f5;
+            border: 1.5px dashed #d98a91;
+            color: #b51f2c;
+            border-radius: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: .15s ease;
+            font-family: inherit;
+        }
 
-        /* =====================================================
-           WALLET SECTION
-        ===================================================== */
+        .loc-btn:hover:not(:disabled) {
+            background: #fbe8e9;
+            border-style: solid;
+        }
 
+        .loc-btn:disabled {
+            opacity: .6;
+            cursor: wait;
+        }
+
+        .loc-btn.success {
+            background: #e8f6ea;
+            border-color: #a5d6a7;
+            color: #2e7d32;
+            border-style: solid;
+        }
+
+        .img-drop {
+            border: 1.5px dashed #d8cdbf;
+            border-radius: 12px;
+            background: #fffdf9;
+            overflow: hidden;
+            transition: .15s ease;
+            cursor: pointer;
+        }
+
+        .img-drop:hover {
+            border-color: #d98a91;
+            background: #fff;
+        }
+
+        .img-drop-empty {
+            padding: 28px 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            color: #948c82;
+            font-size: 12px;
+        }
+
+        .img-drop-empty i {
+            font-size: 26px;
+            color: #d5cbbd;
+        }
+
+        .img-drop img {
+            display: block;
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        /* Wallet */
         .wallet-section {
             margin-top: 22px;
             padding-top: 20px;
@@ -459,12 +533,6 @@ $settings = getSettings($pdo);
             font-size: 15px;
             flex-shrink: 0;
             margin-top: 2px;
-        }
-
-        .wallet-header-title .title-text {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
         }
 
         .wallet-header-title h4 {
@@ -540,7 +608,6 @@ $settings = getSettings($pdo);
             background: #fdfaf4;
             border: 1px solid #f0ebe4;
             border-radius: 12px;
-            animation: fadeSlide .25s ease;
         }
 
         .wallet-fields.show {
@@ -550,18 +617,6 @@ $settings = getSettings($pdo);
         @media (max-width: 620px) {
             .wallet-fields {
                 grid-template-columns: 1fr;
-            }
-        }
-
-        @keyframes fadeSlide {
-            from {
-                opacity: 0;
-                transform: translateY(-6px);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0);
             }
         }
 
@@ -597,11 +652,7 @@ $settings = getSettings($pdo);
             margin-left: auto;
         }
 
-
-        /* =====================================================
-           FORM ACTIONS
-        ===================================================== */
-
+        /* Actions */
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -654,11 +705,7 @@ $settings = getSettings($pdo);
             cursor: not-allowed;
         }
 
-
-        /* =====================================================
-           POPUP (success + error)
-        ===================================================== */
-
+        /* Modal */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -706,24 +753,11 @@ $settings = getSettings($pdo);
             justify-content: center;
             font-size: 30px;
             margin: 0 auto 16px;
-            animation: popIn .35s cubic-bezier(.2, .9, .3, 1.4);
         }
 
         .mm-modal-icon-error {
             background: #fdecec;
             color: #b51f2c;
-        }
-
-        @keyframes popIn {
-            0% {
-                transform: scale(.5);
-                opacity: 0;
-            }
-
-            100% {
-                transform: scale(1);
-                opacity: 1;
-            }
         }
 
         .mm-modal-title {
@@ -777,7 +811,6 @@ $settings = getSettings($pdo);
         .mm-btn-primary {
             background: #b51f2c;
             color: #fff;
-            box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
         }
 
         .mm-btn-primary:hover {
@@ -799,14 +832,12 @@ $settings = getSettings($pdo);
         .mm-btn-danger {
             background: #b51f2c;
             color: #fff;
-            box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
         }
 
         .mm-btn-danger:hover {
             background: #8e1722;
             color: #fff;
         }
-
 
         @media (max-width: 768px) {
             .customer-page {
@@ -832,6 +863,15 @@ $settings = getSettings($pdo);
                 width: 100%;
                 justify-content: center;
             }
+
+            .addr-type-toggle {
+                width: 100%;
+            }
+
+            .addr-type-btn {
+                flex: 1;
+                justify-content: center;
+            }
         }
     </style>
 
@@ -844,25 +884,18 @@ $settings = getSettings($pdo);
     <main class="main">
 
         <header class="topbar">
-
-            <button class="mobile-menu"
-                onclick="toggleSidebar()"
-                aria-label="Open menu">
+            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
                 <i class="bi bi-list"></i>
             </button>
-
             <div class="search-box">
                 <i class="bi bi-search"></i>
-                <input type="text"
-                    placeholder="Search orders, products...">
+                <input type="text" placeholder="Search orders, products...">
             </div>
-
             <div class="top-right">
                 <button class="notification">
                     <i class="bi bi-bell"></i>
                     <span class="notification-dot"></span>
                 </button>
-
                 <div class="admin-profile">
                     <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
                     <div>
@@ -871,107 +904,67 @@ $settings = getSettings($pdo);
                     </div>
                 </div>
             </div>
-
         </header>
 
 
         <div class="customer-page">
 
-            <!-- PAGE HEADER -->
-
             <div class="customer-header">
-
                 <div class="customer-title">
                     <h1>Add Customer</h1>
                     <p>Create a customer account with login details and optional wallet balance.</p>
                 </div>
-
-                
-
             </div>
 
-
-            <!-- FORM CARD -->
 
             <div class="customer-form-card">
 
                 <div class="form-card-header">
-                    <div class="form-card-icon">
-                        <i class="bi bi-person-plus"></i>
-                    </div>
+                    <div class="form-card-icon"><i class="bi bi-person-plus"></i></div>
                     <div>
                         <h3>Customer Details</h3>
                         <span>Enter the customer's information below.</span>
                     </div>
                 </div>
 
-                <form id="customerForm"
-                    class="customer-form"
-                    method="POST"
-                    novalidate>
+                <form id="customerForm" class="customer-form" method="POST" novalidate>
 
                     <div class="row g-3">
 
-                        <!-- FULL NAME -->
                         <div class="col-12 col-md-6">
-                            <label>
-                                Full Name <span class="required">*</span>
-                            </label>
+                            <label>Full Name <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-person"></i>
-                                <input type="text"
-                                    name="full_name"
-                                    id="full_name"
-                                    class="customer-input"
-                                    placeholder="Eg: Ravi Kumar"
-                                    maxlength="150"
-                                    required>
+                                <input type="text" name="full_name" id="full_name"
+                                    class="customer-input" placeholder="Eg: Ravi Kumar" maxlength="150" required>
                             </div>
                         </div>
 
-                        <!-- MOBILE -->
                         <div class="col-12 col-md-6">
-                            <label>
-                                Mobile Number <span class="required">*</span>
-                            </label>
+                            <label>Mobile Number <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-telephone"></i>
-                                <input type="tel"
-                                    name="mobile_number"
-                                    id="mobile_number"
-                                    class="customer-input"
-                                    placeholder="10-digit mobile"
-                                    maxlength="15"
-                                    inputmode="numeric"
-                                    required>
+                                <input type="tel" name="mobile_number" id="mobile_number"
+                                    class="customer-input" placeholder="10-digit mobile"
+                                    maxlength="15" inputmode="numeric" required>
                             </div>
                             <p class="field-help" id="mobileHelp">Enter a 10-digit mobile number.</p>
                         </div>
 
-                        <!-- PASSWORD -->
                         <div class="col-12 col-md-6">
-                            <label>
-                                Password <span class="required">*</span>
-                            </label>
+                            <label>Password <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-key"></i>
-                                <input type="text"
-                                    name="password"
-                                    id="password"
-                                    class="customer-input"
-                                    placeholder="Minimum 3 characters"
-                                    minlength="3"
-                                    required>
+                                <input type="text" name="password" id="password"
+                                    class="customer-input" placeholder="Minimum 3 characters"
+                                    minlength="3" required>
                             </div>
                             <p class="field-help" id="passwordHelp">Password must be at least 3 characters.</p>
                         </div>
 
-                        <!-- STATUS -->
                         <div class="col-12 col-md-6">
                             <label>Status</label>
-                            <select name="status"
-                                id="status"
-                                class="customer-select">
+                            <select name="status" id="status" class="customer-select">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
                             </select>
@@ -980,158 +973,170 @@ $settings = getSettings($pdo);
                     </div>
 
 
-                    <!-- =================================================
-                         ADDRESS & DIVISION
-                    ================================================== -->
-
-                    <div class="divisions-section" style="margin-top:22px;">
-
-                        <div class="divisions-header">
-                            <div class="divisions-header-title">
-                                <i class="bi bi-house-door"></i>
-                                <div class="title-text">
-                                    <h4>Address & Division</h4>
-                                    <span class="subtitle">Type to search apartment and division.</span>
-                                </div>
-                            </div>
+                    <!-- ADDRESS TYPE TOGGLE -->
+                    <div style="margin-top:22px;">
+                        <label>Address Type <span class="required">*</span></label>
+                        <div class="addr-type-toggle" role="tablist">
+                            <button type="button" class="addr-type-btn active" id="addrTypeApt" data-type="apartment">
+                                <i class="bi bi-building"></i> Apartment
+                            </button>
+                            <button type="button" class="addr-type-btn" id="addrTypeHouse" data-type="individual_house">
+                                <i class="bi bi-house-door"></i> Individual House
+                            </button>
                         </div>
+                    </div>
 
-                        <div class="row g-3" style="margin-top:4px;">
 
-                            <!-- APARTMENT SEARCHABLE -->
+                    <!-- APARTMENT BLOCK -->
+                    <div id="aptBlock" style="margin-top:16px;">
+                        <div class="row g-3">
+
                             <div class="col-12 col-md-6">
-                                <label>Apartment</label>
-
+                                <label>Apartment <span class="required">*</span></label>
                                 <div class="sd-wrap" id="acAptDdWrap">
                                     <button type="button" class="sd-toggle" id="acAptDdToggle">
                                         <i class="bi bi-building lead"></i>
                                         <span class="placeholder" id="acAptDdLabel">— Type or select apartment —</span>
                                         <i class="bi bi-chevron-down caret"></i>
                                     </button>
-
                                     <div class="sd-menu">
                                         <div class="sd-search">
                                             <i class="bi bi-search"></i>
-                                            <input type="text" id="acAptDdSearch"
-                                                placeholder="Search apartment..." autocomplete="off">
+                                            <input type="text" id="acAptDdSearch" placeholder="Search apartment..." autocomplete="off">
                                         </div>
                                         <div class="sd-list" id="acAptDdList"></div>
                                     </div>
                                 </div>
-
-                                <input type="hidden" id="acApartmentId" name="apartment_id" value="">
-                                <input type="hidden" id="acApartmentCode" name="apartment_code" value="">
-                                <input type="hidden" id="acApartmentName" name="apartment_name" value="">
+                                <input type="hidden" id="acApartmentId" value="">
+                                <input type="hidden" id="acApartmentCode" value="">
+                                <input type="hidden" id="acApartmentName" value="">
                             </div>
 
-                            <!-- DIVISION SEARCHABLE -->
                             <div class="col-12 col-md-6">
-                                <label>Division</label>
-
+                                <label>Block / Floor / Door <span class="required">*</span></label>
                                 <div class="sd-wrap" id="acDivDdWrap">
                                     <button type="button" class="sd-toggle" id="acDivDdToggle" disabled>
                                         <i class="bi bi-grid-3x3-gap lead"></i>
                                         <span class="placeholder" id="acDivDdLabel">Select apartment first</span>
                                         <i class="bi bi-chevron-down caret"></i>
                                     </button>
-
                                     <div class="sd-menu">
                                         <div class="sd-search">
                                             <i class="bi bi-search"></i>
-                                            <input type="text" id="acDivDdSearch"
-                                                placeholder="Search division..." autocomplete="off">
+                                            <input type="text" id="acDivDdSearch" placeholder="Search block / door / floor..." autocomplete="off">
                                         </div>
                                         <div class="sd-list" id="acDivDdList"></div>
                                     </div>
                                 </div>
-
-                                <input type="hidden" id="acDivision" name="division" value="">
-                                <input type="hidden" id="acDivisionCharge" name="division_charge" value="0">
+                                <input type="hidden" id="acDivision" value="">
+                                <input type="hidden" id="acDivisionCharge" value="0">
                                 <p class="field-help" id="acDivisionHint"></p>
                             </div>
 
                         </div>
-
                     </div>
 
 
-                    <!-- =================================================
-                         INITIAL WALLET
-                    ================================================== -->
+                    <!-- INDIVIDUAL HOUSE BLOCK -->
+                    <div id="houseBlock" style="margin-top:16px; display:none;">
+                        <div class="row g-3">
 
+                            <div class="col-12">
+                                <label>Full Address <span class="required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-geo-alt"></i>
+                                    <textarea id="houseAddress" class="customer-textarea"
+                                        placeholder="Door No, Street, Area, City" maxlength="250"></textarea>
+                                </div>
+                            </div>
+
+                            <div class="col-12">
+                                <label>Google Maps Location <span class="required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-pin-map"></i>
+                                    <input type="text" id="houseMap" class="customer-input"
+                                        placeholder="Paste Google Maps link OR tap the button below"
+                                        maxlength="600">
+                                </div>
+                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                                    <button type="button" class="loc-btn" id="houseLocBtn" style="margin-top:0; flex:1; min-width:180px;">
+                                        <i class="bi bi-crosshair"></i>
+                                        <span id="houseLocBtnText">Get My Current Location</span>
+                                    </button>
+                                    <button type="button" class="loc-btn" id="houseOpenMapBtn" style="margin-top:0; flex:1; min-width:180px;">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                        <span>Open Google Maps</span>
+                                    </button>
+                                </div>
+                                <p class="field-help" style="margin-top:6px;">Paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
+                                <p class="field-help" id="houseLocHint"></p>
+                            </div>
+
+                            <div class="col-12">
+                                <label>House Image (optional)</label>
+                                <div class="img-drop" id="houseImgDrop">
+                                    <input type="file" id="houseImg" accept="image/*" style="display:none;">
+                                    <div id="houseImgPreview" class="img-drop-empty">
+                                        <i class="bi bi-image"></i>
+                                        <span>Tap to upload a photo of the house</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+
+                    <!-- WALLET -->
                     <div class="wallet-section">
-
                         <div class="wallet-header">
-
                             <div class="wallet-header-title">
                                 <i class="bi bi-wallet2"></i>
-                                <div class="title-text">
+                                <div>
                                     <h4>Initial Wallet Balance</h4>
                                     <span class="subtitle">Optionally add money now — customer starts at ₹0 otherwise.</span>
                                 </div>
                             </div>
-
                             <div class="wallet-toggle-wrap">
                                 <div class="wallet-toggle" id="walletToggle"></div>
                                 <span class="wallet-toggle-label">Add wallet money</span>
                             </div>
-
                         </div>
 
                         <div class="wallet-fields" id="walletFields">
-
                             <div>
                                 <label>Amount (₹)</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-currency-rupee"></i>
-                                    <input type="number"
-                                        id="walletAmount"
-                                        class="customer-input"
-                                        min="1"
-                                        step="0.01"
-                                        placeholder="0.00">
+                                    <input type="number" id="walletAmount" class="customer-input"
+                                        min="1" step="0.01" placeholder="0.00">
                                 </div>
                             </div>
-
                             <div>
                                 <label>Note (optional)</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-chat-left-text"></i>
-                                    <input type="text"
-                                        id="walletNote"
-                                        class="customer-input"
-                                        maxlength="250"
-                                        placeholder="e.g. Cash received at counter">
+                                    <input type="text" id="walletNote" class="customer-input"
+                                        maxlength="250" placeholder="e.g. Cash received at counter">
                                 </div>
                             </div>
-
                             <div class="wallet-preview" style="grid-column: 1 / -1;">
                                 <i class="bi bi-wallet2"></i>
                                 <span class="label">Wallet Preview</span>
                                 <span class="value" id="walletPreview">₹0</span>
                             </div>
-
                         </div>
-
                     </div>
 
 
-                    <!-- BUTTONS -->
-
                     <div class="form-actions">
-
                         <a href="customers.php" class="btn-cancel">
-                            <i class="bi bi-x-lg"></i>
-                            Cancel
+                            <i class="bi bi-x-lg"></i> Cancel
                         </a>
-
-                        <button type="submit"
-                            class="btn-save"
-                            id="saveBtn">
+                        <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Save Customer</span>
                         </button>
-
                     </div>
 
                 </form>
@@ -1143,73 +1148,35 @@ $settings = getSettings($pdo);
     </main>
 
 
-    <!-- =========================================================
-         SUCCESS POPUP
-    ========================================================== -->
-
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
-        <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="successTitle">
-
-            <div class="mm-modal-icon">
-                <i class="bi bi-check-lg"></i>
-            </div>
-
-            <h3 class="mm-modal-title" id="successTitle">
-                Customer Added!
-            </h3>
-
-            <p class="mm-modal-text" id="successText">
-                The customer account has been created successfully.
-            </p>
-
+        <div class="mm-modal" role="dialog" aria-modal="true">
+            <div class="mm-modal-icon"><i class="bi bi-check-lg"></i></div>
+            <h3 class="mm-modal-title" id="successTitle">Customer Added!</h3>
+            <p class="mm-modal-text" id="successText">The customer account has been created successfully.</p>
             <div class="mm-modal-code" id="successCode" style="display:none;"></div>
-
             <div class="mm-modal-actions">
-
                 <a href="add-customer.php" class="mm-btn mm-btn-ghost">
-                    <i class="bi bi-plus-lg"></i>
-                    Add Another
+                    <i class="bi bi-plus-lg"></i> Add Another
                 </a>
-
                 <a href="customers.php" class="mm-btn mm-btn-primary">
-                    <i class="bi bi-list-ul"></i>
-                    View List
+                    <i class="bi bi-list-ul"></i> View List
                 </a>
-
             </div>
-
         </div>
     </div>
 
-
-    <!-- =========================================================
-         ERROR POPUP (injected by JS, but keeping HTML for safety)
-    ========================================================== -->
-
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
-        <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="errorTitle">
-
+        <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon mm-modal-icon-error">
                 <i class="bi bi-exclamation-lg"></i>
             </div>
-
-            <h3 class="mm-modal-title" id="errorTitle">
-                Oops! Something's missing
-            </h3>
-
-            <p class="mm-modal-text" id="errorText">
-                Please check the form and try again.
-            </p>
-
+            <h3 class="mm-modal-title">Oops! Something's missing</h3>
+            <p class="mm-modal-text" id="errorText">Please check the form and try again.</p>
             <div class="mm-modal-actions">
-                <button type="button"
-                    class="mm-btn mm-btn-danger"
-                    id="errorOkBtn">
-                    <i class="bi bi-check2"></i>
-                    Got it
+                <button type="button" class="mm-btn mm-btn-danger" id="errorOkBtn">
+                    <i class="bi bi-check2"></i> Got it
                 </button>
             </div>
-
         </div>
     </div>
 
@@ -1217,7 +1184,6 @@ $settings = getSettings($pdo);
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
     </script>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
     <script src="<?= ADMIN_URL ?>js/add-customer.js"></script>

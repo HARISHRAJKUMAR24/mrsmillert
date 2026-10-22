@@ -64,9 +64,11 @@
         const dd  = String(d.getDate()).padStart(2, "0");
         const mon = d.toLocaleString("en-IN", { month: "short" });
         const yr  = d.getFullYear();
-        const hh  = String(d.getHours()).padStart(2, "0");
-        const mm  = String(d.getMinutes()).padStart(2, "0");
-        return `${dd} ${mon} ${yr} · ${hh}:${mm}`;
+        let h = d.getHours();
+        const mm = String(d.getMinutes()).padStart(2, "0");
+        const ampm = h >= 12 ? "PM" : "AM";
+        h = h % 12; if (h === 0) h = 12;
+        return `${dd} ${mon} ${yr} · ${String(h).padStart(2,"0")}:${mm} ${ampm}`;
     }
 
     function payStatusBadge(s) {
@@ -78,18 +80,32 @@
         return `<span class="payment-status ${map[s] || "pay-unpaid"}">${escapeHtml(s)}</span>`;
     }
 
+    /* ---------------- TOAST (hardened) ---------------- */
     function showToast(msg, isError) {
-        if (!toastWrap) return;
+        let wrap = toastWrap;
+
+        /* Create container if missing */
+        if (!wrap) {
+            wrap = document.createElement("div");
+            wrap.id = "toastWrap";
+            wrap.className = "toast-wrap";
+            document.body.appendChild(wrap);
+        }
+
         const el = document.createElement("div");
         el.className = "toast" + (isError ? " error" : "");
-        el.innerHTML = `<i class="bi bi-${isError ? "exclamation-circle" : "check-circle-fill"}"></i> ${escapeHtml(msg)}`;
-        toastWrap.appendChild(el);
+        el.innerHTML = `
+            <i class="bi bi-${isError ? "exclamation-circle" : "check-circle-fill"}"></i>
+            <span>${escapeHtml(msg)}</span>
+        `;
+        wrap.appendChild(el);
 
+        /* Auto-remove */
         setTimeout(() => {
             el.style.opacity = "0";
             el.style.transform = "translateX(100%)";
             el.style.transition = "all .3s ease";
-            setTimeout(() => el.remove(), 300);
+            setTimeout(() => el.remove(), 320);
         }, 2800);
     }
 
@@ -136,7 +152,9 @@
                 <td><div class="amount-cell">${money(o.total_amount)}</div></td>
 
                 <td>
-                    <select class="status-select" data-id="${o.id}">
+                    <select class="status-select"
+                            data-id="${o.id}"
+                            data-prev="${escapeHtml(o.status)}">
                         ${statusOptionsHtml}
                     </select>
                 </td>
@@ -355,21 +373,27 @@
     }
 
     /* =========================================================
-       STATUS CHANGE HANDLER (inline dropdown)
+       STATUS CHANGE HANDLER
        ========================================================= */
     tbody.addEventListener("change", function (e) {
         const select = e.target.closest(".status-select");
         if (!select) return;
 
-        const orderId = Number(select.dataset.id);
+        const orderId   = Number(select.dataset.id);
         const newStatus = select.value;
+        const prevStatus = select.dataset.prev || "";
+
         if (!orderId || !newStatus) return;
 
+        /* Remember previous for revert */
+        select.dataset.prev = newStatus;
+
         select.classList.add("saving");
+        select.disabled = true;
 
         const body = new URLSearchParams();
         body.set("order_id", orderId);
-        body.set("status", newStatus);
+        body.set("status",   newStatus);
 
         fetch(BASE_URL + "ajax/update-pickup-order-status.php", {
             method: "POST",
@@ -381,38 +405,41 @@
         })
         .then(r => r.json().catch(() => null))
         .then(res => {
+
             select.classList.remove("saving");
+            select.disabled = false;
 
             if (!res || !res.success) {
+                /* Revert dropdown to previous value */
+                if (prevStatus) select.value = prevStatus;
+
                 showToast((res && res.message) || "Failed to update status.", true);
-                // reload to revert the dropdown
-                loadOrders();
                 return;
             }
 
-            // Update local data
+            /* Update local data */
             const row = allRows.find(o => o.id === orderId);
             if (row) row.status = newStatus;
 
-            // Update table stats in DOM (optional, simple reload instead)
             showToast("Order status updated.");
         })
         .catch(() => {
             select.classList.remove("saving");
+            select.disabled = false;
+
+            if (prevStatus) select.value = prevStatus;
+
             showToast("Network error. Please try again.", true);
-            loadOrders();
         });
     });
 
     /* ROW CLICK → navigate */
     tbody.addEventListener("click", function (e) {
-        /* Skip if clicked inside the view button or status dropdown */
         if (e.target.closest(".row-view") || e.target.closest(".status-select")) return;
 
         const tr = e.target.closest("tr[data-id]");
         if (!tr) return;
 
-        /* We don't have data-href on pickup rows — build it */
         const id = tr.dataset.id;
         if (id) window.location.href = BASE_URL + "order-view.php?id=" + id;
     });

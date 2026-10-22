@@ -4,6 +4,7 @@
    + 12-hour time format
    + Row checkboxes (select-all with indeterminate state)
    + Bulk action bar
+   + Individual House label for address_type = individual_house
    ========================================================= */
 
 (function () {
@@ -63,7 +64,7 @@
             .replace(/"/g, "&quot;");
     }
 
-    /* ✅ 12-hour format with AM/PM */
+    /* 12-hour format with AM/PM */
     function formatDate(str) {
         if (!str) return "—";
         const d = new Date(str.replace(" ", "T"));
@@ -106,8 +107,9 @@
 
     /* RENDER ROW */
     function renderRow(o) {
-        const initial  = (o.customer_name || "?").trim().charAt(0).toUpperCase();
-        const isPickup = o.delivery_mode === "pickup";
+        const initial   = (o.customer_name || "?").trim().charAt(0).toUpperCase();
+        const isPickup  = o.delivery_mode === "pickup";
+        const isHouse   = o.address_type === "individual_house";
         const isChecked = selectedIds.has(String(o.id));
 
         let modeCell = "";
@@ -119,6 +121,15 @@
                 </div>
                 <div class="cust-meta" style="margin-top:4px;">
                     ${escapeHtml(o.pickup_branch_name || "No branch")}
+                </div>`;
+        } else if (isHouse) {
+            modeCell = `
+                <div class="mode-pill mode-delivery">
+                    <i class="bi bi-truck"></i> Delivery
+                </div>
+                <div class="mode-pill mode-house" style="margin-top:4px;"
+                     title="${escapeHtml(o.full_address || '')}">
+                    <i class="bi bi-house-door"></i> Individual House
                 </div>`;
         } else {
             modeCell = `
@@ -331,7 +342,9 @@
                     o.boy_name || "",
                     o.boy_code || "",
                     o.pickup_branch_name || "",
-                    o.apartment_name || ""
+                    o.apartment_name || "",
+                    o.full_address || "",
+                    o.address_type || ""
                 ].join(" ").toLowerCase();
                 return hay.indexOf(q) !== -1;
             });
@@ -480,7 +493,7 @@
             const total = checkboxes.length;
             const checked = tbody.querySelectorAll(".or-check.checked[data-check-id]").length;
 
-            const shouldSelectAll = checked < total;  /* if not all selected → select all */
+            const shouldSelectAll = checked < total;
 
             checkboxes.forEach(cb => {
                 const id = String(cb.dataset.checkId);
@@ -526,7 +539,6 @@
             const ids = Array.from(selectedIds);
             if (!ids.length) return;
 
-            /* Example: show a confirm or fire an AJAX call */
             alert("Bulk action on " + ids.length + " order(s):\n\n" + ids.join(", "));
 
             /* TODO: replace with real AJAX call, e.g.

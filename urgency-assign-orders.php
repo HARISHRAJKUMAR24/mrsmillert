@@ -791,9 +791,17 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
             color: #fff;
         }
 
-        .as-toast.success .as-toast-icon { background: #4caf50; }
-        .as-toast.error   .as-toast-icon { background: #c62828; }
-        .as-toast.info    .as-toast-icon { background: #3b82f6; }
+        .as-toast.success .as-toast-icon {
+            background: #4caf50;
+        }
+
+        .as-toast.error .as-toast-icon {
+            background: #c62828;
+        }
+
+        .as-toast.info .as-toast-icon {
+            background: #3b82f6;
+        }
 
         .as-toast-body {
             flex: 1;
@@ -897,10 +905,8 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
 
         <div class="as-page">
 
-            <div class="as-header">
-                <h1>Reassign Orders — Boy to Boy</h1>
-                <p>Pick a menu and the current delivery boy, select apartments, then move his orders to another boy.</p>
-            </div>
+            <h1>Reassign Orders — Boy to Boy</h1>
+            <p>Pick a menu and the current delivery boy, then select specific apartment blocks (or individual houses) to move.</p>
 
 
             <!-- =========================================================
@@ -1006,7 +1012,7 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
 
                 <div class="as-apt-head">
                     <div class="as-apt-title">
-                        <h3>Apartments <span class="req">*</span></h3>
+                        <h3>Blocks & Individual Houses <span class="req">*</span></h3>
                         <span class="as-apt-count-pill" id="asAptCount">0 selected</span>
                     </div>
 
@@ -1023,7 +1029,7 @@ $boysJson  = json_encode($boys,  JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_HE
                 <div class="as-apt-list" id="asAptList">
                     <div class="as-empty" style="padding:30px 20px;border:0;background:transparent;">
                         <h3 style="font-size:14px;">Select a menu and from-boy first</h3>
-                        <p style="font-size:11.5px;">Apartments with this boy's pending orders will appear here.</p>
+                        <p style="font-size:11.5px;">Blocks with this boy's pending orders will appear here.</p>
                     </div>
                 </div>
 
