@@ -26,7 +26,6 @@ if (
 }
 
 /* LOAD CATEGORIES */
-
 $categories = [];
 try {
     $stmt = $pdo->query(
@@ -68,20 +67,6 @@ try {
             margin: 0;
             color: #817a71;
             font-size: 13px;
-        }
-
-        .back-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid #e4ddd3;
-            background: #fff;
-            color: #6f675f;
-            padding: 10px 16px;
-            border-radius: 10px;
-            font-size: 11px;
-            font-weight: 700;
-            text-decoration: none;
         }
 
         .product-form-card {
@@ -189,9 +174,130 @@ try {
 
 
         /* =====================================================
+           DESCRIPTION EDITOR
+        ===================================================== */
+        .desc-editor {
+            border: 1.5px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: .2s ease;
+        }
+
+        .desc-editor:focus-within {
+            border-color: #d98a91;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .desc-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 6px;
+            background: #fdfaf4;
+            border-bottom: 1px solid #f0ebe4;
+        }
+
+        .desc-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 7px;
+            border: none;
+            background: transparent;
+            color: #6f675f;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            transition: .15s ease;
+        }
+
+        .desc-btn:hover {
+            background: #fbe8e9;
+            color: #b51f2c;
+        }
+
+        .desc-btn.active {
+            background: #b51f2c;
+            color: #fff;
+        }
+
+        .desc-sep {
+            width: 1px;
+            background: #ece5da;
+            margin: 4px 3px;
+            align-self: stretch;
+        }
+
+        .desc-area {
+            min-height: 140px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 14px 16px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 13px;
+            color: #292521;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        .desc-area:empty::before {
+            content: attr(data-placeholder);
+            color: #b0a79c;
+            pointer-events: none;
+        }
+
+        .desc-area ul,
+        .desc-area ol {
+            margin: 6px 0 6px 20px;
+            padding: 0;
+        }
+
+        .desc-area p {
+            margin: 0 0 8px;
+        }
+
+        .desc-area h3 {
+            margin: 12px 0 6px;
+            font-size: 15px;
+            color: #302923;
+        }
+
+        .desc-area blockquote {
+            margin: 8px 0;
+            padding: 6px 12px;
+            border-left: 3px solid #b51f2c;
+            background: #fff5f5;
+            color: #6f675f;
+            font-style: italic;
+        }
+
+        .desc-counter {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            background: #fdfaf4;
+            border-top: 1px solid #f0ebe4;
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 600;
+        }
+
+        .desc-counter.warn {
+            color: #a35a0e;
+        }
+
+        .desc-counter.over {
+            color: #b51f2c;
+        }
+
+
+        /* =====================================================
            STATUS TOGGLE
         ===================================================== */
-
         .status-toggle-row {
             display: flex;
             align-items: center;
@@ -413,10 +519,7 @@ try {
         }
 
 
-        /* =====================================================
-           VARIANTS SECTION
-        ===================================================== */
-
+        /* VARIANTS */
         .variants-section {
             margin-top: 22px;
             padding-top: 20px;
@@ -830,6 +933,7 @@ try {
             background: #a02020;
         }
 
+
         @media (max-width: 768px) {
             .product-page {
                 padding: 20px 15px 30px;
@@ -860,9 +964,8 @@ try {
             }
         }
 
-        /* =====================================================
-   CONTAINER BOX (optional per variant)
-===================================================== */
+
+        /* CONTAINER BOX */
         .container-box {
             margin-top: 10px;
             padding: 12px 14px;
@@ -1025,7 +1128,7 @@ try {
             <div class="product-header">
                 <div class="product-title">
                     <h1>Edit Product</h1>
-                    <p>Update product info, manage quantity variants, and replace/remove image.</p>
+                    <p>Update product info, description, manage quantity variants, and replace/remove image.</p>
                 </div>
             </div>
 
@@ -1076,8 +1179,42 @@ try {
                             </select>
                         </div>
 
-                        <!-- ==================== STATUS TOGGLE ==================== -->
+                        <!-- DESCRIPTION (NEW) -->
+                        <div class="col-12">
+                            <label>Product Description</label>
 
+                            <div class="desc-editor">
+                                <div class="desc-toolbar" id="descToolbar">
+                                    <button type="button" class="desc-btn" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="formatBlock" data-arg="h3" title="Heading"><i class="bi bi-type-h3"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="formatBlock" data-arg="blockquote" title="Quote"><i class="bi bi-quote"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+                                </div>
+
+                                <div class="desc-area"
+                                    id="descArea"
+                                    contenteditable="true"
+                                    role="textbox"
+                                    aria-multiline="true"
+                                    data-placeholder="Describe the product — ingredients, taste, storage tips, etc."></div>
+
+                                <div class="desc-counter" id="descCounter">
+                                    <span><i class="bi bi-info-circle"></i> Rich text allowed — bold, lists, headings</span>
+                                    <span><span id="descChars">0</span> / 5000</span>
+                                </div>
+
+                                <input type="hidden" id="product_description" name="product_description" value="">
+                            </div>
+                        </div>
+
+                        <!-- STATUS TOGGLE -->
                         <div class="col-12">
                             <div class="status-toggle-row is-active" id="statusToggleRow">
                                 <div class="status-toggle-info">
@@ -1096,6 +1233,7 @@ try {
                             </div>
                         </div>
 
+                        <!-- IMAGE -->
                         <div class="col-12">
                             <label>Product Image</label>
 
@@ -1138,8 +1276,7 @@ try {
                     </div>
 
 
-                    <!-- ==================== QUANTITY VARIANTS ==================== -->
-
+                    <!-- VARIANTS -->
                     <div class="variants-section">
 
                         <div class="variants-head">

@@ -6,6 +6,7 @@
    - Reads apartment_code / apartment_name / division /
      full_address from orders.address_json
    - Sends address_type so JS can show "Individual House"
+   - Sends order_note for the notes popup
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -73,6 +74,7 @@ try {
                 c.mobile_number   AS customer_mobile,
 
                 o.address_type,
+                o.order_note,
 
                 CASE WHEN JSON_VALID(o.address_json)
                      THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code'))
@@ -157,6 +159,8 @@ try {
             'subtotal'        => (float)$r['subtotal'],
             'total_amount'    => (float)$r['total_amount'],
             'products'        => $products,
+
+            'order_note'      => (string)($r['order_note'] ?? ''),
 
             'status'          => $r['status'],
             'delivery_status' => $r['delivery_status'],

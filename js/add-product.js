@@ -6,6 +6,7 @@
    - MULTI QUANTITY VARIANTS with OPTIONAL CONTAINER PRICE
    - Add Variant button at top AND bottom
    - Active / Inactive status toggle
+   - RICH-TEXT PRODUCT DESCRIPTION (bold, italic, lists, headings, quote)
    - All errors shown in popup modal
    ========================================================= */
 
@@ -42,6 +43,13 @@
     const statusTitle = document.getElementById("statusToggleTitle");
     const statusDesc = document.getElementById("statusToggleDesc");
 
+    /* description */
+    const descArea = document.getElementById("descArea");
+    const descToolbar = document.getElementById("descToolbar");
+    const descHidden = document.getElementById("product_description");
+    const descCounter = document.getElementById("descCounter");
+    const descChars = document.getElementById("descChars");
+
     /* popups */
     const errorOverlay = document.getElementById("errorOverlay");
     const errorText = document.getElementById("errorText");
@@ -56,6 +64,9 @@
     /* ---------------- STATE ---------------- */
 
     let variantCounter = 0;
+
+    const DESC_MAX = 5000;                 /* soft cap on plain-text length */
+    const DESC_MAX_HTML = 50000;           /* hard cap on HTML string */
 
     /* ---------------- HELPERS ---------------- */
 
@@ -184,6 +195,85 @@
         });
     }
 
+    /* =====================================================
+       DESCRIPTION EDITOR
+       ===================================================== */
+
+    function updateDescCounter() {
+        if (!descArea || !descChars) return;
+
+        const txt = (descArea.innerText || "").replace(/\u00a0/g, " ");
+        const len = txt.length;
+
+        descChars.textContent = len;
+
+        if (descCounter) {
+            descCounter.classList.remove("warn", "over");
+            if (len > DESC_MAX) descCounter.classList.add("over");
+            else if (len > DESC_MAX * 0.9) descCounter.classList.add("warn");
+        }
+    }
+
+    if (descToolbar) {
+        descToolbar.addEventListener("mousedown", function (e) {
+            /* prevent the toolbar click from moving focus/caret out of the editor */
+            if (e.target.closest(".desc-btn")) e.preventDefault();
+        });
+
+        descToolbar.addEventListener("click", function (e) {
+            const btn = e.target.closest(".desc-btn");
+            if (!btn) return;
+
+            e.preventDefault();
+
+            const cmd = btn.dataset.cmd;
+            const arg = btn.dataset.arg || null;
+
+            /* "formatBlock" needs a value wrapped in <> */
+            const value = (cmd === "formatBlock" && arg)
+                ? "<" + arg + ">"
+                : (arg || null);
+
+            try {
+                document.execCommand(cmd, false, value);
+            } catch (err) { /* ignore */ }
+
+            if (descArea) descArea.focus();
+            updateDescCounter();
+        });
+    }
+
+    if (descArea) {
+        descArea.addEventListener("input", updateDescCounter);
+
+        /* paste as plain text */
+        descArea.addEventListener("paste", function (e) {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+            document.execCommand("insertText", false, text);
+            updateDescCounter();
+        });
+    }
+
+    function syncDescriptionToHidden() {
+        if (!descHidden || !descArea) return;
+
+        let html = descArea.innerHTML.trim();
+
+        /* Empty editor or just a lone <br> → store empty string */
+        if (html === "<br>" || html === "<br/>" || html === "<div><br></div>") {
+            html = "";
+        }
+
+        descHidden.value = html;
+    }
+
+    function resetDescription() {
+        if (descArea) descArea.innerHTML = "";
+        if (descHidden) descHidden.value = "";
+        updateDescCounter();
+    }
+
     /* ---------------- VARIANTS ---------------- */
 
     const UNIT_OPTIONS = [
@@ -258,9 +348,6 @@
                 </div>
             </div>
 
-            <!-- ============================================
-                 CONTAINER BOX (optional — price only)
-            ============================================ -->
             <div class="container-box js-container-box">
 
                 <div class="container-toggle-row">
@@ -297,18 +384,14 @@
         variantsList.appendChild(row);
 
         wireVariantEvents(row);
-
         renumberVariants();
 
-        /* Scroll new variant into view */
         setTimeout(() => {
             row.scrollIntoView({ behavior: "smooth", block: "nearest" });
         }, 80);
     }
 
-    /* Wire events for a variant row */
     function wireVariantEvents(row) {
-
         const toggle = row.querySelector(".js-container-toggle");
         const box = row.querySelector(".js-container-box");
         const priceInput = row.querySelector(".js-container-price");
@@ -334,14 +417,12 @@
         });
     }
 
-    /* TOP Add Variant button */
     if (addVariantBtn) {
         addVariantBtn.addEventListener("click", function () {
             addVariantRow();
         });
     }
 
-    /* BOTTOM Add Variant button */
     if (addVariantBtnBottom) {
         addVariantBtnBottom.addEventListener("click", function () {
             addVariantRow();
@@ -380,7 +461,9 @@
 
             const containerToggle = r.querySelector(".js-container-toggle");
             const containerOn = !!(containerToggle && containerToggle.checked);
-            const containerPrice = containerOn ? (r.querySelector(".js-container-price")?.value || "").trim() : "";
+            const containerPrice = containerOn
+                ? (r.querySelector(".js-container-price")?.value || "").trim()
+                : "";
 
             out.push({
                 index: i + 1,
@@ -446,8 +529,26 @@
 
         if (!name) return showError("Product name is required.", "Missing product name");
         if (categoryId <= 0) return showError("Please choose a category.", "Category required");
-        if (!fileInput.files[0])
-            return showError("Please upload a product image.", "Image required");
+        if (!fileInput.files[0]) return showError("Please upload a product image.", "Image required");
+
+        /* ---- DESCRIPTION ---- */
+        syncDescriptionToHidden();
+
+        if (descArea) {
+            const plainLen = (descArea.innerText || "").replace(/\u00a0/g, " ").length;
+            if (plainLen > DESC_MAX) {
+                return showError(
+                    "Description is too long (" + plainLen + " / " + DESC_MAX + " characters). Please shorten it.",
+                    "Description too long"
+                );
+            }
+            if ((descHidden.value || "").length > DESC_MAX_HTML) {
+                return showError(
+                    "Description HTML is too large. Please simplify the formatting.",
+                    "Description too large"
+                );
+            }
+        }
 
         const variants = validateVariants();
         if (!variants) return;
@@ -460,6 +561,7 @@
         formData.append("product_name", name);
         formData.append("category_id", categoryId);
         formData.append("product_status", status);
+        formData.append("product_description", descHidden ? (descHidden.value || "") : "");
 
         formData.append("variants", JSON.stringify(variants.map(v => ({
             quantity: parseFloat(v.quantity).toFixed(2),
@@ -467,7 +569,9 @@
             quantity_name: v.quantity_name,
             price: parseFloat(v.price).toFixed(2),
             container_enabled: v.container_enabled ? 1 : 0,
-            container_price: v.container_price !== "" ? parseFloat(v.container_price).toFixed(2) : "0.00"
+            container_price: v.container_price !== ""
+                ? parseFloat(v.container_price).toFixed(2)
+                : "0.00"
         }))));
 
         formData.append("product_image", fileInput.files[0]);
@@ -493,8 +597,10 @@
                     successOverlay.setAttribute("aria-hidden", "false");
 
                     setLoading(false);
+
                     form.reset();
                     resetImage();
+                    resetDescription();
 
                     variantsList.innerHTML = "";
                     variantCounter = 0;
@@ -525,7 +631,7 @@
     /* ---------------- INIT ---------------- */
 
     addVariantRow();
-
     applyStatusUI();
+    updateDescCounter();
 
 })();

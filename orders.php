@@ -414,6 +414,7 @@ try {
             transition: background .2s ease;
             border-bottom: 1px solid #f4efe8;
             cursor: pointer;
+            position: relative;
         }
 
         .or-table tbody tr:last-child {
@@ -531,6 +532,44 @@ try {
             font-size: 10px;
             color: #948c82;
             margin-top: 2px;
+        }
+
+        /* ---------- NOTES HOVER BUTTON (inside Order cell) ---------- */
+        .order-note-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 5px;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: #fdf1e2;
+            color: #a35a0e;
+            font-size: 9.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(-3px);
+            transition: .18s ease;
+            border: 1px dashed #f3dca5;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        .or-table tbody tr:hover .order-note-btn {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .order-note-btn:hover {
+            background: #fbe8c9;
+            color: #7a4208;
+            border-color: #e8c98a;
+        }
+
+        .order-note-btn i {
+            font-size: 10px;
         }
 
         .cust-cell {
@@ -890,6 +929,201 @@ try {
             transform: translateY(0);
         }
 
+        /* =====================================================
+           NOTES POPUP (modal)
+           ===================================================== */
+        .or-note-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(48, 41, 35, .5);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity .2s ease;
+        }
+
+        .or-note-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .or-note-modal {
+            background: #fff;
+            border-radius: 18px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+            transform: scale(.92);
+            transition: transform .22s cubic-bezier(.3, 1.2, .5, 1);
+            overflow: hidden;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .or-note-overlay.show .or-note-modal {
+            transform: scale(1);
+        }
+
+        .or-note-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            background: linear-gradient(135deg, #fdf7ec 0%, #fbe8e9 100%);
+            border-bottom: 1px solid #f3dca5;
+        }
+
+        .or-note-head-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .or-note-head-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #b51f2c 0%, #8e1722 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .or-note-head-info {
+            min-width: 0;
+        }
+
+        .or-note-head-title {
+            font-family: "Playfair Display", serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: #302923;
+            margin: 0 0 2px;
+            line-height: 1.2;
+        }
+
+        .or-note-head-code {
+            font-size: 11px;
+            color: #8a7f73;
+            font-weight: 700;
+        }
+
+        .or-note-close {
+            width: 32px;
+            height: 32px;
+            border-radius: 9px;
+            border: 1.5px solid #e4ddd3;
+            background: rgba(255, 255, 255, .8);
+            color: #6f675f;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+            transition: .15s ease;
+            flex-shrink: 0;
+        }
+
+        .or-note-close:hover {
+            background: #fff;
+            color: #b51f2c;
+            border-color: #d98a91;
+        }
+
+        .or-note-body {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .or-note-text {
+            font-size: 13.5px;
+            color: #302923;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+            padding: 14px 16px;
+            background: #fdfaf4;
+            border: 1.5px solid #ece5da;
+            border-radius: 12px;
+            min-height: 60px;
+        }
+
+        .or-note-empty {
+            text-align: center;
+            padding: 20px 10px;
+            color: #948c82;
+            font-size: 13px;
+        }
+
+        .or-note-empty i {
+            font-size: 34px;
+            color: #e4ddd3;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .or-note-foot {
+            padding: 14px 20px;
+            background: #fdfaf4;
+            border-top: 1px solid #f0ebe4;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .or-note-close-btn {
+            height: 36px;
+            padding: 0 18px;
+            border-radius: 9px;
+            border: 1.5px solid #ece5da;
+            background: #fff;
+            color: #6f675f;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .15s ease;
+        }
+
+        .or-note-close-btn:hover {
+            background: #faf7f0;
+            color: #302923;
+        }
+
+        .or-note-view-btn {
+            height: 36px;
+            padding: 0 18px;
+            border-radius: 9px;
+            border: 1.5px solid #b51f2c;
+            background: #b51f2c;
+            color: #fff;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: .15s ease;
+            text-decoration: none;
+        }
+
+        .or-note-view-btn:hover {
+            background: #8e1722;
+            color: #fff;
+        }
+
         @media (max-width: 640px) {
             .or-header-actions {
                 width: 100%;
@@ -898,6 +1132,12 @@ try {
             .or-stock-btn {
                 flex: 1;
                 justify-content: center;
+            }
+
+            /* On mobile, always show note button */
+            .order-note-btn {
+                opacity: 1;
+                transform: none;
             }
         }
 
@@ -1142,6 +1382,41 @@ try {
         </div>
 
     </main>
+
+
+    <!-- =====================================================
+         NOTES POPUP
+         ===================================================== -->
+    <div class="or-note-overlay" id="orNoteOverlay">
+        <div class="or-note-modal" role="dialog" aria-modal="true" aria-labelledby="orNoteTitle">
+            <div class="or-note-head">
+                <div class="or-note-head-left">
+                    <div class="or-note-head-icon">
+                        <i class="bi bi-chat-left-text-fill"></i>
+                    </div>
+                    <div class="or-note-head-info">
+                        <h3 class="or-note-head-title" id="orNoteTitle">Order Instructions</h3>
+                        <div class="or-note-head-code" id="orNoteCode">#ORD000000</div>
+                    </div>
+                </div>
+                <button type="button" class="or-note-close" id="orNoteClose" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="or-note-body" id="orNoteBody">
+                <div class="or-note-text" id="orNoteText"></div>
+            </div>
+
+            <div class="or-note-foot">
+                <button type="button" class="or-note-close-btn" id="orNoteCloseBtn">Close</button>
+                <a href="#" class="or-note-view-btn" id="orNoteViewBtn">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                    View Order
+                </a>
+            </div>
+        </div>
+    </div>
 
 
     <script>

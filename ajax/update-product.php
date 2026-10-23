@@ -3,9 +3,8 @@
    MRS MILL@ — AJAX: UPDATE PRODUCT
    File: ./ajax/update-product.php
 
-   - Saves product_name, category_id, product_image, status
-   - Rebuilds variants (delete + re-insert)
-     with OPTIONAL container (container_enabled + container_price)
+   - Saves product_name, description, category_id, product_image, status
+   - Rebuilds variants with OPTIONAL container
    ========================================================= */
 
 ini_set('display_errors', 0);
@@ -42,16 +41,23 @@ try {
         jsonResponse(false, 'Method not allowed.');
     }
 
-    $id          = (int) ($_POST['id'] ?? 0);
-    $name        = trim($_POST['product_name'] ?? '');
-    $categoryId  = (int) ($_POST['category_id'] ?? 0);
-    $statusRaw   = $_POST['product_status'] ?? '1';
-    $removeImage = (int) ($_POST['remove_image'] ?? 0);
-    $variantsRaw = $_POST['variants'] ?? '[]';
+    $id           = (int) ($_POST['id'] ?? 0);
+    $name         = trim($_POST['product_name'] ?? '');
+    $categoryId   = (int) ($_POST['category_id'] ?? 0);
+    $statusRaw    = $_POST['product_status'] ?? '1';
+    $removeImage  = (int) ($_POST['remove_image'] ?? 0);
+    $variantsRaw  = $_POST['variants'] ?? '[]';
+    $description  = trim($_POST['product_description'] ?? '');
 
     $variants = json_decode($variantsRaw, true);
+    $status   = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
-    $status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
+    /* strip <script> and inline event handlers, cap length */
+    $description = preg_replace('#<script\b[^>]*>(.*?)</script>#is', '', $description);
+    $description = preg_replace('#on\w+\s*=\s*"[^"]*"#i', '', $description);
+    if (strlen($description) > 50000) {
+        $description = substr($description, 0, 50000);
+    }
 
     /* ---------------- VALIDATION ---------------- */
 
@@ -68,7 +74,6 @@ try {
     $cleanVariants = [];
 
     foreach ($variants as $i => $v) {
-
         $label = 'Variant #' . ($i + 1);
 
         $qty   = trim((string)($v['quantity'] ?? ''));
@@ -142,7 +147,6 @@ try {
         if ($file['error'] !== UPLOAD_ERR_OK) {
             jsonResponse(false, 'Image upload failed (code ' . $file['error'] . ').');
         }
-
         if ($file['size'] > 3 * 1024 * 1024) {
             jsonResponse(false, 'Image must be under 3 MB.');
         }
@@ -192,7 +196,6 @@ try {
         $uploadedNew  = true;
 
     } elseif ($removeImage === 1 && $currentPath !== '') {
-
         if (function_exists('deleteCategoryImage')) {
             deleteCategoryImage($currentPath, $baseDir);
         }
@@ -203,10 +206,11 @@ try {
 
     $pdo->beginTransaction();
 
-    /* 1) products */
+    /* 1) products — with description */
     $stmt = $pdo->prepare(
         "UPDATE products
          SET product_name  = ?,
+             description   = ?,
              category_id   = ?,
              product_image = ?,
              status        = ?
@@ -215,13 +219,14 @@ try {
 
     $stmt->execute([
         $name,
+        $description !== '' ? $description : null,
         $categoryId,
         $newImagePath,
         $status,
         $id
     ]);
 
-    /* 2) Rebuild variants (with container) */
+    /* 2) Rebuild variants */
     $delV = $pdo->prepare("DELETE FROM product_variants WHERE product_code = ?");
     $delV->execute([$existing['product_code']]);
 
@@ -250,11 +255,12 @@ try {
         true,
         'Product updated successfully.',
         [
-            'id'        => $id,
-            'code'      => $existing['product_code'],
-            'status'    => $status,
-            'variants'  => $cleanVariants,
-            'image_url' => $newImagePath ? ADMIN_URL . $newImagePath : ''
+            'id'          => $id,
+            'code'        => $existing['product_code'],
+            'status'      => $status,
+            'description' => $description !== '' ? 'saved' : 'empty',
+            'variants'    => $cleanVariants,
+            'image_url'   => $newImagePath ? ADMIN_URL . $newImagePath : ''
         ]
     );
 

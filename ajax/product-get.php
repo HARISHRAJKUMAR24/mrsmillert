@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: GET ONE PRODUCT
    File: ./ajax/product-get.php
    Accepts: ?id=1
-   Returns: product + variants (with container) + status
+   Returns: product (with description) + variants (with container) + status
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -23,8 +23,18 @@ if ($id <= 0) {
 
 try {
 
+    /* Explicit column list — includes description */
     $stmt = $pdo->prepare(
-        "SELECT p.*, c.category_name
+        "SELECT p.id,
+                p.product_code,
+                p.product_name,
+                p.description,
+                p.category_id,
+                p.product_image,
+                p.status,
+                p.created_at,
+                p.updated_at,
+                c.category_name
          FROM products p
          LEFT JOIN categories c ON c.id = p.category_id
          WHERE p.id = ? LIMIT 1"
@@ -65,6 +75,9 @@ try {
     /* Status (cast to int) */
     $row['status'] = isset($row['status']) ? (int)$row['status'] : 1;
 
+    /* Description — always a string */
+    $row['description'] = isset($row['description']) ? (string)$row['description'] : '';
+
     /* Image URL */
     $row['image_url'] = !empty($row['product_image'])
         ? ADMIN_URL . $row['product_image']
@@ -73,5 +86,5 @@ try {
     jsonResponse(true, 'OK', $row);
 
 } catch (PDOException $e) {
-    jsonResponse(false, 'Failed to load product.');
+    jsonResponse(false, 'Failed to load product: ' . $e->getMessage());
 }

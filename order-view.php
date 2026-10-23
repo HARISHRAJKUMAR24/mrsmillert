@@ -22,8 +22,9 @@ $custTotalAmount       = 0;
 $custTotalOrderCount   = 0;
 $custTotalPaidOrders   = 0;
 $custTotalUnpaidOrders = 0;
+$orderNote             = '';
 
-/* ---------- 1. Fetch order (with customers join + JSON extraction) ---------- */
+/* ---------- 1. Fetch order ---------- */
 try {
     $stmt = $pdo->prepare(
         "SELECT
@@ -53,7 +54,6 @@ try {
     $stmt->execute([$id]);
     $order = $stmt->fetch();
 
-    /* If join failed (e.g. tables missing), fall back to bare SELECT */
     if (!$order) {
         $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
         $stmt->execute([$id]);
@@ -71,7 +71,6 @@ try {
         }
     }
 } catch (PDOException $e) {
-    /* Last resort — bare SELECT */
     try {
         $stmt = $pdo->prepare("SELECT * FROM orders WHERE id = ? LIMIT 1");
         $stmt->execute([$id]);
@@ -101,7 +100,10 @@ if (!$order) {
 $products = json_decode($order['products_json'] ?? '[]', true);
 if (!is_array($products)) $products = [];
 
-/* ---------- 3. Customer summary (join-based, uses customer_id) ---------- */
+/* ---------- 2b. Order note ---------- */
+$orderNote = trim((string)($order['order_note'] ?? ''));
+
+/* ---------- 3. Customer summary ---------- */
 $customerId = $order['customer_id'] ?? '';
 
 try {
@@ -135,7 +137,7 @@ foreach ($custOrders as $co) {
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 
-/* ---------- 6. Back URL based on order type ---------- */
+/* ---------- 6. Back URL ---------- */
 $backUrl  = 'orders.php';
 $backText = 'Back to Orders';
 if (!empty($order['delivery_mode']) && $order['delivery_mode'] === 'pickup') {
@@ -249,6 +251,58 @@ function fmtNoDec($n)
             font-size: 12.5px; font-weight: 700;
             color: #302923; display: block;
             word-break: break-word;
+        }
+
+        /* ---------- ORDER NOTE CARD ---------- */
+        .ov-note-card {
+            background: linear-gradient(135deg, #fdf7ec 0%, #fbe8e9 100%);
+            border: 1.5px solid #f3dca5;
+            border-radius: 20px;
+            padding: 20px 22px;
+            margin-bottom: 18px;
+        }
+
+        .ov-note-head {
+            display: flex; align-items: center;
+            gap: 12px; margin-bottom: 12px;
+        }
+
+        .ov-note-icon {
+            width: 40px; height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #b8893c 0%, #8f6620 100%);
+            color: #fff;
+            display: flex; align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+            box-shadow: 0 6px 14px rgba(184,137,60,.28);
+        }
+
+        .ov-note-head h3 {
+            margin: 0;
+            font-family: "Playfair Display", serif;
+            font-size: 15px; font-weight: 700;
+            color: #302923;
+        }
+
+        .ov-note-head p {
+            margin: 2px 0 0;
+            font-size: 11px; color: #8a6a1e;
+            font-weight: 600;
+        }
+
+        .ov-note-body {
+            background: #fff;
+            border: 1.5px solid #f0e2c0;
+            border-radius: 12px;
+            padding: 14px 16px;
+            font-size: 13.5px;
+            color: #302923;
+            line-height: 1.65;
+            white-space: pre-wrap;
+            word-break: break-word;
+            min-height: 52px;
         }
 
         .ov-products { display: flex; flex-direction: column; gap: 8px; }
@@ -915,6 +969,23 @@ function fmtNoDec($n)
                             </div>
                         </div>
                     </div>
+
+
+                    <!-- ORDER INSTRUCTIONS / NOTE -->
+                    <?php if ($orderNote !== ''): ?>
+                        <div class="ov-note-card">
+                            <div class="ov-note-head">
+                                <div class="ov-note-icon">
+                                    <i class="bi bi-chat-left-text-fill"></i>
+                                </div>
+                                <div>
+                                    <h3>Order Instructions</h3>
+                                    <p>Provided by customer at checkout</p>
+                                </div>
+                            </div>
+                            <div class="ov-note-body"><?= htmlspecialchars($orderNote) ?></div>
+                        </div>
+                    <?php endif; ?>
 
 
                     <!-- PRODUCTS -->

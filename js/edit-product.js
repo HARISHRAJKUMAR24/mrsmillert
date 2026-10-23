@@ -1,6 +1,7 @@
 /* =========================================================
    MRS MILL@ — EDIT PRODUCT UX
    File: ./js/edit-product.js
+   + Description editor (rich text)
    ========================================================= */
 
 (function () {
@@ -13,48 +14,58 @@
     const PRODUCT_ID = Number(window.PRODUCT_ID || 0);
     const BACK_URL = window.BACK_URL || (BASE_URL + "products.php");
 
-    const form = document.getElementById("productForm");
+    const form        = document.getElementById("productForm");
     const formLoading = document.getElementById("formLoading");
-    const saveBtn = document.getElementById("saveBtn");
-    const saveText = document.getElementById("saveBtnText");
-    const prodBadge = document.getElementById("prodCodeBadge");
+    const saveBtn     = document.getElementById("saveBtn");
+    const saveText    = document.getElementById("saveBtnText");
+    const prodBadge   = document.getElementById("prodCodeBadge");
 
-    const fileInput = document.getElementById("product_image");
-    const imgZone = document.getElementById("imgZone");
+    const fileInput    = document.getElementById("product_image");
+    const imgZone      = document.getElementById("imgZone");
     const imgPlacehold = document.getElementById("imgPlaceholder");
-    const imgWrap = document.getElementById("imgPreviewWrap");
-    const imgPreview = document.getElementById("imgPreview");
-    const imgReplace = document.getElementById("imgReplaceBtn");
-    const imgRemove = document.getElementById("imgRemoveBtn");
-    const newNote = document.getElementById("newImageNote");
-    const removedNote = document.getElementById("removedImageNote");
-    const removeFlag = document.getElementById("remove_image");
+    const imgWrap      = document.getElementById("imgPreviewWrap");
+    const imgPreview   = document.getElementById("imgPreview");
+    const imgReplace   = document.getElementById("imgReplaceBtn");
+    const imgRemove    = document.getElementById("imgRemoveBtn");
+    const newNote      = document.getElementById("newImageNote");
+    const removedNote  = document.getElementById("removedImageNote");
+    const removeFlag   = document.getElementById("remove_image");
+
+    /* description */
+    const descArea    = document.getElementById("descArea");
+    const descToolbar = document.getElementById("descToolbar");
+    const descHidden  = document.getElementById("product_description");
+    const descCounter = document.getElementById("descCounter");
+    const descChars   = document.getElementById("descChars");
 
     const addVariantBtn = document.getElementById("addVariantBtn");
-    const variantsList = document.getElementById("variantsList");
+    const variantsList  = document.getElementById("variantsList");
     const variantsEmpty = document.getElementById("variantsEmpty");
 
     const statusInput = document.getElementById("product_status");
-    const statusRow = document.getElementById("statusToggleRow");
+    const statusRow   = document.getElementById("statusToggleRow");
     const statusTitle = document.getElementById("statusToggleTitle");
-    const statusDesc = document.getElementById("statusToggleDesc");
+    const statusDesc  = document.getElementById("statusToggleDesc");
 
     const confirmOverlay = document.getElementById("confirmOverlay");
-    const confirmCancel = document.getElementById("confirmCancel");
-    const confirmRemove = document.getElementById("confirmRemove");
+    const confirmCancel  = document.getElementById("confirmCancel");
+    const confirmRemove  = document.getElementById("confirmRemove");
 
     const errorOverlay = document.getElementById("errorOverlay");
-    const errorText = document.getElementById("errorText");
-    const errorTitle = document.getElementById("errorTitle");
-    const errorOkBtn = document.getElementById("errorOkBtn");
+    const errorText    = document.getElementById("errorText");
+    const errorTitle   = document.getElementById("errorTitle");
+    const errorOkBtn   = document.getElementById("errorOkBtn");
 
     const successOverlay = document.getElementById("successOverlay");
-    const successText = document.getElementById("successText");
-    const stayBtn = document.getElementById("stayBtn");
+    const successText    = document.getElementById("successText");
+    const stayBtn        = document.getElementById("stayBtn");
 
     if (!form) return;
 
     let variantCounter = 0;
+
+    const DESC_MAX = 5000;
+    const DESC_MAX_HTML = 50000;
 
     function escapeHtml(str) {
         return String(str ?? "")
@@ -92,7 +103,7 @@
 
     function showError(message, title) {
         if (errorTitle) errorTitle.textContent = title || "Oops!";
-        if (errorText) errorText.textContent = message || "Something went wrong.";
+        if (errorText)  errorText.textContent  = message || "Something went wrong.";
         errorOverlay.classList.add("show");
         errorOverlay.setAttribute("aria-hidden", "false");
     }
@@ -106,6 +117,68 @@
     errorOverlay.addEventListener("click", e => {
         if (e.target === errorOverlay) closeError();
     });
+
+    /* ---------------- DESCRIPTION ---------------- */
+
+    function updateDescCounter() {
+        if (!descArea || !descChars) return;
+        const txt = (descArea.innerText || "").replace(/\u00a0/g, " ");
+        const len = txt.length;
+        descChars.textContent = len;
+
+        if (descCounter) {
+            descCounter.classList.remove("warn", "over");
+            if (len > DESC_MAX)              descCounter.classList.add("over");
+            else if (len > DESC_MAX * 0.9)   descCounter.classList.add("warn");
+        }
+    }
+
+    if (descToolbar) {
+        descToolbar.addEventListener("mousedown", function (e) {
+            if (e.target.closest(".desc-btn")) e.preventDefault();
+        });
+
+        descToolbar.addEventListener("click", function (e) {
+            const btn = e.target.closest(".desc-btn");
+            if (!btn) return;
+            e.preventDefault();
+
+            const cmd = btn.dataset.cmd;
+            const arg = btn.dataset.arg || null;
+            const value = (cmd === "formatBlock" && arg) ? "<" + arg + ">" : (arg || null);
+
+            try { document.execCommand(cmd, false, value); } catch (err) {}
+
+            if (descArea) descArea.focus();
+            updateDescCounter();
+        });
+    }
+
+    if (descArea) {
+        descArea.addEventListener("input", updateDescCounter);
+
+        descArea.addEventListener("paste", function (e) {
+            e.preventDefault();
+            const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+            document.execCommand("insertText", false, text);
+            updateDescCounter();
+        });
+    }
+
+    function setDescription(html) {
+        if (!descArea) return;
+        descArea.innerHTML = html || "";
+        updateDescCounter();
+    }
+
+    function syncDescriptionToHidden() {
+        if (!descHidden || !descArea) return;
+        let html = descArea.innerHTML.trim();
+        if (html === "<br>" || html === "<br/>" || html === "<div><br></div>") {
+            html = "";
+        }
+        descHidden.value = html;
+    }
 
     /* ---------------- IMAGE ---------------- */
 
@@ -146,7 +219,6 @@
                 fileInput.value = "";
                 return;
             }
-
             if (file.size > 3 * 1024 * 1024) {
                 showError("Image must be under 3 MB.", "Image too large");
                 fileInput.value = "";
@@ -162,16 +234,14 @@
 
     if (imgReplace) {
         imgReplace.addEventListener("click", e => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             fileInput.click();
         });
     }
 
     if (imgRemove) {
         imgRemove.addEventListener("click", e => {
-            e.preventDefault();
-            e.stopPropagation();
+            e.preventDefault(); e.stopPropagation();
             confirmOverlay.classList.add("show");
             confirmOverlay.setAttribute("aria-hidden", "false");
         });
@@ -216,13 +286,13 @@
     /* ---------------- VARIANTS ---------------- */
 
     const UNIT_OPTIONS = [
-        { v: "liter", t: "Liter" },
-        { v: "milliliter", t: "Milliliter" },
-        { v: "gram", t: "Gram" },
-        { v: "kilogram", t: "Kilogram" },
-        { v: "plate", t: "Plate" },
-        { v: "packet", t: "Packet" },
-        { v: "bucket", t: "Bucket" }
+        { v: "liter",       t: "Liter" },
+        { v: "milliliter",  t: "Milliliter" },
+        { v: "gram",        t: "Gram" },
+        { v: "kilogram",    t: "Kilogram" },
+        { v: "plate",       t: "Plate" },
+        { v: "packet",      t: "Packet" },
+        { v: "bucket",      t: "Bucket" }
     ];
 
     function buildUnitOptions(selectedVal) {
@@ -241,9 +311,7 @@
         const rows = variantsList.querySelectorAll(".variant-row");
         rows.forEach(function (r, idx) {
             const badge = r.querySelector(".variant-badge");
-            if (badge) {
-                badge.innerHTML = `<i class="bi bi-layers-half"></i> Variant #${idx + 1}`;
-            }
+            if (badge) badge.innerHTML = `<i class="bi bi-layers-half"></i> Variant #${idx + 1}`;
         });
     }
 
@@ -256,7 +324,6 @@
             ? Number(data.container_price)
             : "";
 
-        /* ✅ REAL DB ID if provided, else a temp "new_N" */
         const rowVid = (data.id !== undefined && data.id !== null && Number(data.id) > 0)
             ? String(data.id)
             : "new_" + variantCounter;
@@ -320,25 +387,19 @@
             </div>
 
             <div class="container-box js-container-box ${contEnabled ? "active" : ""}">
-
                 <div class="container-toggle-row">
                     <div class="container-toggle-info">
                         <i class="bi bi-box2-heart"></i>
                         <div>
-                            <h5>
-                                Container Box
-                                <span class="optional-tag">Optional</span>
-                            </h5>
+                            <h5>Container Box <span class="optional-tag">Optional</span></h5>
                             <p>Add a container charge that is added to the variant price.</p>
                         </div>
                     </div>
-
                     <label class="mm-switch-sm">
                         <input type="checkbox" class="js-container-toggle" ${contEnabled ? "checked" : ""}>
                         <span class="mm-switch-slider"></span>
                     </label>
                 </div>
-
                 <div class="container-fields">
                     <label class="field-label">Container Price (₹) <span class="required">*</span></label>
                     <input type="number"
@@ -349,38 +410,31 @@
                            inputmode="decimal"
                            value="${contEnabled && contPrice !== '' ? escapeHtml(String(contPrice)) : ''}">
                 </div>
-
             </div>
         `;
 
         variantsList.appendChild(row);
 
-        const toggle = row.querySelector(".js-container-toggle");
-        const box = row.querySelector(".js-container-box");
+        const toggle  = row.querySelector(".js-container-toggle");
+        const box     = row.querySelector(".js-container-box");
         const contInp = row.querySelector(".js-container-price");
 
         toggle.addEventListener("change", function () {
             box.classList.toggle("active", toggle.checked);
-            if (toggle.checked) {
-                setTimeout(() => contInp.focus(), 100);
-            } else {
-                contInp.value = "";
-            }
+            if (toggle.checked) setTimeout(() => contInp.focus(), 100);
+            else contInp.value = "";
         });
 
         renumberVariants();
         refreshVariantsEmpty();
     }
 
-    if (addVariantBtn) {
-        addVariantBtn.addEventListener("click", () => addVariantRow());
-    }
+    if (addVariantBtn) addVariantBtn.addEventListener("click", () => addVariantRow());
 
     if (variantsList) {
         variantsList.addEventListener("click", e => {
             const btn = e.target.closest(".variant-remove-btn");
             if (!btn) return;
-
             const row = btn.closest(".variant-row");
             if (!row) return;
 
@@ -402,14 +456,12 @@
 
         for (let i = 0; i < rows.length; i++) {
             const r = rows[i];
-
             const containerToggle = r.querySelector(".js-container-toggle");
             const containerOn = !!(containerToggle && containerToggle.checked);
             const containerPrice = containerOn
                 ? (r.querySelector(".js-container-price")?.value || "").trim()
                 : "";
 
-            /* ✅ REAL DB ID (or "new_N") */
             const vid = (r.querySelector(".js-variant-id")?.value || r.dataset.vid || "").trim();
 
             out.push({
@@ -436,7 +488,6 @@
 
         for (const v of variants) {
             const label = "Variant #" + v.index;
-
             if (v.quantity === "" || isNaN(Number(v.quantity)) || Number(v.quantity) <= 0) {
                 showError(label + ": please enter a valid quantity.", "Invalid quantity");
                 return null;
@@ -453,7 +504,6 @@
                 showError(label + ": please enter a valid price.", "Invalid price");
                 return null;
             }
-
             if (v.container_enabled) {
                 if (v.container_price === "" || isNaN(Number(v.container_price)) || Number(v.container_price) < 0) {
                     showError(label + ": please enter a valid container price.", "Invalid container price");
@@ -467,6 +517,8 @@
     /* ---------------- LOAD PRODUCT ---------------- */
 
     function loadProduct() {
+        formLoading.style.display = "";
+        form.style.display = "none";
 
         fetch(BASE_URL + "ajax/product-get.php?id=" + PRODUCT_ID, {
             credentials: "same-origin"
@@ -486,19 +538,18 @@
                 document.getElementById("product_name").value = p.product_name || "";
                 document.getElementById("category_id").value = p.category_id || "";
 
-                if (prodBadge) prodBadge.textContent = "#" + (p.product_code || "");
+                /* description */
+                setDescription(p.description || "");
 
+                if (prodBadge) prodBadge.textContent = "#" + (p.product_code || "");
                 if (removeFlag) removeFlag.value = "0";
 
                 const active = String(p.status) === "1";
                 if (statusInput) statusInput.checked = active;
                 applyStatusUI();
 
-                if (p.image_url) {
-                    showPreviewFromUrl(p.image_url);
-                } else {
-                    hidePreview();
-                }
+                if (p.image_url) showPreviewFromUrl(p.image_url);
+                else hidePreview();
                 resetNotes();
 
                 variantsList.innerHTML = "";
@@ -506,7 +557,7 @@
 
                 if (Array.isArray(p.variants) && p.variants.length > 0) {
                     p.variants.forEach(v => addVariantRow({
-                        id: v.id,                              // ✅ pass real id
+                        id: v.id,
                         quantity: v.quantity,
                         quantity_unit: v.quantity_unit,
                         quantity_name: v.quantity_name,
@@ -521,7 +572,6 @@
 
                 formLoading.style.display = "none";
                 form.style.display = "";
-
             })
             .catch(() => {
                 formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">Unable to connect to server.</div>';
@@ -534,14 +584,33 @@
 
         e.preventDefault();
 
-        const id = Number(document.getElementById("product_id").value || 0);
-        const name = document.getElementById("product_name").value.trim();
-        const categoryId = Number(document.getElementById("category_id").value);
-        const removeImg = removeFlag ? removeFlag.value : "0";
+        const id          = Number(document.getElementById("product_id").value || 0);
+        const name        = document.getElementById("product_name").value.trim();
+        const categoryId  = Number(document.getElementById("category_id").value);
+        const removeImg   = removeFlag ? removeFlag.value : "0";
 
-        if (id <= 0) return showError("Invalid product ID.", "Error");
-        if (!name) return showError("Product name is required.", "Missing name");
+        if (id <= 0)        return showError("Invalid product ID.", "Error");
+        if (!name)          return showError("Product name is required.", "Missing name");
         if (categoryId <= 0) return showError("Please choose a category.", "Category required");
+
+        /* ---- DESCRIPTION ---- */
+        syncDescriptionToHidden();
+
+        if (descArea) {
+            const plainLen = (descArea.innerText || "").replace(/\u00a0/g, " ").length;
+            if (plainLen > DESC_MAX) {
+                return showError(
+                    "Description is too long (" + plainLen + " / " + DESC_MAX + " characters). Please shorten it.",
+                    "Description too long"
+                );
+            }
+            if ((descHidden.value || "").length > DESC_MAX_HTML) {
+                return showError(
+                    "Description HTML is too large. Please simplify the formatting.",
+                    "Description too large"
+                );
+            }
+        }
 
         const variants = validateVariants();
         if (!variants) return;
@@ -568,9 +637,11 @@
         formData.append("remove_image", removeImg);
         formData.append("back", BACK_URL);
 
-        /* ✅ SEND id + data */
+        /* description */
+        formData.append("product_description", descHidden ? (descHidden.value || "") : "");
+
         formData.append("variants", JSON.stringify(variants.map(v => ({
-            id: v.id,                                          // ← FIXED
+            id: v.id,
             quantity: parseFloat(v.quantity).toFixed(2),
             quantity_unit: v.quantity_unit,
             quantity_name: v.quantity_name,
@@ -610,9 +681,7 @@
             });
     });
 
-    function goBackToList() {
-        window.location.href = BACK_URL;
-    }
+    function goBackToList() { window.location.href = BACK_URL; }
 
     if (successOverlay) {
         successOverlay.addEventListener("click", e => {

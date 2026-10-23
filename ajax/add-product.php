@@ -2,6 +2,7 @@
 /* =========================================================
    MRS MILL@ — AJAX: ADD PRODUCT
    File: ./ajax/add-product.php
+   - Saves product description (rich HTML)
    - Auto-generates product_code
    - Uploads product image
    - Inserts MULTIPLE variants with OPTIONAL container price
@@ -21,17 +22,25 @@ $name         = trim($_POST['product_name'] ?? '');
 $categoryId   = (int) ($_POST['category_id'] ?? 0);
 $statusRaw    = $_POST['product_status'] ?? '1';
 $variantsRaw  = $_POST['variants'] ?? '[]';
+$description  = trim($_POST['product_description'] ?? '');
 
 $variants     = json_decode($variantsRaw, true);
+$status       = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
 
-$status = ($statusRaw === '1' || $statusRaw === 1 || $statusRaw === true) ? 1 : 0;
+/* strip <script> tags but keep other HTML */
+$description = preg_replace('#<script\b[^>]*>(.*?)</script>#is', '', $description);
+$description = preg_replace('#on\w+\s*=\s*"[^"]*"#i', '', $description); // remove inline JS handlers
+
+/* cap length */
+if (strlen($description) > 50000) {
+    $description = substr($description, 0, 50000);
+}
 
 /* ---------------- VALIDATION ---------------- */
 
-if ($name === '')       jsonResponse(false, 'Product name is required.');
-if ($categoryId <= 0)   jsonResponse(false, 'Please choose a category.');
+if ($name === '')     jsonResponse(false, 'Product name is required.');
+if ($categoryId <= 0) jsonResponse(false, 'Please choose a category.');
 
-/* ---- Variants ---- */
 if (!is_array($variants) || count($variants) === 0) {
     jsonResponse(false, 'Please add at least one quantity variant.');
 }
@@ -87,8 +96,10 @@ if (count($cleanVariants) === 0) {
     jsonResponse(false, 'Please add at least one valid quantity variant.');
 }
 
-if (!isset($_FILES['product_image']) ||
-    ($_FILES['product_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+if (
+    !isset($_FILES['product_image']) ||
+    ($_FILES['product_image']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE
+) {
     jsonResponse(false, 'Please upload a product image.');
 }
 
@@ -168,16 +179,17 @@ try {
 
     $pdo->beginTransaction();
 
-    /* 1) products */
+    /* 1) products — now with description */
     $stmt = $pdo->prepare(
         "INSERT INTO products
-            (product_code, product_name, category_id, product_image, status)
-         VALUES (?, ?, ?, ?, ?)"
+            (product_code, product_name, description, category_id, product_image, status)
+         VALUES (?, ?, ?, ?, ?, ?)"
     );
 
     $stmt->execute([
         $productCode,
         $name,
+        $description !== '' ? $description : null,
         $categoryId,
         $relPath,
         $status
@@ -215,14 +227,14 @@ try {
         true,
         'Product added successfully.',
         [
-            'id'         => $productId,
-            'code'       => $productCode,
-            'status'     => $status,
-            'variants'   => $cleanVariants,
-            'image_url'  => ADMIN_URL . $relPath
+            'id'          => $productId,
+            'code'        => $productCode,
+            'status'      => $status,
+            'description' => $description !== '' ? 'saved' : 'empty',
+            'variants'    => $cleanVariants,
+            'image_url'   => ADMIN_URL . $relPath
         ]
     );
-
 } catch (PDOException $e) {
 
     if ($pdo->inTransaction()) {

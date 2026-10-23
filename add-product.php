@@ -167,9 +167,135 @@ try {
 
 
         /* =====================================================
-           STATUS TOGGLE
+           DESCRIPTION EDITOR (LIGHTWEIGHT, NO EXTERNAL LIBRARY)
         ===================================================== */
 
+        .desc-editor {
+            border: 1.5px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 12px;
+            overflow: hidden;
+            transition: .2s ease;
+        }
+
+        .desc-editor:focus-within {
+            border-color: #d98a91;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .desc-toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+            padding: 6px;
+            background: #fdfaf4;
+            border-bottom: 1px solid #f0ebe4;
+        }
+
+        .desc-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 7px;
+            border: none;
+            background: transparent;
+            color: #6f675f;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            transition: .15s ease;
+        }
+
+        .desc-btn:hover {
+            background: #fbe8e9;
+            color: #b51f2c;
+        }
+
+        .desc-btn.active {
+            background: #b51f2c;
+            color: #fff;
+        }
+
+        .desc-sep {
+            width: 1px;
+            background: #ece5da;
+            margin: 4px 3px;
+            align-self: stretch;
+        }
+
+        .desc-area {
+            min-height: 140px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 14px 16px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 13px;
+            color: #292521;
+            line-height: 1.6;
+            outline: none;
+        }
+
+        .desc-area:empty::before {
+            content: attr(data-placeholder);
+            color: #b0a79c;
+            pointer-events: none;
+        }
+
+        .desc-area ul {
+            margin: 6px 0 6px 20px;
+            padding: 0;
+        }
+
+        .desc-area ol {
+            margin: 6px 0 6px 20px;
+            padding: 0;
+        }
+
+        .desc-area p {
+            margin: 0 0 8px;
+        }
+
+        .desc-area h3 {
+            margin: 12px 0 6px;
+            font-size: 15px;
+            color: #302923;
+        }
+
+        .desc-area blockquote {
+            margin: 8px 0;
+            padding: 6px 12px;
+            border-left: 3px solid #b51f2c;
+            background: #fff5f5;
+            color: #6f675f;
+            font-style: italic;
+        }
+
+        .desc-counter {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 14px;
+            background: #fdfaf4;
+            border-top: 1px solid #f0ebe4;
+            font-size: 10.5px;
+            color: #948c82;
+            font-weight: 600;
+        }
+
+        .desc-counter.warn {
+            color: #a35a0e;
+        }
+
+        .desc-counter.over {
+            color: #b51f2c;
+        }
+
+
+        /* =====================================================
+           STATUS TOGGLE (unchanged)
+        ===================================================== */
         .status-toggle-row {
             display: flex;
             align-items: center;
@@ -265,9 +391,8 @@ try {
 
 
         /* =====================================================
-           VARIANTS SECTION
+           VARIANTS
         ===================================================== */
-
         .variants-section {
             margin-top: 22px;
             padding-top: 20px;
@@ -334,7 +459,6 @@ try {
             background: #8e1722;
         }
 
-        /* Bottom add-variant button */
         .add-variant-btn-bottom {
             width: 100%;
             margin-top: 12px;
@@ -472,10 +596,6 @@ try {
             box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
-
-        /* =====================================================
-           CONTAINER BOX (optional per variant)
-        ===================================================== */
         .container-box {
             margin-top: 10px;
             padding: 12px 14px;
@@ -603,7 +723,6 @@ try {
 
 
         /* IMAGE UPLOAD */
-
         .img-upload-zone {
             position: relative;
             border: 2px dashed #e4ddd3;
@@ -700,7 +819,6 @@ try {
 
 
         /* ACTIONS */
-
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -763,7 +881,6 @@ try {
 
 
         /* MODALS */
-
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -889,6 +1006,7 @@ try {
             background: #faf7f0;
         }
 
+
         @media (max-width: 768px) {
             .product-page {
                 padding: 20px 15px 30px;
@@ -978,6 +1096,7 @@ try {
 
                     <div class="row g-3">
 
+                        <!-- NAME -->
                         <div class="col-12">
                             <label>Product Name <span class="required">*</span></label>
                             <div class="input-icon-wrap">
@@ -991,6 +1110,7 @@ try {
                             </div>
                         </div>
 
+                        <!-- CATEGORY -->
                         <div class="col-12">
                             <label>Category <span class="required">*</span></label>
                             <select id="category_id" class="product-input" required>
@@ -1009,8 +1129,42 @@ try {
                             <?php endif; ?>
                         </div>
 
-                        <!-- ==================== STATUS TOGGLE ==================== -->
+                        <!-- DESCRIPTION (NEW) -->
+                        <div class="col-12">
+                            <label>Product Description</label>
 
+                            <div class="desc-editor">
+                                <div class="desc-toolbar" id="descToolbar">
+                                    <button type="button" class="desc-btn" data-cmd="bold" title="Bold"><i class="bi bi-type-bold"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="italic" title="Italic"><i class="bi bi-type-italic"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="underline" title="Underline"><i class="bi bi-type-underline"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="insertUnorderedList" title="Bullet list"><i class="bi bi-list-ul"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="insertOrderedList" title="Numbered list"><i class="bi bi-list-ol"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="formatBlock" data-arg="h3" title="Heading"><i class="bi bi-type-h3"></i></button>
+                                    <button type="button" class="desc-btn" data-cmd="formatBlock" data-arg="blockquote" title="Quote"><i class="bi bi-quote"></i></button>
+                                    <span class="desc-sep"></span>
+                                    <button type="button" class="desc-btn" data-cmd="removeFormat" title="Clear formatting"><i class="bi bi-eraser"></i></button>
+                                </div>
+
+                                <div class="desc-area"
+                                    id="descArea"
+                                    contenteditable="true"
+                                    role="textbox"
+                                    aria-multiline="true"
+                                    data-placeholder="Describe the product — ingredients, taste, storage tips, etc."></div>
+
+                                <div class="desc-counter" id="descCounter">
+                                    <span><i class="bi bi-info-circle"></i> Rich text allowed — bold, lists, headings</span>
+                                    <span><span id="descChars">0</span> / 5000</span>
+                                </div>
+
+                                <input type="hidden" id="product_description" name="product_description" value="">
+                            </div>
+                        </div>
+
+                        <!-- STATUS -->
                         <div class="col-12">
                             <div class="status-toggle-row is-active" id="statusToggleRow">
                                 <div class="status-toggle-info">
@@ -1029,6 +1183,7 @@ try {
                             </div>
                         </div>
 
+                        <!-- IMAGE -->
                         <div class="col-12">
                             <label>Product Image <span class="required">*</span></label>
 
@@ -1061,8 +1216,7 @@ try {
                     </div>
 
 
-                    <!-- ==================== QUANTITY VARIANTS ==================== -->
-
+                    <!-- VARIANTS -->
                     <div class="variants-section">
 
                         <div class="variants-head">
@@ -1079,12 +1233,8 @@ try {
                             </button>
                         </div>
 
-                        <div class="variants-list" id="variantsList">
-                            <!-- JS renders variant rows here -->
-                        </div>
+                        <div class="variants-list" id="variantsList"></div>
 
-
-                        <!-- Bottom Add Variant button -->
                         <button type="button" class="add-variant-btn-bottom" id="addVariantBtnBottom">
                             <i class="bi bi-plus-circle"></i>
                             Add Another Variant
@@ -1094,7 +1244,7 @@ try {
 
 
                     <div class="form-actions">
-                        <a href="product.php" class="btn-cancel">Cancel</a>
+                        <a href="products.php" class="btn-cancel">Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Save Product</span>
@@ -1111,7 +1261,6 @@ try {
 
 
     <!-- ERROR POPUP -->
-
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon error">
@@ -1129,7 +1278,6 @@ try {
 
 
     <!-- SUCCESS POPUP -->
-
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon success">

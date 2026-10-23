@@ -5,6 +5,7 @@
    + Row checkboxes (select-all with indeterminate state)
    + Bulk action bar
    + Individual House label for address_type = individual_house
+   + Notes hover button → popup modal
    ========================================================= */
 
 (function () {
@@ -36,6 +37,15 @@
     const bulkCountEl  = document.getElementById("orBulkCount");
     const bulkClear    = document.getElementById("orBulkClear");
     const bulkSample   = document.getElementById("orBulkSample");
+
+    /* Notes popup */
+    const noteOverlay  = document.getElementById("orNoteOverlay");
+    const noteClose    = document.getElementById("orNoteClose");
+    const noteCloseBtn = document.getElementById("orNoteCloseBtn");
+    const noteCodeEl   = document.getElementById("orNoteCode");
+    const noteTextEl   = document.getElementById("orNoteText");
+    const noteBodyEl   = document.getElementById("orNoteBody");
+    const noteViewBtn  = document.getElementById("orNoteViewBtn");
 
     if (!tbody) return;
 
@@ -111,6 +121,7 @@
         const isPickup  = o.delivery_mode === "pickup";
         const isHouse   = o.address_type === "individual_house";
         const isChecked = selectedIds.has(String(o.id));
+        const hasNote   = !!(o.order_note && String(o.order_note).trim() !== "");
 
         let modeCell = "";
 
@@ -142,6 +153,12 @@
                 </div>`;
         }
 
+        const noteBtnHtml = hasNote
+            ? `<div class="order-note-btn" data-note-btn="1" data-note-order="${o.id}" title="Click to view order instructions">
+                   <i class="bi bi-chat-left-text"></i> Notes
+               </div>`
+            : ``;
+
         return `
             <tr data-id="${o.id}" class="${isChecked ? 'is-selected' : ''}" data-href="${BASE_URL}order-view.php?id=${o.id}">
                 <td class="col-check">
@@ -155,6 +172,7 @@
                         <div class="order-info">
                             <div class="order-code">#${escapeHtml(o.order_code)}</div>
                             <div class="order-time">${escapeHtml(formatDate(o.created_at))}</div>
+                            ${noteBtnHtml}
                         </div>
                     </div>
                 </td>
@@ -192,7 +210,68 @@
         `;
     }
 
-    /* PAGINATION */
+    /* =========================================================
+       NOTES POPUP
+       ========================================================= */
+    function openNotePopup(order) {
+        if (!noteOverlay) return;
+
+        if (noteCodeEl) noteCodeEl.textContent = "#" + (order.order_code || "");
+        if (noteTextEl) {
+            const note = String(order.order_note || "").trim();
+            if (note) {
+                noteTextEl.textContent = note;
+                noteTextEl.style.display = "block";
+            } else {
+                noteTextEl.style.display = "none";
+            }
+        }
+
+        if (noteBodyEl) {
+            const existingEmpty = noteBodyEl.querySelector(".or-note-empty");
+            if (existingEmpty) existingEmpty.remove();
+
+            const note = String(order.order_note || "").trim();
+            if (!note) {
+                const emptyDiv = document.createElement("div");
+                emptyDiv.className = "or-note-empty";
+                emptyDiv.innerHTML = `<i class="bi bi-inbox"></i>No instructions on this order.`;
+                noteBodyEl.appendChild(emptyDiv);
+            }
+        }
+
+        if (noteViewBtn) {
+            noteViewBtn.href = BASE_URL + "order-view.php?id=" + order.id;
+        }
+
+        noteOverlay.classList.add("show");
+        document.body.style.overflow = "hidden";
+    }
+
+    function closeNotePopup() {
+        if (!noteOverlay) return;
+        noteOverlay.classList.remove("show");
+        document.body.style.overflow = "";
+    }
+
+    if (noteClose) noteClose.addEventListener("click", closeNotePopup);
+    if (noteCloseBtn) noteCloseBtn.addEventListener("click", closeNotePopup);
+
+    if (noteOverlay) {
+        noteOverlay.addEventListener("click", function (e) {
+            if (e.target === noteOverlay) closeNotePopup();
+        });
+    }
+
+    document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape" && noteOverlay && noteOverlay.classList.contains("show")) {
+            closeNotePopup();
+        }
+    });
+
+    /* =========================================================
+       PAGINATION
+       ========================================================= */
     function renderPage() {
         const total = filteredRows.length;
 
@@ -344,7 +423,8 @@
                     o.pickup_branch_name || "",
                     o.apartment_name || "",
                     o.full_address || "",
-                    o.address_type || ""
+                    o.address_type || "",
+                    o.order_note || ""
                 ].join(" ").toLowerCase();
                 return hay.indexOf(q) !== -1;
             });
@@ -466,6 +546,17 @@
 
     /* Toggle on checkbox click */
     tbody.addEventListener("click", function (e) {
+
+        /* ---------- Notes button click → open popup ---------- */
+        const noteBtn = e.target.closest(".order-note-btn");
+        if (noteBtn) {
+            e.stopPropagation();
+            e.preventDefault();
+            const orderId = noteBtn.dataset.noteOrder;
+            const order = allRows.find(r => String(r.id) === String(orderId));
+            if (order) openNotePopup(order);
+            return;
+        }
 
         /* Checkbox click */
         const checkbox = e.target.closest(".or-check[data-check-id]");
