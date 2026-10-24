@@ -76,7 +76,6 @@ try {
             font-size: 13px;
         }
 
-        /* Selection toolbar */
         .or-bulk {
             display: flex;
             align-items: center;
@@ -206,11 +205,6 @@ try {
             color: #2e7d32;
         }
 
-        .or-stat.gold .or-stat-value {
-            color: #b8893c;
-        }
-
-        /* Filters */
         .or-filters {
             display: flex;
             align-items: center;
@@ -231,11 +225,6 @@ try {
             transition: .2s ease;
         }
 
-        .or-date-filter:focus-within {
-            border-color: #b51f2c;
-            box-shadow: 0 0 0 4px rgba(181, 31, 44, .08);
-        }
-
         .or-date-filter>i {
             position: absolute;
             left: 12px;
@@ -248,7 +237,6 @@ try {
 
         .or-date-filter select {
             appearance: none;
-            -webkit-appearance: none;
             border: none;
             background: transparent;
             font-family: "DM Sans", sans-serif;
@@ -369,7 +357,6 @@ try {
             pointer-events: none;
         }
 
-        /* Card + table */
         .or-card {
             background: #fff;
             border: 1px solid #eee7dc;
@@ -402,7 +389,6 @@ try {
             white-space: nowrap;
         }
 
-        /* Checkbox column */
         .or-table th.col-check,
         .or-table td.col-check {
             width: 44px;
@@ -440,7 +426,6 @@ try {
             vertical-align: middle;
         }
 
-        /* Custom checkbox */
         .or-check {
             position: relative;
             width: 20px;
@@ -495,7 +480,6 @@ try {
             transform: none;
             border-radius: 2px;
             opacity: 1;
-            margin: 0;
         }
 
         .order-cell {
@@ -534,7 +518,6 @@ try {
             margin-top: 2px;
         }
 
-        /* ---------- NOTES HOVER BUTTON (inside Order cell) ---------- */
         .order-note-btn {
             display: inline-flex;
             align-items: center;
@@ -570,6 +553,36 @@ try {
 
         .order-note-btn i {
             font-size: 10px;
+        }
+
+        /* ---------- ASSIGN DELIVERY BOY BUTTON ---------- */
+        .assign-boy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+            padding: 4px 10px;
+            border-radius: 7px;
+            background: #fff;
+            border: 1.5px dashed #b51f2c;
+            color: #b51f2c;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            cursor: pointer;
+            transition: .18s ease;
+            white-space: nowrap;
+        }
+
+        .assign-boy-btn:hover {
+            background: #b51f2c;
+            color: #fff;
+            border-style: solid;
+        }
+
+        .assign-boy-btn i {
+            font-size: 11px;
         }
 
         .cust-cell {
@@ -675,10 +688,12 @@ try {
             background: #fdf1e2;
             color: #a35a0e;
         }
+
         .mode-house {
             background: #eef7f0;
             color: #2e7d32;
         }
+
         .amount-cell {
             font-family: "Playfair Display", serif;
             font-weight: 700;
@@ -733,7 +748,6 @@ try {
             font-size: 12px;
         }
 
-        /* Pagination */
         .or-pagination {
             display: flex;
             align-items: center;
@@ -783,11 +797,9 @@ try {
             cursor: pointer;
             outline: none;
             appearance: none;
-            -webkit-appearance: none;
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
             background-repeat: no-repeat;
             background-position: right 9px center;
-            transition: .2s ease;
         }
 
         .pagination-controls {
@@ -845,10 +857,6 @@ try {
             user-select: none;
         }
 
-        .pagination-controls i {
-            font-size: 12px;
-        }
-
         .or-stock-btn {
             display: inline-flex;
             align-items: center;
@@ -876,15 +884,8 @@ try {
         .or-stock-btn:hover {
             transform: translateY(-1px);
             color: #fff;
-            box-shadow: 0 14px 28px rgba(181, 31, 44, .3);
         }
 
-        .or-stock-btn:active {
-            transform: translateY(0);
-        }
-        /* =====================================================
-           HEADER ACTIONS GROUP
-           ===================================================== */
         .or-header-actions {
             display: flex;
             gap: 10px;
@@ -892,7 +893,6 @@ try {
             flex-wrap: wrap;
         }
 
-        /* ---------- APARTMENT ORDERS BUTTON ---------- */
         .or-apartment-btn {
             display: inline-flex;
             align-items: center;
@@ -921,17 +921,9 @@ try {
             background: #fdfaf4;
             border-color: #d98a91;
             color: #302923;
-            transform: translateY(-1px);
-            box-shadow: 0 8px 20px rgba(48, 41, 35, .08);
         }
 
-        .or-apartment-btn:active {
-            transform: translateY(0);
-        }
-
-        /* =====================================================
-           NOTES POPUP (modal)
-           ===================================================== */
+        /* NOTES MODAL */
         .or-note-overlay {
             position: fixed;
             inset: 0;
@@ -997,10 +989,6 @@ try {
             justify-content: center;
             font-size: 18px;
             flex-shrink: 0;
-        }
-
-        .or-note-head-info {
-            min-width: 0;
         }
 
         .or-note-head-title {
@@ -1124,17 +1112,224 @@ try {
             color: #fff;
         }
 
+        /* =====================================================
+           ASSIGN DELIVERY BOY MODAL
+           ===================================================== */
+        .or-assign-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(48, 41, 35, .5);
+            backdrop-filter: blur(3px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+            opacity: 0;
+            transition: opacity .2s ease;
+        }
+
+        .or-assign-overlay.show {
+            display: flex;
+            opacity: 1;
+        }
+
+        .or-assign-modal {
+            background: #fff;
+            border-radius: 18px;
+            max-width: 460px;
+            width: 100%;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, .25);
+            transform: scale(.92);
+            transition: transform .22s cubic-bezier(.3, 1.2, .5, 1);
+            overflow: hidden;
+            max-height: 85vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .or-assign-overlay.show .or-assign-modal {
+            transform: scale(1);
+        }
+
+        .or-assign-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 18px 20px;
+            background: linear-gradient(135deg, #fbeaea 0%, #f5d6d8 100%);
+            border-bottom: 1px solid #f1c8cc;
+        }
+
+        .or-assign-head-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .or-assign-head-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, #b51f2c 0%, #8e1722 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            flex-shrink: 0;
+        }
+
+        .or-assign-head-title {
+            font-family: "Playfair Display", serif;
+            font-size: 17px;
+            font-weight: 700;
+            color: #302923;
+            margin: 0 0 2px;
+        }
+
+        .or-assign-head-code {
+            font-size: 11px;
+            color: #8a7f73;
+            font-weight: 700;
+        }
+
+        .or-assign-body {
+            padding: 18px 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+
+        .or-assign-empty {
+            text-align: center;
+            padding: 30px 10px;
+            color: #948c82;
+            font-size: 13px;
+        }
+
+        .or-assign-empty i {
+            font-size: 34px;
+            color: #e4ddd3;
+            display: block;
+            margin-bottom: 10px;
+        }
+
+        .or-boy-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .or-boy-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 14px;
+            border-radius: 12px;
+            border: 1.5px solid #ece5da;
+            background: #fffdf9;
+            cursor: pointer;
+            transition: .18s ease;
+        }
+
+        .or-boy-item:hover {
+            border-color: #b51f2c;
+            background: #fff5f5;
+            transform: translateY(-1px);
+        }
+
+        .or-boy-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 11px;
+            background: linear-gradient(135deg, #b51f2c 0%, #8e1722 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            font-size: 14px;
+            flex-shrink: 0;
+        }
+
+        .or-boy-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .or-boy-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: #302923;
+            margin: 0 0 2px;
+        }
+
+        .or-boy-code {
+            font-size: 11px;
+            color: #948c82;
+            font-weight: 700;
+        }
+
+        .or-boy-pick {
+            font-size: 11.5px;
+            color: #b51f2c;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .or-assign-foot {
+            padding: 14px 20px;
+            background: #fdfaf4;
+            border-top: 1px solid #f0ebe4;
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        /* Toast */
+        .or-toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(20px);
+            padding: 12px 22px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 700;
+            font-family: "DM Sans", sans-serif;
+            color: #fff;
+            background: #2e7d32;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, .25);
+            z-index: 99999;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .25s ease, transform .25s ease;
+            max-width: 90vw;
+            text-align: center;
+        }
+
+        .or-toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .or-toast.error {
+            background: #b51f2c;
+        }
+
         @media (max-width: 640px) {
             .or-header-actions {
                 width: 100%;
             }
+
             .or-apartment-btn,
             .or-stock-btn {
                 flex: 1;
                 justify-content: center;
             }
 
-            /* On mobile, always show note button */
             .order-note-btn {
                 opacity: 1;
                 transform: none;
@@ -1178,12 +1373,6 @@ try {
         @media (max-width: 480px) {
             .or-stats {
                 grid-template-columns: 1fr;
-            }
-
-            .pagination-controls button {
-                min-width: 30px;
-                height: 30px;
-                font-size: 10px;
             }
         }
     </style>
@@ -1242,7 +1431,6 @@ try {
             </div>
 
 
-            <!-- BULK TOOLBAR -->
             <div class="or-bulk" id="orBulkBar">
                 <span class="or-bulk-count">
                     <i class="bi bi-check2-square"></i>
@@ -1262,7 +1450,6 @@ try {
 
 
             <div class="or-stats">
-
                 <div class="or-stat">
                     <div class="or-stat-label">Total Orders</div>
                     <div class="or-stat-value"><?= $stats['total'] ?></div>
@@ -1286,12 +1473,10 @@ try {
                     <div class="or-stat-value"><?= $stats['today'] ?></div>
                     <div class="or-stat-sub">New orders</div>
                 </div>
-
             </div>
 
 
             <div class="or-filters">
-
                 <div class="or-tabs">
                     <button class="or-tab active" data-filter="all">All</button>
                     <button class="or-tab" data-filter="paid">Paid</button>
@@ -1323,13 +1508,10 @@ try {
                     <i class="bi bi-search"></i>
                     <input type="text" id="orSearch" placeholder="Search order code, name, mobile...">
                 </div>
-
             </div>
 
             <div class="or-card">
-
                 <div class="or-table-wrap">
-
                     <table class="or-table" id="orTable">
                         <thead>
                             <tr>
@@ -1354,9 +1536,7 @@ try {
                             </tr>
                         </tbody>
                     </table>
-
                 </div>
-
 
                 <div class="or-pagination" id="orPagination" style="display:none;">
                     <div class="pagination-left">
@@ -1376,24 +1556,17 @@ try {
                     </div>
                     <div class="pagination-controls" id="paginationControls"></div>
                 </div>
-
             </div>
-
         </div>
-
     </main>
 
 
-    <!-- =====================================================
-         NOTES POPUP
-         ===================================================== -->
+    <!-- NOTES MODAL -->
     <div class="or-note-overlay" id="orNoteOverlay">
-        <div class="or-note-modal" role="dialog" aria-modal="true" aria-labelledby="orNoteTitle">
+        <div class="or-note-modal" role="dialog" aria-modal="true">
             <div class="or-note-head">
                 <div class="or-note-head-left">
-                    <div class="or-note-head-icon">
-                        <i class="bi bi-chat-left-text-fill"></i>
-                    </div>
+                    <div class="or-note-head-icon"><i class="bi bi-chat-left-text-fill"></i></div>
                     <div class="or-note-head-info">
                         <h3 class="or-note-head-title" id="orNoteTitle">Order Instructions</h3>
                         <div class="or-note-head-code" id="orNoteCode">#ORD000000</div>
@@ -1418,6 +1591,38 @@ try {
         </div>
     </div>
 
+
+    <!-- ASSIGN DELIVERY BOY MODAL -->
+    <div class="or-assign-overlay" id="orAssignOverlay">
+        <div class="or-assign-modal" role="dialog" aria-modal="true">
+            <div class="or-assign-head">
+                <div class="or-assign-head-left">
+                    <div class="or-assign-head-icon"><i class="bi bi-person-plus-fill"></i></div>
+                    <div>
+                        <h3 class="or-assign-head-title">Assign Delivery Boy</h3>
+                        <div class="or-assign-head-code" id="orAssignCode">#ORD000000</div>
+                    </div>
+                </div>
+                <button type="button" class="or-note-close" id="orAssignClose" aria-label="Close">
+                    <i class="bi bi-x-lg"></i>
+                </button>
+            </div>
+
+            <div class="or-assign-body" id="orAssignBody">
+                <div class="or-assign-empty">
+                    <i class="bi bi-hourglass-split"></i>
+                    Loading delivery boys…
+                </div>
+            </div>
+
+            <div class="or-assign-foot">
+                <button type="button" class="or-note-close-btn" id="orAssignCancel">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="or-toast" id="orToast"></div>
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
