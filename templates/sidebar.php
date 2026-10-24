@@ -633,10 +633,9 @@ $sidebarGroup = function (
             <?php
             $managementPages = [
                 'discounts.php',
-                'payment-settings.php',
+                'admin-requests.php',   /* ✅ NEW */
                 'staff.php',
-                'settings.php',
-                'website-settings.php'
+                'settings.php'
             ];
 
             $managementLinks =
@@ -646,19 +645,14 @@ $sidebarGroup = function (
                     'bi-percent'
                 )
                 . $sidebarLink(
-                    'payment-settings.php',
-                    'Payments',
-                    'bi-credit-card'
+                    'admin-requests.php',   /* ✅ NEW */
+                    'Delivery Boy Requests',
+                    'bi-inbox'
                 )
                 . $sidebarLink(
                     'staff.php',
                     'Staff',
                     'bi-person-vcard'
-                )
-                . $sidebarLink(
-                    'website-settings.php',
-                    'Website Settings',
-                    'bi-globe'
                 )
                 . $sidebarLink(
                     'settings.php',

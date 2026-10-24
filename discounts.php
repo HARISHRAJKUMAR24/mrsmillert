@@ -3,42 +3,26 @@ require_once './config/config.php';
 require_once './config/function.php';
 
 /* =========================================================
-   LOAD DISCOUNTS + SLOT SUMMARY
+   LOAD DISCOUNTS + SLOT/TIER SUMMARY
    ========================================================= */
-
 $discounts = [];
 
 try {
-
     $stmt = $pdo->query(
-        "SELECT d.id,
-                d.discount_code,
-                d.discount_name,
-                d.discount_type,
-                d.coupon_code,
-                d.valid_from_date,
-                d.valid_to_date,
-                d.status,
-                d.created_at,
-                (SELECT COUNT(*) FROM discount_times WHERE discount_code = d.discount_code) AS slot_count,
-                (SELECT MIN(discount_amount) FROM discount_times WHERE discount_code = d.discount_code) AS min_amount,
-                (SELECT MAX(discount_amount) FROM discount_times WHERE discount_code = d.discount_code) AS max_amount,
-                (SELECT amount_type FROM discount_times WHERE discount_code = d.discount_code LIMIT 1) AS amount_type_sample,
-                (SELECT MIN(start_time) FROM discount_times WHERE discount_code = d.discount_code) AS first_start,
-                (SELECT MAX(end_time)   FROM discount_times WHERE discount_code = d.discount_code) AS last_end
+        "SELECT d.id, d.discount_code, d.discount_name, d.discount_type,
+                d.coupon_code, d.valid_from_date, d.valid_to_date,
+                d.status, d.created_at
          FROM discounts d
          ORDER BY d.id DESC"
     );
-
     $discounts = $stmt->fetchAll();
-
-    /* Load slot names for each discount (limited to first 4 per discount) */
-    $slotsByCode = [];
 
     if (!empty($discounts)) {
         $codes = array_column($discounts, 'discount_code');
         $placeholders = implode(',', array_fill(0, count($codes), '?'));
 
+        // 1. Load time slots
+        $timesByCode = [];
         $sStmt = $pdo->prepare(
             "SELECT discount_code, slot_name, start_time, end_time, amount_type, discount_amount
              FROM discount_times
@@ -46,16 +30,30 @@ try {
              ORDER BY id ASC"
         );
         $sStmt->execute($codes);
-
         foreach ($sStmt->fetchAll() as $row) {
-            $slotsByCode[$row['discount_code']][] = $row;
+            $timesByCode[$row['discount_code']][] = $row;
         }
-    }
 
-    foreach ($discounts as &$d) {
-        $d['slots'] = $slotsByCode[$d['discount_code']] ?? [];
+        // 2. Load customer tiers
+        $tiersByCode = [];
+        $tStmt = $pdo->prepare(
+            "SELECT discount_code, tier_name, min_orders, max_orders, amount_type, discount_amount
+             FROM discount_customer_tiers
+             WHERE discount_code IN ($placeholders)
+             ORDER BY min_orders ASC"
+        );
+        $tStmt->execute($codes);
+        foreach ($tStmt->fetchAll() as $row) {
+            $tiersByCode[$row['discount_code']][] = $row;
+        }
+
+        // 3. Attach to discounts
+        foreach ($discounts as &$d) {
+            $d['slots'] = $timesByCode[$d['discount_code']] ?? [];
+            $d['tiers'] = $tiersByCode[$d['discount_code']] ?? [];
+        }
+        unset($d);
     }
-    unset($d);
 } catch (PDOException $e) {
     $discounts = [];
 }
@@ -63,7 +61,6 @@ try {
 /* =========================================================
    HELPERS
    ========================================================= */
-
 function fmtTime(string $t): string
 {
     $ts = strtotime($t);
@@ -80,14 +77,12 @@ function fmtDate(string $d): string
 
 function discountRuleStatus(array $d): array
 {
-    /* 1) Inactive if toggled off */
     if ((int)$d['status'] !== 1) {
         return ['key' => 'inactive', 'label' => 'Inactive'];
     }
 
-    /* 2) Coupon — check date range */
+    // Coupon
     if ($d['discount_type'] === 'coupon') {
-
         $now  = time();
         $from = strtotime($d['valid_from_date'] . ' 00:00:00');
         $to   = strtotime($d['valid_to_date'] . ' 23:59:59');
@@ -95,7 +90,6 @@ function discountRuleStatus(array $d): array
         if ($now < $from) return ['key' => 'upcoming', 'label' => 'Upcoming'];
         if ($now > $to)   return ['key' => 'expired',  'label' => 'Expired'];
 
-        /* Also check time window of the coupon slot */
         $slots = $d['slots'] ?? [];
         if (!empty($slots)) {
             $slot = $slots[0];
@@ -103,21 +97,20 @@ function discountRuleStatus(array $d): array
             $et   = strtotime($slot['end_time']);
             $cur  = strtotime(date('H:i:s'));
 
-            if ($cur >= $st && $cur <= $et) {
-                return ['key' => 'active', 'label' => 'Live'];
-            }
+            if ($cur >= $st && $cur <= $et) return ['key' => 'active', 'label' => 'Live'];
             return ['key' => 'upcoming', 'label' => 'Off Time'];
         }
-
         return ['key' => 'active', 'label' => 'Active'];
     }
 
-    /* 3) Time-based — check if any slot is live right now */
-    $slots = $d['slots'] ?? [];
-
-    if (empty($slots)) {
-        return ['key' => 'inactive', 'label' => 'No Slots'];
+    // Customer loyalty — always active if enabled
+    if ($d['discount_type'] === 'customer_type') {
+        return ['key' => 'active', 'label' => 'Live'];
     }
+
+    // Time based
+    $slots = $d['slots'] ?? [];
+    if (empty($slots)) return ['key' => 'inactive', 'label' => 'No Slots'];
 
     $cur = strtotime(date('H:i:s'));
     $liveNow = false;
@@ -127,13 +120,11 @@ function discountRuleStatus(array $d): array
         $et = strtotime($s['end_time']);
 
         if ($st <= $et) {
-            /* Same day: start < end */
             if ($cur >= $st && $cur <= $et) {
                 $liveNow = true;
                 break;
             }
         } else {
-            /* Cross-midnight: e.g. 22:00 → 02:00 */
             if ($cur >= $st || $cur <= $et) {
                 $liveNow = true;
                 break;
@@ -150,9 +141,7 @@ function discountRuleStatus(array $d): array
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
-
     <style>
         .disc-page {
             padding: 30px 32px 40px;
@@ -269,7 +258,6 @@ function discountRuleStatus(array $d): array
             background: #fff;
         }
 
-        /* TABLE */
         .disc-table-wrap {
             border: 1px solid #f0ebe4;
             border-radius: 14px;
@@ -364,6 +352,12 @@ function discountRuleStatus(array $d): array
             border: 1px solid #d9c9f7;
         }
 
+        .type-pill.customer_type {
+            background: #f0e8fa;
+            color: #6a1b9a;
+            border: 1px solid #d9c9f7;
+        }
+
         .type-pill i {
             font-size: 11px;
         }
@@ -399,7 +393,6 @@ function discountRuleStatus(array $d): array
             gap: 5px;
         }
 
-        /* Slot pills with names */
         .slot-pill {
             display: inline-flex;
             align-items: center;
@@ -583,7 +576,7 @@ function discountRuleStatus(array $d): array
             margin-bottom: 12px;
         }
 
-        /* MODALS */
+        /* MODALS (same as before) */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -755,7 +748,6 @@ function discountRuleStatus(array $d): array
             }
         }
     </style>
-
 </head>
 
 <body>
@@ -763,20 +755,11 @@ function discountRuleStatus(array $d): array
     <?php include './templates/sidebar.php'; ?>
 
     <main class="main">
-
         <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
-                <i class="bi bi-list"></i>
-            </button>
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search orders, products...">
-            </div>
+            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu"><i class="bi bi-list"></i></button>
+            <div class="search-box"><i class="bi bi-search"></i><input type="text" placeholder="Search orders, products..."></div>
             <div class="top-right">
-                <button class="notification">
-                    <i class="bi bi-bell"></i>
-                    <span class="notification-dot"></span>
-                </button>
+                <button class="notification"><i class="bi bi-bell"></i><span class="notification-dot"></span></button>
                 <div class="admin-profile">
                     <div class="admin-avatar">A</div>
                     <div>
@@ -787,37 +770,27 @@ function discountRuleStatus(array $d): array
             </div>
         </header>
 
-
         <div class="disc-page">
-
             <div class="disc-header">
                 <div class="disc-title">
                     <h1>Discounts</h1>
-                    <p>All time-based and coupon-based discounts.</p>
+                    <p>All time-based, coupon-based, and customer loyalty discounts.</p>
                 </div>
-
-                <a href="add-discount.php" class="btn-add">
-                    <i class="bi bi-plus-lg"></i> Add Discount
-                </a>
+                <a href="add-discount.php" class="btn-add"><i class="bi bi-plus-lg"></i> Add Discount</a>
             </div>
 
-
             <div class="disc-card">
-
                 <div class="disc-toolbar">
                     <div class="disc-search">
                         <i class="bi bi-search"></i>
-                        <input type="text"
-                            id="searchInput"
-                            placeholder="Search by name, code or coupon...">
+                        <input type="text" id="searchInput" placeholder="Search by name, code or coupon...">
                     </div>
-
                     <select id="typeFilter" class="disc-filter">
                         <option value="">All Types</option>
                         <option value="time">Time Based</option>
                         <option value="coupon">Coupon Code</option>
+                        <option value="customer_type">Customer Loyalty</option>
                     </select>
-
                     <select id="statusFilter" class="disc-filter">
                         <option value="">All Status</option>
                         <option value="active">Live</option>
@@ -827,23 +800,19 @@ function discountRuleStatus(array $d): array
                     </select>
                 </div>
 
-
                 <div class="disc-table-wrap">
-
                     <table class="disc-table">
                         <thead>
                             <tr>
                                 <th>Discount</th>
                                 <th>Type</th>
                                 <th>Amount</th>
-                                <th>Slots / Coupon</th>
+                                <th>Slots / Rules</th>
                                 <th>Status</th>
                                 <th style="text-align:right;">Actions</th>
                             </tr>
                         </thead>
-
                         <tbody id="discTbody">
-
                             <?php if (empty($discounts)): ?>
                                 <tr>
                                     <td colspan="6">
@@ -855,24 +824,44 @@ function discountRuleStatus(array $d): array
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($discounts as $d):
-
                                     $s = discountRuleStatus($d);
                                     $isCoupon = $d['discount_type'] === 'coupon';
+                                    $isLoyalty = $d['discount_type'] === 'customer_type';
 
-                                    $minAmt = (float)$d['min_amount'];
-                                    $maxAmt = (float)$d['max_amount'];
-                                    $sampleType = $d['amount_type_sample'] ?? 'fixed';
-
-                                    /* Display amount summary */
-                                    if ($minAmt === $maxAmt) {
-                                        $amtLabel = $sampleType === 'percent'
-                                            ? number_format($minAmt, 0) . '%'
-                                            : '₹' . number_format($minAmt, 2);
-                                    } else {
-                                        if ($sampleType === 'percent') {
-                                            $amtLabel = number_format($minAmt, 0) . '% – ' . number_format($maxAmt, 0) . '%';
+                                    // Build amount label
+                                    if ($isLoyalty) {
+                                        $tiers = $d['tiers'] ?? [];
+                                        if (empty($tiers)) {
+                                            $amtLabel = '—';
                                         } else {
-                                            $amtLabel = '₹' . number_format($minAmt, 0) . ' – ₹' . number_format($maxAmt, 0);
+                                            $minAmt = (float)min(array_column($tiers, 'discount_amount'));
+                                            $maxAmt = (float)max(array_column($tiers, 'discount_amount'));
+                                            $sampleType = $tiers[0]['amount_type'] ?? 'fixed';
+
+                                            if ($minAmt === $maxAmt) {
+                                                $amtLabel = $sampleType === 'percent' ? number_format($minAmt, 0) . '%' : '₹' . number_format($minAmt, 2);
+                                            } else {
+                                                $amtLabel = $sampleType === 'percent'
+                                                    ? number_format($minAmt, 0) . '% – ' . number_format($maxAmt, 0) . '%'
+                                                    : '₹' . number_format($minAmt, 0) . ' – ₹' . number_format($maxAmt, 0);
+                                            }
+                                        }
+                                    } else {
+                                        $slots = $d['slots'] ?? [];
+                                        if (empty($slots)) {
+                                            $amtLabel = '—';
+                                        } else {
+                                            $minAmt = (float)min(array_column($slots, 'discount_amount'));
+                                            $maxAmt = (float)max(array_column($slots, 'discount_amount'));
+                                            $sampleType = $slots[0]['amount_type'] ?? 'fixed';
+
+                                            if ($minAmt === $maxAmt) {
+                                                $amtLabel = $sampleType === 'percent' ? number_format($minAmt, 0) . '%' : '₹' . number_format($minAmt, 2);
+                                            } else {
+                                                $amtLabel = $sampleType === 'percent'
+                                                    ? number_format($minAmt, 0) . '% – ' . number_format($maxAmt, 0) . '%'
+                                                    : '₹' . number_format($minAmt, 0) . ' – ₹' . number_format($maxAmt, 0);
+                                            }
                                         }
                                     }
                                 ?>
@@ -884,71 +873,68 @@ function discountRuleStatus(array $d): array
                                         data-status="<?= htmlspecialchars($s['key']) ?>">
                                         <td>
                                             <div class="disc-name-cell">
-                                                <div class="disc-name-main">
-                                                    <?= htmlspecialchars($d['discount_name']) ?>
-                                                </div>
-                                                <span class="disc-code-tag">
-                                                    #<?= htmlspecialchars($d['discount_code']) ?>
-                                                </span>
+                                                <div class="disc-name-main"><?= htmlspecialchars($d['discount_name']) ?></div>
+                                                <span class="disc-code-tag">#<?= htmlspecialchars($d['discount_code']) ?></span>
                                             </div>
                                         </td>
 
                                         <td>
                                             <?php if ($isCoupon): ?>
-                                                <span class="type-pill coupon">
-                                                    <i class="bi bi-ticket-detailed"></i> Coupon
-                                                </span>
+                                                <span class="type-pill coupon"><i class="bi bi-ticket-detailed"></i> Coupon</span>
+                                            <?php elseif ($isLoyalty): ?>
+                                                <span class="type-pill customer_type"><i class="bi bi-people-fill"></i> Loyalty</span>
                                             <?php else: ?>
-                                                <span class="type-pill time">
-                                                    <i class="bi bi-clock-history"></i> Time
-                                                </span>
+                                                <span class="type-pill time"><i class="bi bi-clock-history"></i> Time</span>
                                             <?php endif; ?>
                                         </td>
 
                                         <td>
-                                            <div class="disc-amount">
-                                                <?= htmlspecialchars($amtLabel) ?>
-                                                <?php if ($sampleType === 'percent'): ?>
-                                                    <small>%</small>
-                                                <?php endif; ?>
-                                            </div>
+                                            <div class="disc-amount"><?= htmlspecialchars($amtLabel) ?></div>
                                         </td>
 
                                         <td>
                                             <?php if ($isCoupon): ?>
                                                 <div class="slot-list">
-                                                    <span class="coupon-code-text">
-                                                        <?= htmlspecialchars($d['coupon_code'] ?? '—') ?>
-                                                    </span>
+                                                    <span class="coupon-code-text"><?= htmlspecialchars($d['coupon_code'] ?? '—') ?></span>
                                                     <span class="slot-line">
                                                         <i class="bi bi-calendar-range"></i>
-                                                        <?= fmtDate($d['valid_from_date']) ?>
-                                                        → <?= fmtDate($d['valid_to_date']) ?>
+                                                        <?= fmtDate($d['valid_from_date']) ?> → <?= fmtDate($d['valid_to_date']) ?>
                                                     </span>
                                                     <?php if (!empty($d['slots']) && $d['slots'][0]['start_time']): ?>
                                                         <span class="slot-line">
                                                             <i class="bi bi-clock"></i>
-                                                            <?= fmtTime($d['slots'][0]['start_time']) ?>
-                                                            – <?= fmtTime($d['slots'][0]['end_time']) ?>
+                                                            <?= fmtTime($d['slots'][0]['start_time']) ?> – <?= fmtTime($d['slots'][0]['end_time']) ?>
                                                         </span>
                                                     <?php endif; ?>
                                                 </div>
+
+                                            <?php elseif ($isLoyalty): ?>
+                                                <div class="slot-list">
+                                                    <?php $tiers = $d['tiers'] ?? []; ?>
+                                                    <span class="slot-count-badge"><?= count($tiers) ?> tier<?= count($tiers) === 1 ? '' : 's' ?></span>
+                                                    <?php foreach (array_slice($tiers, 0, 4) as $t): ?>
+                                                        <span class="slot-pill">
+                                                            <span class="nm"><?= htmlspecialchars($t['tier_name'] ?? 'Tier') ?></span>
+                                                            <span class="tm">(<?= (int)$t['min_orders'] ?>–<?= (int)$t['max_orders'] ?>)</span>
+                                                            <span class="am">
+                                                                <?= $t['amount_type'] === 'percent'
+                                                                    ? number_format((float)$t['discount_amount'], 0) . '%'
+                                                                    : '₹' . number_format((float)$t['discount_amount'], 0) ?>
+                                                            </span>
+                                                        </span>
+                                                    <?php endforeach; ?>
+                                                    <?php if (count($tiers) > 4): ?>
+                                                        <span class="slot-more">+ <?= count($tiers) - 4 ?> more…</span>
+                                                    <?php endif; ?>
+                                                </div>
+
                                             <?php else: ?>
                                                 <div class="slot-list">
-                                                    <span class="slot-count-badge">
-                                                        <?= (int)$d['slot_count'] ?> slot<?= (int)$d['slot_count'] === 1 ? '' : 's' ?>
-                                                    </span>
-
-                                                    <?php
-                                                    /* Show up to 3 named slot pills */
-                                                    $shownSlots = array_slice($d['slots'], 0, 3);
-                                                    foreach ($shownSlots as $slot):
-                                                    ?>
+                                                    <span class="slot-count-badge"><?= count($d['slots']) ?> slot<?= count($d['slots']) === 1 ? '' : 's' ?></span>
+                                                    <?php foreach (array_slice($d['slots'], 0, 3) as $slot): ?>
                                                         <span class="slot-pill">
                                                             <span class="nm"><?= htmlspecialchars($slot['slot_name'] ?? 'Set') ?></span>
-                                                            <span class="tm">
-                                                                <?= fmtTime($slot['start_time']) ?> – <?= fmtTime($slot['end_time']) ?>
-                                                            </span>
+                                                            <span class="tm"><?= fmtTime($slot['start_time']) ?> – <?= fmtTime($slot['end_time']) ?></span>
                                                             <span class="am">
                                                                 <?= $slot['amount_type'] === 'percent'
                                                                     ? number_format((float)$slot['discount_amount'], 0) . '%'
@@ -956,11 +942,8 @@ function discountRuleStatus(array $d): array
                                                             </span>
                                                         </span>
                                                     <?php endforeach; ?>
-
                                                     <?php if (count($d['slots']) > 3): ?>
-                                                        <span class="slot-more">
-                                                            + <?= count($d['slots']) - 3 ?> more…
-                                                        </span>
+                                                        <span class="slot-more">+ <?= count($d['slots']) - 3 ?> more…</span>
                                                     <?php endif; ?>
                                                 </div>
                                             <?php endif; ?>
@@ -975,13 +958,10 @@ function discountRuleStatus(array $d): array
 
                                         <td>
                                             <div class="row-actions">
-                                                <a href="edit-discount.php?id=<?= (int)$d['id'] ?>"
-                                                    class="row-btn edit"
-                                                    title="Edit">
+                                                <a href="edit-discount.php?id=<?= (int)$d['id'] ?>" class="row-btn edit" title="Edit">
                                                     <i class="bi bi-pencil"></i>
                                                 </a>
-                                                <button type="button"
-                                                    class="row-btn delete js-delete-btn"
+                                                <button type="button" class="row-btn delete js-delete-btn"
                                                     data-id="<?= (int)$d['id'] ?>"
                                                     data-name="<?= htmlspecialchars($d['discount_name']) ?>"
                                                     title="Delete">
@@ -992,77 +972,49 @@ function discountRuleStatus(array $d): array
                                     </tr>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-
                         </tbody>
                     </table>
-
                 </div>
-
             </div>
-
         </div>
-
     </main>
-
 
     <!-- DELETE CONFIRM -->
     <div class="mm-modal-overlay" id="deleteOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon danger">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
+            <div class="mm-modal-icon danger"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <h3 class="mm-modal-title">Delete Discount?</h3>
-            <p class="mm-modal-text" id="deleteText">
-                This will permanently remove the discount and all its time slots.
-            </p>
+            <p class="mm-modal-text" id="deleteText">This will permanently remove the discount and all its time slots.</p>
             <div class="mm-modal-actions">
                 <button type="button" class="mm-btn mm-btn-ghost" id="deleteCancel">Cancel</button>
-                <button type="button" class="mm-btn mm-btn-danger" id="deleteConfirm">
-                    <i class="bi bi-trash3"></i> Delete
-                </button>
+                <button type="button" class="mm-btn mm-btn-danger" id="deleteConfirm"><i class="bi bi-trash3"></i> Delete</button>
             </div>
         </div>
     </div>
-
 
     <!-- ERROR -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon error">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
+            <div class="mm-modal-icon error"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <h3 class="mm-modal-title" id="errorTitle">Oops!</h3>
             <p class="mm-modal-text" id="errorText">Something went wrong.</p>
-            <div class="mm-modal-actions">
-                <button type="button" class="mm-btn mm-btn-primary" id="errorOkBtn">Got it</button>
-            </div>
+            <div class="mm-modal-actions"><button type="button" class="mm-btn mm-btn-primary" id="errorOkBtn">Got it</button></div>
         </div>
     </div>
-
 
     <!-- SUCCESS -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon success">
-                <i class="bi bi-check-lg"></i>
-            </div>
+            <div class="mm-modal-icon success"><i class="bi bi-check-lg"></i></div>
             <h3 class="mm-modal-title">Deleted!</h3>
             <p class="mm-modal-text" id="successText">Discount deleted successfully.</p>
-            <div class="mm-modal-actions">
-                <button type="button" class="mm-btn mm-btn-primary" id="successOkBtn">
-                    <i class="bi bi-check2"></i> Done
-                </button>
-            </div>
+            <div class="mm-modal-actions"><button type="button" class="mm-btn mm-btn-primary" id="successOkBtn"><i class="bi bi-check2"></i> Done</button></div>
         </div>
     </div>
-
-
-
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>
     <script src="<?= ADMIN_URL; ?>js/discounts.js"></script>
-
 </body>
 
 </html>

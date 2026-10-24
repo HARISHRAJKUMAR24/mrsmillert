@@ -553,3 +553,40 @@ if (!function_exists('getActiveMenu')) {
         }
     }
 }
+
+
+/**
+ * Generate next discount code like DSC001, DSC002 ...
+ * Safe against duplicates and race conditions.
+ */
+function generateDiscountCode(PDO $pdo): ?string
+{
+    try {
+        // Get the highest numeric suffix from existing discount_code
+        $row = $pdo->query(
+            "SELECT discount_code FROM discounts
+             WHERE discount_code LIKE 'DSC%'
+             ORDER BY CAST(SUBSTRING(discount_code, 4) AS UNSIGNED) DESC
+             LIMIT 1"
+        )->fetch(PDO::FETCH_ASSOC);
+
+        $next = 1;
+        if ($row && !empty($row['discount_code'])) {
+            $next = (int)substr($row['discount_code'], 3) + 1;
+        }
+
+        // Loop until we find a code that doesn't exist
+        for ($i = 0; $i < 1000; $i++) {
+            $code = 'DSC' . str_pad((string)$next, 3, '0', STR_PAD_LEFT);
+            $chk  = $pdo->prepare("SELECT 1 FROM discounts WHERE discount_code = ? LIMIT 1");
+            $chk->execute([$code]);
+            if (!$chk->fetch()) {
+                return $code;
+            }
+            $next++;
+        }
+    } catch (Throwable $e) {
+        error_log('generateDiscountCode error: ' . $e->getMessage());
+    }
+    return null;
+}
