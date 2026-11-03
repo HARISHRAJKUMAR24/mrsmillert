@@ -1072,7 +1072,18 @@ $settings = getSettings($pdo);
                                 <p class="field-help" id="houseLocHint"></p>
                             </div>
 
-                            <div class="col-12">
+                            <!-- ✅ NEW: Delivery charge -->
+                            <div class="col-12 col-md-6">
+                                <label>Delivery Charge (₹)</label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-truck"></i>
+                                    <input type="number" id="houseDeliveryCharge" class="customer-input"
+                                        min="0" step="0.01" placeholder="0.00" value="0">
+                                </div>
+                                <p class="field-help">Applies only to this individual-house customer.</p>
+                            </div>
+
+                            <div class="col-12 col-md-6">
                                 <label>House Image (optional)</label>
                                 <div class="img-drop" id="houseImgDrop">
                                     <input type="file" id="houseImg" accept="image/*" style="display:none;">

@@ -2,17 +2,12 @@
 require_once './config/config.php';
 require_once './config/function.php';
 
-/* ---------------- AUTH ---------------- */
 if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) {
     header('Location: login.php');
     exit;
 }
-
-/* ADMIN ONLY */
 requireAdmin();
-
 $isAdmin = (isset($_SESSION['admin_role']) && $_SESSION['admin_role'] === 'admin');
-
 $settings = getSettings($pdo);
 $siteName = $settings['username'] ?? 'Mrs Mill@';
 ?>
@@ -20,10 +15,10 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
 
     <style>
+        /* ================= Page layout ================= */
         .ar-page {
             padding: 30px 32px 60px;
         }
@@ -62,8 +57,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
-            text-decoration: none;
-            transition: .2s ease;
+            transition: .2s;
         }
 
         .ar-refresh-btn:hover {
@@ -71,13 +65,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #302923;
         }
 
-        .ar-refresh-btn i {
-            font-size: 14px;
-        }
-
-        /* =====================================================
-           CARD
-           ===================================================== */
         .ar-card {
             background: #fff;
             border: 1px solid #eee7dc;
@@ -90,7 +77,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             align-items: center;
             justify-content: space-between;
             gap: 15px;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
             flex-wrap: wrap;
         }
 
@@ -133,7 +120,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-family: "DM Sans", sans-serif;
             font-size: 11px;
             background: #fffdf9;
-            transition: .15s ease;
+            transition: .15s;
         }
 
         .ar-search input:focus {
@@ -141,52 +128,120 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             background: #fff;
         }
 
-        /* =====================================================
-           TABLE — no inner scroll on desktop
-           ===================================================== */
-        .ar-table-wrap {
-            /* No max-height, no inner scrollbar */
-            overflow: visible;
+        /* ================= Filters ================= */
+        .ar-filters {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 18px;
+            padding: 12px 14px;
+            background: #fdfaf4;
+            border: 1px solid #f0ebe4;
             border-radius: 12px;
         }
 
-        .ar-table {
-            width: 100%;
-            border-collapse: collapse;
-            /* Fluid width — fits card */
-            table-layout: auto;
+        .ar-filters .ar-fgroup {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .ar-table th {
-            background: #faf7f0;
-            color: #938a80;
-            font-size: 9px;
-            font-weight: 700;
+        .ar-filters label {
+            font-size: 10px;
+            font-weight: 800;
             text-transform: uppercase;
-            letter-spacing: .7px;
-            padding: 11px 10px;
-            border-bottom: 1px solid #eee7dc;
-            text-align: left;
-            white-space: nowrap;
+            letter-spacing: .5px;
+            color: #938a80;
         }
 
-        .ar-table td {
-            padding: 12px 10px;
-            border-bottom: 1px solid #f2ede5;
-            font-size: 12px;
+        .ar-filters select,
+        .ar-filters input[type=date] {
+            height: 34px;
+            border: 1px solid #e8e1d8;
+            border-radius: 8px;
+            background: #fff;
+            padding: 0 10px;
+            font-family: inherit;
+            font-size: 11.5px;
             color: #4c4640;
-            vertical-align: middle;
+            outline: none;
+            transition: .15s;
+            min-width: 130px;
         }
 
-        .ar-table tbody tr:hover {
+        .ar-filters select:focus,
+        .ar-filters input[type=date]:focus {
+            border-color: #d98a91;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        #arCustomRange {
+            display: none;
+        }
+
+        /* ================= Accordion ================= */
+        .ar-acc-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .ar-acc-item {
+            background: #fff;
+            border: 1.5px solid #eee7dc;
+            border-radius: 14px;
+            overflow: hidden;
+            transition: .2s;
+        }
+
+        .ar-acc-item.open {
+            border-color: #d98a91;
+            box-shadow: 0 6px 20px rgba(181, 31, 44, .06);
+        }
+
+        .ar-acc-head {
+            display: grid;
+            grid-template-columns: 1.4fr 1fr 1fr 120px 130px 42px;
+            gap: 12px;
+            align-items: center;
+            padding: 14px 16px;
+            cursor: pointer;
+            user-select: none;
+            transition: background .15s;
+        }
+
+        .ar-acc-head:hover {
             background: #fffdf9;
         }
 
-        .ar-table tbody tr:last-child td {
-            border-bottom: 0;
+        .ar-acc-item.open .ar-acc-head {
+            background: #fffdf9;
+            border-bottom: 1px solid #f0ebe4;
         }
 
-        .ar-customer {
+        .ar-acc-item.is-approved .ar-acc-head {
+            border-left: 4px solid #2e6b3a;
+        }
+
+        .ar-acc-item.is-rejected .ar-acc-head {
+            border-left: 4px solid #a02020;
+        }
+
+        .ar-acc-item.is-pending .ar-acc-head {
+            border-left: 4px solid #d4a017;
+        }
+
+        .ar-acc-head .ar-col-label {
+            font-size: 9px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .7px;
+            color: #938a80;
+            margin-bottom: 3px;
+            display: none;
+        }
+
+        .ar-acc-customer {
             display: flex;
             align-items: center;
             gap: 10px;
@@ -210,12 +265,12 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
         .ar-cust-name {
             font-weight: 700;
             color: #302923;
-            font-size: 12px;
+            font-size: 12.5px;
             display: block;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            max-width: 160px;
+            max-width: 200px;
         }
 
         .ar-cust-mobile {
@@ -232,10 +287,26 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             display: block;
         }
 
-        .ar-division {
-            font-size: 10.5px;
-            color: #948c82;
-            margin-top: 2px;
+        .ar-acc-chevron {
+            width: 30px;
+            height: 30px;
+            border-radius: 8px;
+            border: 1.5px solid #eee7dc;
+            background: #fff;
+            color: #817a71;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: .25s;
+            flex-shrink: 0;
+            cursor: pointer;
+        }
+
+        .ar-acc-item.open .ar-acc-chevron {
+            transform: rotate(180deg);
+            background: #fbe8e9;
+            color: #b51f2c;
+            border-color: #f0c1c5;
         }
 
         .ar-date {
@@ -253,120 +324,190 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             margin-top: 2px;
         }
 
-        /* =====================================================
-           STATUS DROPDOWN
-           ===================================================== */
-        .ar-status {
-            position: relative;
-            display: inline-block;
-            min-width: 130px;
+        .ar-acc-status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            height: 26px;
+            padding: 0 10px;
+            border-radius: 99px;
+            font-size: 10.5px;
+            font-weight: 800;
+            white-space: nowrap;
         }
 
-        .ar-status-btn {
+        .ar-acc-status-pill .dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+        }
+
+        .ar-acc-status-pill.pending {
+            background: #fff8e1;
+            color: #a17f00;
+        }
+
+        .ar-acc-status-pill.pending .dot {
+            background: #d4a017;
+        }
+
+        .ar-acc-status-pill.approved {
+            background: #e8f1e8;
+            color: #2e6b3a;
+        }
+
+        .ar-acc-status-pill.approved .dot {
+            background: #2e6b3a;
+        }
+
+        .ar-acc-status-pill.rejected {
+            background: #fdeaea;
+            color: #a02020;
+        }
+
+        .ar-acc-status-pill.rejected .dot {
+            background: #a02020;
+        }
+
+        .ar-acc-body {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height .3s cubic-bezier(.4, 0, .2, 1);
+            background: #fff;
+        }
+
+        .ar-acc-item.open .ar-acc-body {
+            max-height: 2200px;
+        }
+
+        .ar-acc-body-inner {
+            padding: 16px 18px 18px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px 22px;
+            border-top: 1px solid #f7f2ec;
+        }
+
+        .ar-acc-detail {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .ar-acc-detail-label {
+            font-size: 9.5px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .6px;
+            color: #948c82;
+        }
+
+        .ar-acc-detail-value {
+            font-size: 12.5px;
+            color: #302923;
+            font-weight: 600;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .ar-acc-detail-value a {
+            color: #b51f2c;
+            text-decoration: none;
+            font-weight: 700;
+        }
+
+        .ar-acc-actions {
+            grid-column: 1/-1;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            padding-top: 12px;
+            border-top: 1px solid #f7f2ec;
+            margin-top: 4px;
+        }
+
+        /* Mini previews in body */
+        .ar-mini-map {
+            grid-column: 1/-1;
+            border: 1px solid #f0ebe4;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .ar-mini-map iframe {
             width: 100%;
+            height: 180px;
+            border: 0;
+            display: block;
+        }
+
+        .ar-mini-img {
+            grid-column: 1/-1;
+            border: 1px solid #f0ebe4;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .ar-mini-img img {
+            width: 100%;
+            max-height: 220px;
+            object-fit: contain;
+            display: block;
+        }
+
+        .ar-mini-label {
+            font-size: 9.5px;
+            font-weight: 800;
+            letter-spacing: .6px;
+            color: #948c82;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+        }
+
+        /* ================= Buttons ================= */
+        .ar-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
             height: 34px;
+            padding: 0 14px;
             border-radius: 8px;
             border: 1.5px solid transparent;
-            padding: 0 30px 0 12px;
             font-family: "DM Sans", sans-serif;
             font-size: 11px;
             font-weight: 800;
             cursor: pointer;
-            text-align: left;
-            transition: .15s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            outline: none;
-            position: relative;
-        }
-
-        .ar-status-btn i.caret {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translateY(-50%);
-            font-size: 10px;
-            pointer-events: none;
-        }
-
-        .ar-status-btn:hover {
-            opacity: .9;
-        }
-
-        .ar-status-btn[data-status="1"] {
-            background: #e8f1e8;
-            color: #52745b;
-        }
-
-        .ar-status-btn[data-status="0"] {
-            background: #f4ecec;
-            color: #8b5a5a;
-        }
-
-        .ar-status-btn[data-status="2"] {
-            background: #eef4fd;
-            color: #1d5cb8;
-        }
-
-        .ar-status-menu {
-            position: absolute;
-            top: calc(100% + 4px);
-            left: 0;
-            min-width: 100%;
-            background: #fff;
-            border: 1.5px solid #ece5da;
-            border-radius: 10px;
-            box-shadow: 0 14px 30px rgba(48, 41, 35, .12);
-            padding: 4px;
-            z-index: 100;
-            opacity: 0;
-            visibility: hidden;
-            transform: translateY(-4px);
-            transition: .15s ease;
-        }
-
-        .ar-status.open .ar-status-menu {
-            opacity: 1;
-            visibility: visible;
-            transform: translateY(0);
-        }
-
-        .ar-status-opt {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            padding: 8px 10px;
-            border-radius: 7px;
-            font-size: 11px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: .12s ease;
+            text-decoration: none;
+            transition: .15s;
             white-space: nowrap;
         }
 
-        .ar-status-opt:hover {
-            background: #faf7f0;
+        .ar-btn-approve {
+            background: #e8f1e8;
+            color: #2e6b3a;
+            border-color: #a7c8a9;
         }
 
-        .ar-status-opt .dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            flex-shrink: 0;
+        .ar-btn-approve:hover {
+            background: #2e6b3a;
+            color: #fff;
+            border-color: #2e6b3a;
         }
 
-        .ar-status-opt[data-status="1"] .dot { background: #52745b; }
-        .ar-status-opt[data-status="0"] .dot { background: #8b5a5a; }
-        .ar-status-opt[data-status="2"] .dot { background: #1d5cb8; }
-
-        .ar-status-opt.active {
-            background: #fbe8e9;
+        .ar-btn-unapprove {
+            background: #fff5e6;
+            color: #a06000;
+            border-color: #f0c98a;
         }
 
-        /* =====================================================
-           CALL BUTTON
-           ===================================================== */
+        .ar-btn-unapprove:hover {
+            background: #a06000;
+            color: #fff;
+            border-color: #a06000;
+        }
+
         .ar-call {
             display: inline-flex;
             align-items: center;
@@ -383,25 +524,13 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-weight: 800;
             cursor: pointer;
             text-decoration: none;
-            transition: .15s ease;
-            white-space: nowrap;
+            transition: .15s;
         }
 
         .ar-call:hover {
             background: #e8f1e8;
             border-color: #a7c8a9;
             color: #1b5e20;
-        }
-
-        .ar-call i {
-            font-size: 12px;
-        }
-        /* ---------- WHATSAPP BUTTON ---------- */
-        .ar-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            flex-wrap: nowrap;
         }
 
         .ar-whatsapp {
@@ -420,8 +549,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-weight: 800;
             cursor: pointer;
             text-decoration: none;
-            transition: .15s ease;
-            white-space: nowrap;
+            transition: .15s;
         }
 
         .ar-whatsapp:hover {
@@ -430,12 +558,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #fff;
         }
 
-        .ar-whatsapp i {
-            font-size: 13px;
-        }
-        /* =====================================================
-           EMPTY STATE
-           ===================================================== */
+        /* ================= Misc ================= */
         .ar-empty {
             text-align: center;
             padding: 50px 20px;
@@ -462,9 +585,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 12px;
         }
 
-        /* =====================================================
-           PAGINATION
-           ===================================================== */
         .ar-pagination {
             display: flex;
             align-items: center;
@@ -513,17 +633,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #4c4640;
             cursor: pointer;
             outline: none;
-            appearance: none;
-            -webkit-appearance: none;
-            background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
-            background-repeat: no-repeat;
-            background-position: right 9px center;
-            transition: .2s ease;
-        }
-
-        .ar-perpage select:focus {
-            border-color: #d98a91;
-            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
         .ar-pag-controls {
@@ -546,22 +655,19 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            transition: .2s ease;
             padding: 0 8px;
             font-family: inherit;
+            transition: .2s;
         }
 
         .ar-pag-controls button:hover:not(:disabled):not(.active) {
             background: #faf7f0;
-            border-color: #e4ddd3;
-            color: #302923;
         }
 
         .ar-pag-controls button.active {
             background: #b51f2c;
             border-color: #b51f2c;
             color: #fff;
-            box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
             cursor: default;
         }
 
@@ -579,12 +685,8 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #b5aca2;
             font-size: 12px;
             font-weight: 700;
-            user-select: none;
         }
 
-        /* =====================================================
-           TOAST
-           ===================================================== */
         .ar-toast-wrap {
             position: fixed;
             top: 22px;
@@ -611,7 +713,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             box-shadow: 0 14px 34px rgba(0, 0, 0, .14);
             transform: translateX(120%);
             opacity: 0;
-            transition: transform .3s cubic-bezier(.2, .9, .3, 1.2), opacity .3s ease;
+            transition: .3s;
             pointer-events: auto;
         }
 
@@ -632,9 +734,13 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #fff;
         }
 
-        .ar-toast.success .ar-toast-icon { background: #4caf50; }
-        .ar-toast.error   .ar-toast-icon { background: #c62828; }
-        .ar-toast.info    .ar-toast-icon { background: #3b82f6; }
+        .ar-toast.success .ar-toast-icon {
+            background: #4caf50;
+        }
+
+        .ar-toast.error .ar-toast-icon {
+            background: #c62828;
+        }
 
         .ar-toast-body {
             flex: 1;
@@ -652,36 +758,268 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             line-height: 1;
         }
 
-        /* =====================================================
-           MOBILE — allow horizontal scroll only when needed
-           ===================================================== */
-        @media (max-width: 768px) {
-            .ar-page { padding: 20px 15px 40px; }
+        /* ================= Modal ================= */
+        .ar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(30, 25, 22, .55);
+            backdrop-filter: blur(3px);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            padding: 24px 20px;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: .2s;
+            overflow-y: auto;
+        }
+
+        .ar-modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .ar-modal {
+            background: #fff;
+            border-radius: 18px;
+            width: 100%;
+            max-width: 680px;
+            padding: 26px 24px;
+            box-shadow: 0 30px 80px rgba(0, 0, 0, .25);
+            transform: translateY(15px) scale(.97);
+            transition: .25s;
+            margin: auto;
+        }
+
+        .ar-modal-overlay.show .ar-modal {
+            transform: translateY(0) scale(1);
+        }
+
+        .ar-modal-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 18px;
+        }
+
+        .ar-modal-head h3 {
+            margin: 0;
+            font-family: "Playfair Display", serif;
+            font-size: 20px;
+            color: #302923;
+            font-weight: 700;
+        }
+
+        .ar-modal-head p {
+            margin: 4px 0 0;
+            font-size: 12px;
+            color: #817a71;
+        }
+
+        .ar-modal-close {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            background: transparent;
+            border: 0;
+            color: #948c82;
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .ar-modal-close:hover {
+            background: #faf7f0;
+            color: #302923;
+        }
+
+        .ar-modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .ar-modal-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        @media (max-width:560px) {
+            .ar-modal-row {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .ar-modal-field label {
+            display: block;
+            font-size: 10px;
+            font-weight: 800;
+            color: #4e4841;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: .4px;
+        }
+
+        .ar-modal-field input,
+        .ar-modal-field select,
+        .ar-modal-field textarea {
+            width: 100%;
+            border: 1.5px solid #e8e1d8;
+            background: #fffdf9;
+            border-radius: 9px;
+            padding: 9px 11px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 12px;
+            color: #292521;
+            outline: none;
+            transition: .15s;
+        }
+
+        .ar-modal-field textarea {
+            min-height: 60px;
+            resize: vertical;
+        }
+
+        .ar-modal-field input:focus,
+        .ar-modal-field select:focus,
+        .ar-modal-field textarea:focus {
+            border-color: #d98a91;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
+        }
+
+        .ar-modal-hint {
+            font-size: 10.5px;
+            color: #948c82;
+            margin-top: 4px;
+            line-height: 1.5;
+        }
+
+        .ar-modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 18px;
+            padding-top: 16px;
+            border-top: 1px solid #f0ebe4;
+        }
+
+        .ar-modal-btn {
+            border: 0;
+            border-radius: 10px;
+            padding: 10px 18px;
+            font-family: inherit;
+            font-size: 12px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .15s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .ar-modal-btn-ghost {
+            background: #fff;
+            border: 1.5px solid #e4ddd3;
+            color: #6f675f;
+        }
+
+        .ar-modal-btn-ghost:hover {
+            background: #faf7f0;
+        }
+
+        .ar-modal-btn-primary {
+            background: #2e6b3a;
+            color: #fff;
+        }
+
+        .ar-modal-btn-primary:hover {
+            background: #1f4f29;
+        }
+
+        .ar-modal-btn[disabled] {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
+        /* Map + image preview inside modal */
+        .ar-preview {
+            margin-top: 6px;
+            border: 1px solid #f0ebe4;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fdfaf4;
+        }
+
+        .ar-preview iframe {
+            width: 100%;
+            height: 180px;
+            border: 0;
+            display: block;
+        }
+
+        .ar-preview img {
+            width: 100%;
+            max-height: 200px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .ar-preview-empty {
+            padding: 12px;
+            font-size: 11px;
+            color: #948c82;
+            text-align: center;
+        }
+
+        @media (max-width:900px) {
+            .ar-acc-head {
+                grid-template-columns: 1fr 42px;
+                gap: 8px;
+                padding: 12px 14px;
+            }
+
+            .ar-acc-head>*:nth-child(2),
+            .ar-acc-head>*:nth-child(3),
+            .ar-acc-head>*:nth-child(4),
+            .ar-acc-head>*:nth-child(5) {
+                display: none;
+            }
+
+            .ar-acc-body-inner {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width:768px) {
+            .ar-page {
+                padding: 20px 15px 40px;
+            }
 
             .ar-header {
                 flex-direction: column;
                 align-items: flex-start;
             }
 
-            .ar-refresh-btn { width: 100%; justify-content: center; }
+            .ar-refresh-btn {
+                width: 100%;
+                justify-content: center;
+            }
 
-            .ar-card { padding: 17px; border-radius: 17px; }
+            .ar-card {
+                padding: 17px;
+                border-radius: 17px;
+            }
 
             .ar-list-head {
                 flex-direction: column;
                 align-items: stretch;
             }
 
-            .ar-search { width: 100%; }
-
-            /* Only on mobile: allow horizontal scroll if table too wide */
-            .ar-table-wrap {
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
-            }
-
-            .ar-table {
-                min-width: 760px;
+            .ar-search {
+                width: 100%;
             }
 
             .ar-pagination {
@@ -689,48 +1027,41 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
                 align-items: stretch;
             }
 
-            .ar-pag-left { justify-content: center; }
-            .ar-pag-info { text-align: center; }
-            .ar-pag-controls { justify-content: center; }
+            .ar-pag-controls {
+                justify-content: center;
+            }
         }
 
-        @media (max-width: 480px) {
-            .ar-toast-wrap {
-                top: 14px;
-                right: 14px;
-                left: 14px;
+        @media (max-width:600px) {
+            .ar-acc-actions {
+                flex-direction: column;
             }
 
-            .ar-toast {
-                min-width: 0;
+            .ar-acc-actions .ar-btn,
+            .ar-acc-actions .ar-call,
+            .ar-acc-actions .ar-whatsapp {
                 width: 100%;
+                justify-content: center;
+            }
+        }
+
+        @keyframes arSpin {
+            to {
+                transform: rotate(360deg);
             }
         }
     </style>
 </head>
 
 <body>
-
     <?php include './templates/sidebar.php'; ?>
 
     <main class="main">
-
         <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
-                <i class="bi bi-list"></i>
-            </button>
-
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search...">
-            </div>
-
+            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu"><i class="bi bi-list"></i></button>
+            <div class="search-box"><i class="bi bi-search"></i><input type="text" placeholder="Search..."></div>
             <div class="top-right">
-                <button class="notification">
-                    <i class="bi bi-bell"></i>
-                    <span class="notification-dot"></span>
-                </button>
-
+                <button class="notification"><i class="bi bi-bell"></i><span class="notification-dot"></span></button>
                 <div class="admin-profile">
                     <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
                     <div>
@@ -741,104 +1072,185 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             </div>
         </header>
 
-
         <div class="ar-page">
-
             <div class="ar-header">
                 <div class="ar-title">
                     <h1>Address Requests</h1>
                     <p>Customers requesting to be added to an apartment or division.</p>
                 </div>
-
-                <button type="button" class="ar-refresh-btn" id="arRefresh">
-                    <i class="bi bi-arrow-clockwise"></i>
-                    Refresh
-                </button>
+                <button type="button" class="ar-refresh-btn" id="arRefresh"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
 
-
             <div class="ar-card">
-
                 <div class="ar-list-head">
                     <div class="ar-list-title">
                         <h3>All Requests</h3>
                         <span>Loaded from the database</span>
                     </div>
-
                     <div class="ar-search">
                         <i class="bi bi-search"></i>
                         <input type="text" id="arSearch" placeholder="Search name, mobile, apartment...">
                     </div>
                 </div>
 
-                <div class="ar-table-wrap">
-                    <table class="ar-table">
-                        <thead>
-                            <tr>
-                                <th>Customer</th>
-                                <th>Requested Apartment</th>
-                                <th>Division</th>
-                                <th>Date</th>
-                                <th>Status</th>
-                                <th>Action</th>
-                            </tr>
-                        </thead>
-                        <tbody id="arTbody">
-                            <tr>
-                                <td colspan="6" style="text-align:center;padding:40px;color:#948c82;">
-                                    <span style="display:inline-block;width:22px;height:22px;border:3px solid #eee7dc;border-top-color:#b51f2c;border-radius:50%;animation:arSpin .7s linear infinite;"></span>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
+                <!-- FILTERS -->
+                <div class="ar-filters">
+                    <div class="ar-fgroup">
+                        <label><i class="bi bi-calendar3"></i> Date</label>
+                        <select id="arFilterDate">
+                            <option value="all">All time</option>
+                            <option value="today">Today</option>
+                            <option value="yesterday">Yesterday</option>
+                            <option value="7d">Last 7 days</option>
+                            <option value="30d">Last 30 days</option>
+                            <option value="custom">Custom range…</option>
+                        </select>
+                    </div>
+                    <div class="ar-fgroup" id="arCustomRange">
+                        <label>From</label><input type="date" id="arDateFrom">
+                        <label>To</label><input type="date" id="arDateTo">
+                    </div>
+                    <div class="ar-fgroup">
+                        <label><i class="bi bi-funnel"></i> Status</label>
+                        <select id="arFilterStatus">
+                            <option value="all">All</option>
+                            <option value="0">Pending</option>
+                            <option value="1">Approved</option>
+                            <option value="2">Rejected</option>
+                        </select>
+                    </div>
                 </div>
 
+                <div class="ar-acc-list" id="arTbody">
+                    <div class="ar-acc-item" style="padding:40px;text-align:center;color:#948c82;border:1.5px dashed #e4ddd3;">
+                        <span style="display:inline-block;width:22px;height:22px;border:3px solid #eee7dc;border-top-color:#b51f2c;border-radius:50%;animation:arSpin .7s linear infinite;"></span>
+                    </div>
+                </div>
 
-                <!-- PAGINATION -->
                 <div class="ar-pagination" id="arPagination" style="display:none;">
-
                     <div class="ar-pag-left">
-
-                        <div class="ar-pag-info" id="arPagInfo">
-                            Showing <strong>0</strong>–<strong>0</strong> of <strong>0</strong>
-                        </div>
-
-                        <label class="ar-perpage">
-                            Show
+                        <div class="ar-pag-info" id="arPagInfo">Showing <strong>0</strong>–<strong>0</strong> of <strong>0</strong></div>
+                        <label class="ar-perpage">Show
                             <select id="arPerPage">
                                 <option value="10">10</option>
                                 <option value="25">25</option>
                                 <option value="50">50</option>
                                 <option value="100">100</option>
-                            </select>
-                            entries
+                            </select> entries
                         </label>
-
                     </div>
-
                     <div class="ar-pag-controls" id="arPagControls"></div>
-
                 </div>
-
             </div>
-
         </div>
-
     </main>
-
 
     <div class="ar-toast-wrap" id="arToastWrap"></div>
 
+    <!-- APPROVE MODAL -->
+    <div class="ar-modal-overlay" id="arApproveOverlay" aria-hidden="true">
+        <div class="ar-modal" role="dialog" aria-modal="true">
+            <div class="ar-modal-head">
+                <div>
+                    <h3>Approve & Create Customer</h3>
+                    <p>Edit any detail, then click <strong>Approve</strong>. A customer account will be created.</p>
+                </div>
+                <button type="button" class="ar-modal-close" id="arApproveClose"><i class="bi bi-x-lg"></i></button>
+            </div>
+
+            <form id="arApproveForm">
+                <input type="hidden" id="arReqId">
+                <div class="ar-modal-body">
+                    <div class="ar-modal-row">
+                        <div class="ar-modal-field"><label>Customer Name</label><input type="text" id="arName" required maxlength="150"></div>
+                        <div class="ar-modal-field"><label>Mobile Number</label><input type="text" id="arMobile" required maxlength="15" inputmode="numeric"></div>
+                    </div>
+                    <div class="ar-modal-row">
+                        <div class="ar-modal-field"><label>Password (leave blank to keep existing)</label><input type="text" id="arPassword" maxlength="100" placeholder="e.g. 123456"></div>
+                        <div class="ar-modal-field"><label>Request Type</label>
+                            <select id="arReqType">
+                                <option value="apartment">Apartment</option>
+                                <option value="individual_house">Individual House</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- ===== APARTMENT BLOCK ===== -->
+                    <div id="arAptBlock">
+                        <div class="ar-modal-row">
+                            <div class="ar-modal-field">
+                                <label>Apartment Name</label>
+                                <input type="text" id="arApartment" maxlength="200" placeholder="Existing or new apartment name">
+                                <p class="ar-modal-hint">If this name doesn't exist, a new apartment will be created.</p>
+                            </div>
+                            <div class="ar-modal-field">
+                                <label>Branch</label>
+                                <select id="arBranch">
+                                    <option value="">— Select Branch —</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="ar-modal-field">
+                            <label>Apartment Address</label>
+                            <textarea id="arApartmentAddress" maxlength="500" placeholder="Full apartment address (only used when creating a new apartment)"></textarea>
+                        </div>
+                        <div class="ar-modal-row">
+                            <div class="ar-modal-field">
+                                <label>Division / Block / Door / Floor</label>
+                                <input type="text" id="arDivision" maxlength="100" placeholder="e.g. Blk A / Door 101 / Fl 2">
+                                <p class="ar-modal-hint">This is added to the apartment's variant list.</p>
+                            </div>
+                            <div class="ar-modal-field">
+                                <label>Delivery Charge (₹)</label>
+                                <input type="number" id="arDeliveryCharge" min="0" step="0.01" placeholder="0.00">
+                                <p class="ar-modal-hint">Saved per division on the apartment.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ===== HOUSE BLOCK ===== -->
+                    <div id="arHouseBlock" style="display:none;">
+                        <div class="ar-modal-field">
+                            <label>Full Address</label>
+                            <textarea id="arHouseAddress" maxlength="250"></textarea>
+                        </div>
+                        <div class="ar-modal-row">
+                            <div class="ar-modal-field">
+                                <label>Google Maps Link</label>
+                                <input type="text" id="arMapLink" maxlength="600" placeholder="https://maps.google.com/...">
+                            </div>
+                            <div class="ar-modal-field">
+                                <label>Delivery Charge (₹)</label>
+                                <input type="number" id="arHouseDeliveryCharge" min="0" step="0.01" placeholder="0.00">
+                            </div>
+                        </div>
+                        <div class="ar-modal-field">
+                            <label>House Image URL / Path</label>
+                            <input type="text" id="arHouseImage" maxlength="600" placeholder="uploads/houses/.../image.jpg">
+                            <p class="ar-modal-hint">Leave blank to hide the image preview.</p>
+                        </div>
+                        <div id="arMapPreview" class="ar-preview" style="display:none;"></div>
+                        <div id="arImagePreview" class="ar-preview" style="display:none;"></div>
+                    </div>
+                </div>
+
+                <div class="ar-modal-actions">
+                    <button type="button" class="ar-modal-btn ar-modal-btn-ghost" id="arApproveCancel">Cancel</button>
+                    <button type="submit" class="ar-modal-btn ar-modal-btn-primary" id="arApproveSubmit">
+                        <i class="bi bi-check-lg"></i> Approve &amp; Save
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
         window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
     </script>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
     <script src="<?= ADMIN_URL ?>js/address-requests.js"></script>
-
 </body>
 
 </html>

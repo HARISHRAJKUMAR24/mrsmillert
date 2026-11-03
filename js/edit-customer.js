@@ -1,7 +1,8 @@
 /* =========================================================
    MRS MILL@ — EDIT CUSTOMER
-   File: ./js/edit-customer.js
+   File: ./js/edit-customer.js   v2026-11-03h
    Delete removed. Supports apartment OR individual_house edit.
+   House mode now saves delivery charge.
    ========================================================= */
 
 (function () {
@@ -11,90 +12,91 @@
         ? window.ADMIN_URL
         : "./";
 
-    const CUSTOMER_ID   = window.CUSTOMER_ID || 0;
-    const ADDRESS_TYPE  = window.ADDRESS_TYPE || "apartment";
+    const CUSTOMER_ID = window.CUSTOMER_ID || 0;
+    const ADDRESS_TYPE = window.ADDRESS_TYPE || "apartment";
 
     /* Form */
-    const form          = document.getElementById("customerForm");
-    const saveBtn       = document.getElementById("saveBtn");
-    const saveBtnText   = document.getElementById("saveBtnText");
+    const form = document.getElementById("customerForm");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveBtnText = document.getElementById("saveBtnText");
 
-    const nameInput     = document.getElementById("full_name");
-    const mobileInput   = document.getElementById("mobile_number");
-    const mobileHelp    = document.getElementById("mobileHelp");
+    const nameInput = document.getElementById("full_name");
+    const mobileInput = document.getElementById("mobile_number");
+    const mobileHelp = document.getElementById("mobileHelp");
 
     const passwordInput = document.getElementById("password");
-    const passwordHelp  = document.getElementById("passwordHelp");
+    const passwordHelp = document.getElementById("passwordHelp");
 
     /* Apartment */
-    const aptBlock      = document.getElementById("aptBlock");
-    const aptDdWrap     = document.getElementById("acAptDdWrap");
-    const aptDdToggle   = document.getElementById("acAptDdToggle");
-    const aptDdLabel    = document.getElementById("acAptDdLabel");
-    const aptDdSearch   = document.getElementById("acAptDdSearch");
-    const aptDdList     = document.getElementById("acAptDdList");
-    const aptIdInput    = document.getElementById("acApartmentId");
-    const aptCodeInput  = document.getElementById("acApartmentCode");
-    const aptNameInput  = document.getElementById("acApartmentName");
+    const aptBlock = document.getElementById("aptBlock");
+    const aptDdWrap = document.getElementById("acAptDdWrap");
+    const aptDdToggle = document.getElementById("acAptDdToggle");
+    const aptDdLabel = document.getElementById("acAptDdLabel");
+    const aptDdSearch = document.getElementById("acAptDdSearch");
+    const aptDdList = document.getElementById("acAptDdList");
+    const aptIdInput = document.getElementById("acApartmentId");
+    const aptCodeInput = document.getElementById("acApartmentCode");
+    const aptNameInput = document.getElementById("acApartmentName");
 
     /* Division */
-    const divDdWrap      = document.getElementById("acDivDdWrap");
-    const divDdToggle    = document.getElementById("acDivDdToggle");
-    const divDdLabel     = document.getElementById("acDivDdLabel");
-    const divDdSearch    = document.getElementById("acDivDdSearch");
-    const divDdList      = document.getElementById("acDivDdList");
-    const divInput       = document.getElementById("acDivision");
+    const divDdWrap = document.getElementById("acDivDdWrap");
+    const divDdToggle = document.getElementById("acDivDdToggle");
+    const divDdLabel = document.getElementById("acDivDdLabel");
+    const divDdSearch = document.getElementById("acDivDdSearch");
+    const divDdList = document.getElementById("acDivDdList");
+    const divInput = document.getElementById("acDivision");
     const divChargeInput = document.getElementById("acDivisionCharge");
-    const divHint        = document.getElementById("acDivisionHint");
+    const divHint = document.getElementById("acDivisionHint");
 
     /* House */
-    const houseBlock     = document.getElementById("houseBlock");
-    const houseAddress   = document.getElementById("houseAddress");
-    const houseMap       = document.getElementById("houseMap");
-    const houseLocBtn    = document.getElementById("houseLocBtn");
-    const houseLocBtnText= document.getElementById("houseLocBtnText");
-    const houseLocHint   = document.getElementById("houseLocHint");
-    const houseOpenMapBtn= document.getElementById("houseOpenMapBtn");
-    const houseImgDrop   = document.getElementById("houseImgDrop");
-    const houseImg       = document.getElementById("houseImg");
-    const houseImgPreview= document.getElementById("houseImgPreview");
+    const houseBlock = document.getElementById("houseBlock");
+    const houseAddress = document.getElementById("houseAddress");
+    const houseMap = document.getElementById("houseMap");
+    const houseLocBtn = document.getElementById("houseLocBtn");
+    const houseLocBtnText = document.getElementById("houseLocBtnText");
+    const houseLocHint = document.getElementById("houseLocHint");
+    const houseOpenMapBtn = document.getElementById("houseOpenMapBtn");
+    const houseChargeInput = document.getElementById("houseDeliveryCharge");
+    const houseImgDrop = document.getElementById("houseImgDrop");
+    const houseImg = document.getElementById("houseImg");
+    const houseImgPreview = document.getElementById("houseImgPreview");
 
     /* Wallet */
-    const walletDisplay  = document.getElementById("walletDisplay");
-    const wForm          = document.getElementById("walletForm");
-    const wTxnType       = document.getElementById("wTxnType");
-    const wAmount        = document.getElementById("wAmount");
-    const wNote          = document.getElementById("wNote");
-    const wSubmitBtn     = document.getElementById("walletSubmitBtn");
-    const wSubmitText    = document.getElementById("walletSubmitText");
-    const wRefreshBtn    = document.getElementById("walletRefreshHistory");
-    const walletHistory  = document.getElementById("walletHistory");
+    const walletDisplay = document.getElementById("walletDisplay");
+    const wForm = document.getElementById("walletForm");
+    const wTxnType = document.getElementById("wTxnType");
+    const wAmount = document.getElementById("wAmount");
+    const wNote = document.getElementById("wNote");
+    const wSubmitBtn = document.getElementById("walletSubmitBtn");
+    const wSubmitText = document.getElementById("walletSubmitText");
+    const wRefreshBtn = document.getElementById("walletRefreshHistory");
+    const walletHistory = document.getElementById("walletHistory");
     const historyPagination = document.getElementById("historyPagination");
-    const sumCredit      = document.getElementById("sumCredit");
-    const sumDebit       = document.getElementById("sumDebit");
-    const sumEntries     = document.getElementById("sumEntries");
+    const sumCredit = document.getElementById("sumCredit");
+    const sumDebit = document.getElementById("sumDebit");
+    const sumEntries = document.getElementById("sumEntries");
 
     /* Success / error popups */
     const successOverlay = document.getElementById("successOverlay");
-    const successText    = document.getElementById("successText");
-    const successOkBtn   = document.getElementById("successOkBtn");
+    const successText = document.getElementById("successText");
+    const successOkBtn = document.getElementById("successOkBtn");
 
-    const errorOverlay   = document.getElementById("errorOverlay");
-    const errorText      = document.getElementById("errorText");
-    const errorOkBtn     = document.getElementById("errorOkBtn");
+    const errorOverlay = document.getElementById("errorOverlay");
+    const errorText = document.getElementById("errorText");
+    const errorOkBtn = document.getElementById("errorOkBtn");
 
     if (!form) return;
 
     let apartmentsCache = [];
-    let divisionsCache  = [];
-    let currentBalance  = 0;
-    let historyLoaded   = false;
-    let houseImgData    = "";
+    let divisionsCache = [];
+    let currentBalance = 0;
+    let historyLoaded = false;
+    let houseImgData = "";
 
     let hxCurrentPage = 1;
-    let hxPerPage     = 10;
-    let hxFilter      = "";
-    let hxTotalPages  = 1;
+    let hxPerPage = 10;
+    let hxFilter = "";
+    let hxTotalPages = 1;
 
     try {
         const raw = (walletDisplay?.textContent || "").replace(/[^\d.]/g, "");
@@ -304,7 +306,7 @@
     aptDdList?.addEventListener("click", function (e) {
         const opt = e.target.closest(".sd-option");
         if (!opt) return;
-        aptIdInput.value   = opt.dataset.id;
+        aptIdInput.value = opt.dataset.id;
         aptCodeInput.value = opt.dataset.code;
         aptNameInput.value = opt.dataset.name;
         aptDdLabel.textContent = opt.dataset.name;
@@ -318,17 +320,17 @@
     function divLabelText(d) {
         if (d.division_label) return d.division_label;
         const parts = [];
-        if (d.block)   parts.push("Blk " + d.block);
+        if (d.block) parts.push("Blk " + d.block);
         if (d.door_no) parts.push("Door " + d.door_no);
-        if (d.floor)   parts.push("Fl " + d.floor);
+        if (d.floor) parts.push("Fl " + d.floor);
         return parts.length ? parts.join(" · ") : ("Division " + (d.division || ""));
     }
     function divValueText(d) {
         if (d.division_value) return d.division_value;
         const parts = [];
-        if (d.block)   parts.push("Blk " + d.block);
+        if (d.block) parts.push("Blk " + d.block);
         if (d.door_no) parts.push("Door " + d.door_no);
-        if (d.floor)   parts.push("Fl " + d.floor);
+        if (d.floor) parts.push("Fl " + d.floor);
         return parts.length ? parts.join(" / ") : String(d.division || "");
     }
 
@@ -382,7 +384,7 @@
                 const label = divLabelText(d).toLowerCase();
                 const value = divValueText(d).toLowerCase();
                 return label.includes(q) || value.includes(q);
-              })
+            })
             : divisionsCache;
 
         if (!list.length) {
@@ -526,8 +528,8 @@
     form.addEventListener("submit", function (e) {
         e.preventDefault();
 
-        const name     = nameInput.value.trim();
-        const mobile   = mobileInput.value.trim();
+        const name = nameInput.value.trim();
+        const mobile = mobileInput.value.trim();
         const password = passwordInput.value.trim();
 
         if (!name) return showErrorPopup("Customer name is required.");
@@ -538,14 +540,14 @@
         let addressJson = {};
 
         if (ADDRESS_TYPE === "apartment") {
-            const aptId   = aptIdInput.value;
+            const aptId = aptIdInput.value;
             const aptCode = aptCodeInput.value;
             const aptName = aptNameInput.value;
-            const div     = divInput.value;
-            const charge  = Number(divChargeInput.value || 0);
+            const div = divInput.value;
+            const charge = Number(divChargeInput.value || 0);
 
             if (!aptId) return showErrorPopup("Please select an apartment.");
-            if (!div)   return showErrorPopup("Please select a division.");
+            if (!div) return showErrorPopup("Please select a division.");
 
             let block = "", door = "", floor = "";
             const parts = div.split("/").map(s => s.trim());
@@ -568,15 +570,29 @@
         } else {
             const addr = (houseAddress.value || "").trim();
             const mapVal = (houseMap.value || "").trim();
+            const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
             if (!mapVal) return showErrorPopup("Please pin the location or paste a Google Maps link.");
             if (!isValidMapLink(mapVal)) return showErrorPopup("Invalid Google Maps link.");
+            if (isNaN(chargeVal) || chargeVal < 0) return showErrorPopup("Delivery charge must be 0 or more.");
 
             addressJson = {
                 full_address: addr,
-                map_link: mapVal
+                map_link: mapVal,
+                delivery_charge: chargeVal
             };
+
+            /* Preserve existing house_image if there is one */
+            if (!houseImgData) {
+                const existingImgEl = houseImgPreview && houseImgPreview.querySelector("img");
+                if (existingImgEl && existingImgEl.src) {
+                    const src = existingImgEl.src;
+                    if (src.indexOf(BASE_URL) === 0) {
+                        addressJson.house_image = src.substring(BASE_URL.length);
+                    }
+                }
+            }
         }
 
         setCustomerLoading(true);
@@ -599,23 +615,23 @@
             body: fd,
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
-        .then(data => {
-            setCustomerLoading(false);
-            if (data.success) {
-                showSuccessPopup(data.message || "Customer updated successfully.");
-            } else {
-                showErrorPopup(data.message || "Failed to update customer.");
-            }
-        })
-        .catch(() => {
-            setCustomerLoading(false);
-            showErrorPopup("Unable to connect to server.");
-        });
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+            .then(data => {
+                setCustomerLoading(false);
+                if (data.success) {
+                    showSuccessPopup(data.message || "Customer updated successfully.");
+                } else {
+                    showErrorPopup(data.message || "Failed to update customer.");
+                }
+            })
+            .catch(() => {
+                setCustomerLoading(false);
+                showErrorPopup("Unable to connect to server.");
+            });
     });
 
     /* =========================================
-       WALLET — same as before
+       WALLET
        ========================================= */
     document.querySelectorAll(".wallet-tab").forEach(tab => {
         tab.addEventListener("click", function () { setWalletTab(this.dataset.tab); });
@@ -656,34 +672,34 @@
         fetch(BASE_URL + "ajax/wallet-update.php", {
             method: "POST", body: fd, credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => null))
-        .then(res => {
-            wSubmitBtn.disabled = false;
-            wSubmitText.innerHTML = '<i class="bi bi-check-lg"></i> Save Wallet';
+            .then(r => r.json().catch(() => null))
+            .then(res => {
+                wSubmitBtn.disabled = false;
+                wSubmitText.innerHTML = '<i class="bi bi-check-lg"></i> Save Wallet';
 
-            if (!res || !res.success) {
-                showErrorPopup((res && res.message) || "Wallet update failed.");
-                return;
-            }
+                if (!res || !res.success) {
+                    showErrorPopup((res && res.message) || "Wallet update failed.");
+                    return;
+                }
 
-            if (res.data && typeof res.data.balance_after !== "undefined") {
-                currentBalance = Number(res.data.balance_after);
-                walletDisplay.textContent = money(currentBalance);
-            }
+                if (res.data && typeof res.data.balance_after !== "undefined") {
+                    currentBalance = Number(res.data.balance_after);
+                    walletDisplay.textContent = money(currentBalance);
+                }
 
-            wAmount.value = "";
-            wNote.value = "";
-            showSuccessPopup(res.message || "Wallet updated successfully.");
+                wAmount.value = "";
+                wNote.value = "";
+                showSuccessPopup(res.message || "Wallet updated successfully.");
 
-            hxCurrentPage = 1;
-            historyLoaded = true;
-            loadWalletHistory();
-        })
-        .catch(() => {
-            wSubmitBtn.disabled = false;
-            wSubmitText.innerHTML = '<i class="bi bi-check-lg"></i> Save Wallet';
-            showErrorPopup("Unable to connect.");
-        });
+                hxCurrentPage = 1;
+                historyLoaded = true;
+                loadWalletHistory();
+            })
+            .catch(() => {
+                wSubmitBtn.disabled = false;
+                wSubmitText.innerHTML = '<i class="bi bi-check-lg"></i> Save Wallet';
+                showErrorPopup("Unable to connect.");
+            });
     });
 
     wRefreshBtn?.addEventListener("click", () => {
@@ -713,53 +729,53 @@
         if (hxFilter) params.set("filter", hxFilter);
 
         fetch(BASE_URL + "ajax/wallet-history.php?" + params.toString(), { credentials: "same-origin" })
-        .then(r => r.json().catch(() => null))
-        .then(res => {
-            if (!res || !res.success) {
-                walletHistory.innerHTML = `
+            .then(r => r.json().catch(() => null))
+            .then(res => {
+                if (!res || !res.success) {
+                    walletHistory.innerHTML = `
                     <div class="history-empty">
                         <i class="bi bi-exclamation-triangle"></i>
                         <h4>Failed to load</h4>
                         <p>${esc((res && res.message) || "Please try again.")}</p>
                     </div>`;
-                return;
-            }
+                    return;
+                }
 
-            let rows = [], totalCredit = 0, totalDebit = 0, totalEntries = 0, totalPages = 1;
+                let rows = [], totalCredit = 0, totalDebit = 0, totalEntries = 0, totalPages = 1;
 
-            if (Array.isArray(res.data)) {
-                rows = res.data;
-                rows.forEach(t => {
-                    if (t.txn_type === "credit") totalCredit += Number(t.amount) || 0;
-                    else                          totalDebit  += Number(t.amount) || 0;
-                });
-                totalEntries = rows.length;
-            } else if (res.data && typeof res.data === "object") {
-                rows         = Array.isArray(res.data.transactions) ? res.data.transactions : [];
-                totalCredit  = Number(res.data.total_credit) || 0;
-                totalDebit   = Number(res.data.total_debit)  || 0;
-                totalEntries = Number(res.data.total_entries) || Number(res.data.total_count) || 0;
-                totalPages   = Number(res.data.total_pages)   || 1;
-            }
+                if (Array.isArray(res.data)) {
+                    rows = res.data;
+                    rows.forEach(t => {
+                        if (t.txn_type === "credit") totalCredit += Number(t.amount) || 0;
+                        else totalDebit += Number(t.amount) || 0;
+                    });
+                    totalEntries = rows.length;
+                } else if (res.data && typeof res.data === "object") {
+                    rows = Array.isArray(res.data.transactions) ? res.data.transactions : [];
+                    totalCredit = Number(res.data.total_credit) || 0;
+                    totalDebit = Number(res.data.total_debit) || 0;
+                    totalEntries = Number(res.data.total_entries) || Number(res.data.total_count) || 0;
+                    totalPages = Number(res.data.total_pages) || 1;
+                }
 
-            hxTotalPages = totalPages;
+                hxTotalPages = totalPages;
 
-            if (sumCredit)  sumCredit.textContent  = "+" + money(totalCredit);
-            if (sumDebit)   sumDebit.textContent   = "−" + money(totalDebit);
-            if (sumEntries) sumEntries.textContent = totalEntries;
+                if (sumCredit) sumCredit.textContent = "+" + money(totalCredit);
+                if (sumDebit) sumDebit.textContent = "−" + money(totalDebit);
+                if (sumEntries) sumEntries.textContent = totalEntries;
 
-            if (rows.length === 0) {
-                walletHistory.innerHTML = `
+                if (rows.length === 0) {
+                    walletHistory.innerHTML = `
                     <div class="history-empty">
                         <i class="bi bi-inbox"></i>
                         <h4>No transactions yet</h4>
                         <p>Start by adding money to the wallet.</p>
                     </div>`;
-                if (historyPagination) historyPagination.innerHTML = "";
-                return;
-            }
+                    if (historyPagination) historyPagination.innerHTML = "";
+                    return;
+                }
 
-            walletHistory.innerHTML = `
+                walletHistory.innerHTML = `
                 <table class="wallet-history-table">
                     <thead>
                         <tr>
@@ -769,8 +785,8 @@
                     </thead>
                     <tbody>
                         ${rows.map(t => {
-                            const isCredit = t.txn_type === "credit";
-                            return `
+                    const isCredit = t.txn_type === "credit";
+                    return `
                                 <tr>
                                     <td>
                                         <div style="font-weight:700;color:#302923;font-size:11px;">
@@ -800,20 +816,20 @@
                                         </div>
                                     </td>
                                 </tr>`;
-                        }).join("")}
+                }).join("")}
                     </tbody>
                 </table>`;
 
-            renderHistoryPagination();
-        })
-        .catch(() => {
-            walletHistory.innerHTML = `
+                renderHistoryPagination();
+            })
+            .catch(() => {
+                walletHistory.innerHTML = `
                 <div class="history-empty">
                     <i class="bi bi-wifi-off"></i>
                     <h4>Unable to connect</h4>
                     <p>Please check your network.</p>
                 </div>`;
-        });
+            });
     }
 
     function renderHistoryPagination() {

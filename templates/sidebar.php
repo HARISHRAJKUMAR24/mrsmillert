@@ -522,15 +522,15 @@ $sidebarGroup = function (
 
         ?>
 
-
         <!-- ==================================
-             CUSTOMERS
-        ================================== -->
+     CUSTOMERS
+================================== -->
 
         <?php
 
         $customerPages = [
-            'customers.php'
+            'customers.php',
+            'referrals.php'
         ];
 
         $customerLinks =
@@ -538,6 +538,11 @@ $sidebarGroup = function (
                 'customers.php',
                 'Customers',
                 'bi-people'
+            )
+            . $sidebarLink(
+                'referrals.php',
+                'Referrals',
+                'bi-person-plus'
             );
 
         echo $sidebarGroup(
@@ -549,7 +554,6 @@ $sidebarGroup = function (
         );
 
         ?>
-
 
         <!-- ==================================
              APARTMENTS & DELIVERY

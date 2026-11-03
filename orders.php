@@ -45,10 +45,10 @@ try {
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
 
     <style>
+        /* ===== (unchanged styles — same as before) ===== */
         .or-page {
             padding: 30px 32px 40px;
         }
@@ -518,6 +518,7 @@ try {
             margin-top: 2px;
         }
 
+        /* ✅ NOTES BUTTON — ALWAYS VISIBLE (no hover required) */
         .order-note-btn {
             display: inline-flex;
             align-items: center;
@@ -532,17 +533,12 @@ try {
             text-transform: uppercase;
             letter-spacing: .4px;
             cursor: pointer;
-            opacity: 0;
-            transform: translateY(-3px);
+            opacity: 1;
+            transform: none;
             transition: .18s ease;
             border: 1px dashed #f3dca5;
             white-space: nowrap;
             user-select: none;
-        }
-
-        .or-table tbody tr:hover .order-note-btn {
-            opacity: 1;
-            transform: translateY(0);
         }
 
         .order-note-btn:hover {
@@ -555,7 +551,6 @@ try {
             font-size: 10px;
         }
 
-        /* ---------- ASSIGN DELIVERY BOY BUTTON ---------- */
         .assign-boy-btn {
             display: inline-flex;
             align-items: center;
@@ -923,7 +918,7 @@ try {
             color: #302923;
         }
 
-        /* NOTES MODAL */
+        /* Notes Modal */
         .or-note-overlay {
             position: fixed;
             inset: 0;
@@ -1112,9 +1107,7 @@ try {
             color: #fff;
         }
 
-        /* =====================================================
-           ASSIGN DELIVERY BOY MODAL
-           ===================================================== */
+        /* Assign Modal */
         .or-assign-overlay {
             position: fixed;
             inset: 0;
@@ -1288,7 +1281,6 @@ try {
             gap: 8px;
         }
 
-        /* Toast */
         .or-toast {
             position: fixed;
             bottom: 30px;
@@ -1328,11 +1320,6 @@ try {
             .or-stock-btn {
                 flex: 1;
                 justify-content: center;
-            }
-
-            .order-note-btn {
-                opacity: 1;
-                transform: none;
             }
         }
 
@@ -1408,7 +1395,6 @@ try {
             </div>
         </header>
 
-
         <div class="or-page">
 
             <div class="or-header">
@@ -1430,7 +1416,6 @@ try {
                 </div>
             </div>
 
-
             <div class="or-bulk" id="orBulkBar">
                 <span class="or-bulk-count">
                     <i class="bi bi-check2-square"></i>
@@ -1447,7 +1432,6 @@ try {
                     <i class="bi bi-lightning-charge"></i> Bulk Action
                 </button>
             </div>
-
 
             <div class="or-stats">
                 <div class="or-stat">
@@ -1474,7 +1458,6 @@ try {
                     <div class="or-stat-sub">New orders</div>
                 </div>
             </div>
-
 
             <div class="or-filters">
                 <div class="or-tabs">
@@ -1560,8 +1543,6 @@ try {
         </div>
     </main>
 
-
-    <!-- NOTES MODAL -->
     <div class="or-note-overlay" id="orNoteOverlay">
         <div class="or-note-modal" role="dialog" aria-modal="true">
             <div class="or-note-head">
@@ -1591,8 +1572,6 @@ try {
         </div>
     </div>
 
-
-    <!-- ASSIGN DELIVERY BOY MODAL -->
     <div class="or-assign-overlay" id="orAssignOverlay">
         <div class="or-assign-modal" role="dialog" aria-modal="true">
             <div class="or-assign-head">
@@ -1620,7 +1599,6 @@ try {
             </div>
         </div>
     </div>
-
 
     <div class="or-toast" id="orToast"></div>
 

@@ -19,6 +19,18 @@ define(
     'http://localhost/mrs.millet.admin/'
 );
 
+
+// Delivery Boy URL
+define(
+    'BASE_URL',
+    'http://localhost/mrs.millet.delivery-boy/'
+);
+
+define(
+    'MAIN_URL',
+    'http://localhost/mrs.millet.customer/'
+);
+
 date_default_timezone_set('Asia/Kolkata');
 
 

@@ -1,8 +1,8 @@
 /* =========================================================
    MRS MILL@ — ADD CUSTOMER
-   File: ./js/add-customer.js
+   File: ./js/add-customer.js   v2026-11-03i
    Apartment OR Individual House — sends address_json
-   Division labels: Blk X · Door Y · Fl Z
+   Individual house now saves delivery_charge.
    ========================================================= */
 
 (function () {
@@ -51,15 +51,16 @@
     const divHint        = document.getElementById("acDivisionHint");
 
     /* House */
-    const houseAddress   = document.getElementById("houseAddress");
-    const houseMap       = document.getElementById("houseMap");
-    const houseLocBtn    = document.getElementById("houseLocBtn");
-    const houseLocBtnText= document.getElementById("houseLocBtnText");
-    const houseLocHint   = document.getElementById("houseLocHint");
-    const houseOpenMapBtn= document.getElementById("houseOpenMapBtn");
-    const houseImgDrop   = document.getElementById("houseImgDrop");
-    const houseImg       = document.getElementById("houseImg");
-    const houseImgPreview= document.getElementById("houseImgPreview");
+    const houseAddress      = document.getElementById("houseAddress");
+    const houseMap          = document.getElementById("houseMap");
+    const houseLocBtn       = document.getElementById("houseLocBtn");
+    const houseLocBtnText   = document.getElementById("houseLocBtnText");
+    const houseLocHint      = document.getElementById("houseLocHint");
+    const houseOpenMapBtn   = document.getElementById("houseOpenMapBtn");
+    const houseChargeInput  = document.getElementById("houseDeliveryCharge");
+    const houseImgDrop      = document.getElementById("houseImgDrop");
+    const houseImg          = document.getElementById("houseImg");
+    const houseImgPreview   = document.getElementById("houseImgPreview");
 
     /* Wallet */
     const walletToggle  = document.getElementById("walletToggle");
@@ -531,16 +532,19 @@
                 charge: charge
             };
         } else {
-            const addr = (houseAddress.value || "").trim();
-            const mapVal = (houseMap.value || "").trim();
+            const addr      = (houseAddress.value || "").trim();
+            const mapVal    = (houseMap.value || "").trim();
+            const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
             if (!mapVal) return showErrorPopup("Please pin the location or paste a Google Maps link.");
             if (!isValidMapLink(mapVal)) return showErrorPopup("Invalid Google Maps link.");
+            if (isNaN(chargeVal) || chargeVal < 0) return showErrorPopup("Delivery charge must be 0 or more.");
 
             addressJson = {
                 full_address: addr,
-                map_link: mapVal
+                map_link: mapVal,
+                delivery_charge: chargeVal
             };
         }
 
@@ -608,6 +612,7 @@
                 houseMapLink = "";
                 houseImgData = "";
                 if (houseMap) houseMap.value = "";
+                if (houseChargeInput) houseChargeInput.value = "0";
                 if (houseLocBtn) { houseLocBtn.disabled = false; houseLocBtn.classList.remove("success"); }
                 if (houseLocBtnText) houseLocBtnText.textContent = "Get My Current Location";
                 if (houseLocHint) { houseLocHint.textContent = ""; houseLocHint.className = "field-help"; }
