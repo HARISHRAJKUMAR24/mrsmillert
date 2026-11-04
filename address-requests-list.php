@@ -1057,20 +1057,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
     <?php include './templates/sidebar.php'; ?>
 
     <main class="main">
-        <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu"><i class="bi bi-list"></i></button>
-            <div class="search-box"><i class="bi bi-search"></i><input type="text" placeholder="Search..."></div>
-            <div class="top-right">
-                <button class="notification"><i class="bi bi-bell"></i><span class="notification-dot"></span></button>
-                <div class="admin-profile">
-                    <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
-                    <div>
-                        <div class="admin-name"><?= htmlspecialchars($_SESSION['admin_name'] ?? 'User') ?></div>
-                        <div class="admin-role"><?= $isAdmin ? 'Admin' : 'Staff' ?></div>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include './templates/header.php'; ?>
 
         <div class="ar-page">
             <div class="ar-header">

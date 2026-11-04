@@ -191,7 +191,6 @@ $settings = getSettings($pdo);
             }
         }
 
-        /* Address type toggle */
         .addr-type-toggle {
             display: inline-flex;
             gap: 6px;
@@ -228,7 +227,6 @@ $settings = getSettings($pdo);
             box-shadow: 0 4px 12px rgba(181, 31, 44, .22);
         }
 
-        /* Dropdown */
         .sd-wrap {
             position: relative;
         }
@@ -426,7 +424,6 @@ $settings = getSettings($pdo);
             color: #948c82;
         }
 
-        /* Map + Image */
         .loc-btn {
             margin-top: 10px;
             width: 100%;
@@ -499,7 +496,6 @@ $settings = getSettings($pdo);
             object-fit: cover;
         }
 
-        /* Wallet */
         .wallet-section {
             margin-top: 22px;
             padding-top: 20px;
@@ -614,12 +610,6 @@ $settings = getSettings($pdo);
             display: grid;
         }
 
-        @media (max-width: 620px) {
-            .wallet-fields {
-                grid-template-columns: 1fr;
-            }
-        }
-
         .wallet-preview {
             display: flex;
             align-items: center;
@@ -652,7 +642,6 @@ $settings = getSettings($pdo);
             margin-left: auto;
         }
 
-        /* Actions */
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -790,10 +779,11 @@ $settings = getSettings($pdo);
         .mm-modal-actions {
             display: flex;
             gap: 10px;
+            flex-direction: column;
         }
 
         .mm-btn {
-            flex: 1;
+            width: 100%;
             height: 44px;
             border-radius: 11px;
             border: none;
@@ -815,6 +805,17 @@ $settings = getSettings($pdo);
 
         .mm-btn-primary:hover {
             background: #8e1722;
+            color: #fff;
+        }
+
+        .mm-btn-whatsapp {
+            background: #25D366;
+            color: #fff;
+            display: none;
+        }
+
+        .mm-btn-whatsapp:hover {
+            background: #1da851;
             color: #fff;
         }
 
@@ -883,28 +884,7 @@ $settings = getSettings($pdo);
 
     <main class="main">
 
-        <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
-                <i class="bi bi-list"></i>
-            </button>
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search orders, products...">
-            </div>
-            <div class="top-right">
-                <button class="notification">
-                    <i class="bi bi-bell"></i>
-                    <span class="notification-dot"></span>
-                </button>
-                <div class="admin-profile">
-                    <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
-                    <div>
-                        <div class="admin-name"><?= htmlspecialchars($_SESSION['admin_name'] ?? 'User') ?></div>
-                        <div class="admin-role"><?= $isAdmin ? 'Admin' : 'Staff' ?></div>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include './templates/header.php'; ?>
 
 
         <div class="customer-page">
@@ -1072,7 +1052,6 @@ $settings = getSettings($pdo);
                                 <p class="field-help" id="houseLocHint"></p>
                             </div>
 
-                            <!-- ✅ NEW: Delivery charge -->
                             <div class="col-12 col-md-6">
                                 <label>Delivery Charge (₹)</label>
                                 <div class="input-icon-wrap">
@@ -1159,13 +1138,20 @@ $settings = getSettings($pdo);
     </main>
 
 
+    <!-- SUCCESS MODAL -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon"><i class="bi bi-check-lg"></i></div>
             <h3 class="mm-modal-title" id="successTitle">Customer Added!</h3>
             <p class="mm-modal-text" id="successText">The customer account has been created successfully.</p>
             <div class="mm-modal-code" id="successCode" style="display:none;"></div>
+
             <div class="mm-modal-actions">
+                <!-- WhatsApp Share Button -->
+                <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank">
+                    <i class="bi bi-whatsapp"></i> Share Details on WhatsApp
+                </a>
+
                 <a href="add-customer.php" class="mm-btn mm-btn-ghost">
                     <i class="bi bi-plus-lg"></i> Add Another
                 </a>
@@ -1176,6 +1162,7 @@ $settings = getSettings($pdo);
         </div>
     </div>
 
+    <!-- ERROR MODAL -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
             <div class="mm-modal-icon mm-modal-icon-error">

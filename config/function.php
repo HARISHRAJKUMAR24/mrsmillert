@@ -590,3 +590,36 @@ function generateDiscountCode(PDO $pdo): ?string
     }
     return null;
 }
+/* =========================================================
+   TWO-WAY PASSWORD ENCRYPTION (FOR WHATSAPP SHARING)
+   ========================================================= */
+if (!defined('MRS_SECRET_KEY')) define('MRS_SECRET_KEY', 'MrsMill@SuperSecretKey2026!');
+if (!defined('MRS_SECRET_IV')) define('MRS_SECRET_IV', 'MrsMill@InitVector16');
+
+if (!function_exists('encryptPassword')) {
+    function encryptPassword($password) {
+        if (empty($password)) return null;
+        $method = 'AES-256-CBC';
+        $key = hash('sha256', MRS_SECRET_KEY);
+        $iv = substr(hash('sha256', MRS_SECRET_IV), 0, 16);
+        return base64_encode(openssl_encrypt($password, $method, $key, 0, $iv));
+    }
+}
+
+if (!function_exists('decryptPassword')) {
+    function decryptPassword($encryptedString) {
+        if (empty($encryptedString)) return 'Welcome@123';
+        
+        // Fallback for old hashed passwords
+        if (strpos($encryptedString, '$2y$') === 0) {
+            return '{Paste your changed password here}';
+        }
+
+        $method = 'AES-256-CBC';
+        $key = hash('sha256', MRS_SECRET_KEY);
+        $iv = substr(hash('sha256', MRS_SECRET_IV), 0, 16);
+        
+        $decrypted = openssl_decrypt(base64_decode($encryptedString), $method, $key, 0, $iv);
+        return $decrypted !== false ? $decrypted : 'Error reading password.';
+    }
+}

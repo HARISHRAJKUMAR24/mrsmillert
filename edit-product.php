@@ -1099,28 +1099,7 @@ try {
 
     <main class="main">
 
-        <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
-                <i class="bi bi-list"></i>
-            </button>
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search orders, products...">
-            </div>
-            <div class="top-right">
-                <button class="notification">
-                    <i class="bi bi-bell"></i>
-                    <span class="notification-dot"></span>
-                </button>
-                <div class="admin-profile">
-                    <div class="admin-avatar">A</div>
-                    <div>
-                        <div class="admin-name">Admin</div>
-                        <div class="admin-role">Store Manager</div>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include './templates/header.php'; ?>
 
 
         <div class="product-page">

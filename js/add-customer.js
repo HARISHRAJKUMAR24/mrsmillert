@@ -1,8 +1,6 @@
 /* =========================================================
    MRS MILL@ — ADD CUSTOMER
-   File: ./js/add-customer.js   v2026-11-03i
-   Apartment OR Individual House — sends address_json
-   Individual house now saves delivery_charge.
+   File: ./js/add-customer.js
    ========================================================= */
 
 (function () {
@@ -13,79 +11,80 @@
         : "./";
 
     /* DOM */
-    const form         = document.getElementById("customerForm");
-    const saveBtn      = document.getElementById("saveBtn");
-    const saveBtnText  = document.getElementById("saveBtnText");
+    const form = document.getElementById("customerForm");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveBtnText = document.getElementById("saveBtnText");
 
-    const nameInput    = document.getElementById("full_name");
-    const mobileInput  = document.getElementById("mobile_number");
-    const mobileHelp   = document.getElementById("mobileHelp");
+    const nameInput = document.getElementById("full_name");
+    const mobileInput = document.getElementById("mobile_number");
+    const mobileHelp = document.getElementById("mobileHelp");
 
     const passwordInput = document.getElementById("password");
-    const passwordHelp  = document.getElementById("passwordHelp");
+    const passwordHelp = document.getElementById("passwordHelp");
 
     /* Address type toggle */
-    const addrTypeApt   = document.getElementById("addrTypeApt");
+    const addrTypeApt = document.getElementById("addrTypeApt");
     const addrTypeHouse = document.getElementById("addrTypeHouse");
-    const aptBlock      = document.getElementById("aptBlock");
-    const houseBlock    = document.getElementById("houseBlock");
+    const aptBlock = document.getElementById("aptBlock");
+    const houseBlock = document.getElementById("houseBlock");
 
     /* Apartment */
-    const aptDdWrap     = document.getElementById("acAptDdWrap");
-    const aptDdToggle   = document.getElementById("acAptDdToggle");
-    const aptDdLabel    = document.getElementById("acAptDdLabel");
-    const aptDdSearch   = document.getElementById("acAptDdSearch");
-    const aptDdList     = document.getElementById("acAptDdList");
-    const aptIdInput    = document.getElementById("acApartmentId");
-    const aptCodeInput  = document.getElementById("acApartmentCode");
-    const aptNameInput  = document.getElementById("acApartmentName");
+    const aptDdWrap = document.getElementById("acAptDdWrap");
+    const aptDdToggle = document.getElementById("acAptDdToggle");
+    const aptDdLabel = document.getElementById("acAptDdLabel");
+    const aptDdSearch = document.getElementById("acAptDdSearch");
+    const aptDdList = document.getElementById("acAptDdList");
+    const aptIdInput = document.getElementById("acApartmentId");
+    const aptCodeInput = document.getElementById("acApartmentCode");
+    const aptNameInput = document.getElementById("acApartmentName");
 
     /* Division */
-    const divDdWrap      = document.getElementById("acDivDdWrap");
-    const divDdToggle    = document.getElementById("acDivDdToggle");
-    const divDdLabel     = document.getElementById("acDivDdLabel");
-    const divDdSearch    = document.getElementById("acDivDdSearch");
-    const divDdList      = document.getElementById("acDivDdList");
-    const divInput       = document.getElementById("acDivision");
+    const divDdWrap = document.getElementById("acDivDdWrap");
+    const divDdToggle = document.getElementById("acDivDdToggle");
+    const divDdLabel = document.getElementById("acDivDdLabel");
+    const divDdSearch = document.getElementById("acDivDdSearch");
+    const divDdList = document.getElementById("acDivDdList");
+    const divInput = document.getElementById("acDivision");
     const divChargeInput = document.getElementById("acDivisionCharge");
-    const divHint        = document.getElementById("acDivisionHint");
+    const divHint = document.getElementById("acDivisionHint");
 
     /* House */
-    const houseAddress      = document.getElementById("houseAddress");
-    const houseMap          = document.getElementById("houseMap");
-    const houseLocBtn       = document.getElementById("houseLocBtn");
-    const houseLocBtnText   = document.getElementById("houseLocBtnText");
-    const houseLocHint      = document.getElementById("houseLocHint");
-    const houseOpenMapBtn   = document.getElementById("houseOpenMapBtn");
-    const houseChargeInput  = document.getElementById("houseDeliveryCharge");
-    const houseImgDrop      = document.getElementById("houseImgDrop");
-    const houseImg          = document.getElementById("houseImg");
-    const houseImgPreview   = document.getElementById("houseImgPreview");
+    const houseAddress = document.getElementById("houseAddress");
+    const houseMap = document.getElementById("houseMap");
+    const houseLocBtn = document.getElementById("houseLocBtn");
+    const houseLocBtnText = document.getElementById("houseLocBtnText");
+    const houseLocHint = document.getElementById("houseLocHint");
+    const houseOpenMapBtn = document.getElementById("houseOpenMapBtn");
+    const houseChargeInput = document.getElementById("houseDeliveryCharge");
+    const houseImgDrop = document.getElementById("houseImgDrop");
+    const houseImg = document.getElementById("houseImg");
+    const houseImgPreview = document.getElementById("houseImgPreview");
 
     /* Wallet */
-    const walletToggle  = document.getElementById("walletToggle");
-    const walletFields  = document.getElementById("walletFields");
-    const walletAmount  = document.getElementById("walletAmount");
-    const walletNote    = document.getElementById("walletNote");
+    const walletToggle = document.getElementById("walletToggle");
+    const walletFields = document.getElementById("walletFields");
+    const walletAmount = document.getElementById("walletAmount");
+    const walletNote = document.getElementById("walletNote");
     const walletPreview = document.getElementById("walletPreview");
 
     /* Popups */
     const successOverlay = document.getElementById("successOverlay");
-    const successText    = document.getElementById("successText");
-    const successCode    = document.getElementById("successCode");
-    const errorOverlay   = document.getElementById("errorOverlay");
-    const errorText      = document.getElementById("errorText");
-    const errorOkBtn     = document.getElementById("errorOkBtn");
+    const successText = document.getElementById("successText");
+    const successCode = document.getElementById("successCode");
+    const waShareBtn = document.getElementById("waShareBtn"); // WhatsApp Button
+    const errorOverlay = document.getElementById("errorOverlay");
+    const errorText = document.getElementById("errorText");
+    const errorOkBtn = document.getElementById("errorOkBtn");
 
     if (!form) return;
 
     /* State */
     let apartmentsCache = [];
-    let divisionsCache  = [];
-    let walletEnabled   = false;
-    let addressType     = "apartment";
-    let houseMapLink    = "";
-    let houseImgData    = "";
+    let divisionsCache = [];
+    let walletEnabled = false;
+    let addressType = "apartment";
+    let houseMapLink = "";
+    let houseImgData = "";
 
     /* Helpers */
     function esc(s) {
@@ -103,9 +102,11 @@
     }
 
     /* Popups */
-    function showSuccessPopup(message, code) {
+    function showSuccessPopup(message, code, mobile, password, name) {
         if (!successOverlay) return;
+
         if (successText) successText.textContent = message || "Customer added successfully.";
+
         if (successCode) {
             if (code) {
                 successCode.textContent = "Customer ID: " + code;
@@ -114,6 +115,16 @@
                 successCode.style.display = "none";
             }
         }
+
+        // Generate WhatsApp Message
+        if (waShareBtn) {
+            const waNumber = String(mobile || "").replace(/[^0-9]/g, "");
+            const waMsgText = `Hello ${name},\n\nHere are your login details for Mrs Mill@:\n\nMobile: ${mobile}\nPassword: ${password}\n\nPlease keep this safe.`;
+
+            waShareBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsgText)}`;
+            waShareBtn.style.display = "inline-flex"; // Show the button
+        }
+
         successOverlay.classList.add("show");
         successOverlay.setAttribute("aria-hidden", "false");
     }
@@ -265,7 +276,7 @@
     aptDdList?.addEventListener("click", e => {
         const opt = e.target.closest(".sd-option");
         if (!opt) return;
-        aptIdInput.value   = opt.dataset.id;
+        aptIdInput.value = opt.dataset.id;
         aptCodeInput.value = opt.dataset.code;
         aptNameInput.value = opt.dataset.name;
         aptDdLabel.textContent = opt.dataset.name;
@@ -281,17 +292,17 @@
     function divLabelText(d) {
         if (d.division_label) return d.division_label;
         const parts = [];
-        if (d.block)   parts.push("Blk " + d.block);
+        if (d.block) parts.push("Blk " + d.block);
         if (d.door_no) parts.push("Door " + d.door_no);
-        if (d.floor)   parts.push("Fl " + d.floor);
+        if (d.floor) parts.push("Fl " + d.floor);
         return parts.length ? parts.join(" · ") : ("Division " + (d.division || ""));
     }
     function divValueText(d) {
         if (d.division_value) return d.division_value;
         const parts = [];
-        if (d.block)   parts.push("Blk " + d.block);
+        if (d.block) parts.push("Blk " + d.block);
         if (d.door_no) parts.push("Door " + d.door_no);
-        if (d.floor)   parts.push("Fl " + d.floor);
+        if (d.floor) parts.push("Fl " + d.floor);
         return parts.length ? parts.join(" / ") : String(d.division || "");
     }
 
@@ -331,7 +342,7 @@
                 const label = divLabelText(d).toLowerCase();
                 const value = divValueText(d).toLowerCase();
                 return label.includes(q) || value.includes(q);
-              })
+            })
             : divisionsCache;
 
         if (!list.length) {
@@ -492,8 +503,8 @@
     form.addEventListener("submit", function (e) {
         e.preventDefault();
 
-        const name     = nameInput.value.trim();
-        const mobile   = mobileInput.value.trim();
+        const name = nameInput.value.trim();
+        const mobile = mobileInput.value.trim();
         const password = passwordInput.value.trim();
 
         if (!name) return showErrorPopup("Customer name is required.");
@@ -504,14 +515,14 @@
         let addressJson = {};
 
         if (addressType === "apartment") {
-            const aptId   = aptIdInput.value;
+            const aptId = aptIdInput.value;
             const aptCode = aptCodeInput.value;
             const aptName = aptNameInput.value;
-            const div     = divInput.value;
-            const charge  = Number(divChargeInput.value || 0);
+            const div = divInput.value;
+            const charge = Number(divChargeInput.value || 0);
 
             if (!aptId) return showErrorPopup("Please select an apartment.");
-            if (!div)   return showErrorPopup("Please select a block / floor / door.");
+            if (!div) return showErrorPopup("Please select a block / floor / door.");
 
             let block = "", door = "", floor = "";
             const parts = div.split("/").map(s => s.trim());
@@ -532,8 +543,8 @@
                 charge: charge
             };
         } else {
-            const addr      = (houseAddress.value || "").trim();
-            const mapVal    = (houseMap.value || "").trim();
+            const addr = (houseAddress.value || "").trim();
+            const mapVal = (houseMap.value || "").trim();
             const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
@@ -549,10 +560,10 @@
         }
 
         let initWallet = 0;
-        let initNote   = "";
+        let initNote = "";
         if (walletEnabled) {
             initWallet = parseFloat(walletAmount.value || "0");
-            initNote   = walletNote.value.trim();
+            initNote = walletNote.value.trim();
             if (!initWallet || initWallet <= 0) {
                 return showErrorPopup("Enter a valid wallet amount or turn off the wallet toggle.");
             }
@@ -580,57 +591,58 @@
             body: fd,
             credentials: "same-origin"
         })
-        .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
-        .then(data => {
-            if (data.success) {
-                const code = data.data && data.data.code ? data.data.code : "";
-                showSuccessPopup(data.message || "Customer added successfully.", code);
-                setLoading(false);
-                form.reset();
-                walletEnabled = false;
-                walletToggle.classList.remove("on");
-                walletFields.classList.remove("show");
-                walletPreview.textContent = "₹0";
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+            .then(data => {
+                if (data.success) {
+                    const code = data.data && data.data.code ? data.data.code : "";
+                    // Pass name, mobile, and password to the popup
+                    showSuccessPopup(data.message || "Customer added successfully.", code, mobile, password, name);
+                    setLoading(false);
+                    form.reset();
+                    walletEnabled = false;
+                    walletToggle.classList.remove("on");
+                    walletFields.classList.remove("show");
+                    walletPreview.textContent = "₹0";
 
-                aptIdInput.value = "";
-                aptCodeInput.value = "";
-                aptNameInput.value = "";
-                aptDdLabel.textContent = "— Type or select apartment —";
-                aptDdLabel.classList.add("placeholder");
-                aptDdToggle.classList.remove("has-value");
+                    aptIdInput.value = "";
+                    aptCodeInput.value = "";
+                    aptNameInput.value = "";
+                    aptDdLabel.textContent = "— Type or select apartment —";
+                    aptDdLabel.classList.add("placeholder");
+                    aptDdToggle.classList.remove("has-value");
 
-                divisionsCache = [];
-                divInput.value = "";
-                divChargeInput.value = 0;
-                divDdToggle.disabled = true;
-                divDdLabel.textContent = "Select apartment first";
-                divDdLabel.classList.add("placeholder");
-                divDdToggle.classList.remove("has-value");
-                divDdList.innerHTML = "";
-                divHint.textContent = "";
+                    divisionsCache = [];
+                    divInput.value = "";
+                    divChargeInput.value = 0;
+                    divDdToggle.disabled = true;
+                    divDdLabel.textContent = "Select apartment first";
+                    divDdLabel.classList.add("placeholder");
+                    divDdToggle.classList.remove("has-value");
+                    divDdList.innerHTML = "";
+                    divHint.textContent = "";
 
-                houseMapLink = "";
-                houseImgData = "";
-                if (houseMap) houseMap.value = "";
-                if (houseChargeInput) houseChargeInput.value = "0";
-                if (houseLocBtn) { houseLocBtn.disabled = false; houseLocBtn.classList.remove("success"); }
-                if (houseLocBtnText) houseLocBtnText.textContent = "Get My Current Location";
-                if (houseLocHint) { houseLocHint.textContent = ""; houseLocHint.className = "field-help"; }
-                if (houseImgPreview) {
-                    houseImgPreview.classList.add("img-drop-empty");
-                    houseImgPreview.innerHTML = '<i class="bi bi-image"></i><span>Tap to upload a photo of the house</span>';
+                    houseMapLink = "";
+                    houseImgData = "";
+                    if (houseMap) houseMap.value = "";
+                    if (houseChargeInput) houseChargeInput.value = "0";
+                    if (houseLocBtn) { houseLocBtn.disabled = false; houseLocBtn.classList.remove("success"); }
+                    if (houseLocBtnText) houseLocBtnText.textContent = "Get My Current Location";
+                    if (houseLocHint) { houseLocHint.textContent = ""; houseLocHint.className = "field-help"; }
+                    if (houseImgPreview) {
+                        houseImgPreview.classList.add("img-drop-empty");
+                        houseImgPreview.innerHTML = '<i class="bi bi-image"></i><span>Tap to upload a photo of the house</span>';
+                    }
+
+                    setAddressType("apartment");
+                } else {
+                    showErrorPopup(data.message || "Failed to save customer.");
+                    setLoading(false);
                 }
-
-                setAddressType("apartment");
-            } else {
-                showErrorPopup(data.message || "Failed to save customer.");
+            })
+            .catch(() => {
+                showErrorPopup("Unable to connect to server.");
                 setLoading(false);
-            }
-        })
-        .catch(() => {
-            showErrorPopup("Unable to connect to server.");
-            setLoading(false);
-        });
+            });
     });
 
     /* INIT */

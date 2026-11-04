@@ -1,8 +1,6 @@
 /* =========================================================
    MRS MILL@ — EDIT CUSTOMER
-   File: ./js/edit-customer.js   v2026-11-03h
-   Delete removed. Supports apartment OR individual_house edit.
-   House mode now saves delivery charge.
+   File: ./js/edit-customer.js
    ========================================================= */
 
 (function () {
@@ -13,6 +11,8 @@
         : "./";
 
     const CUSTOMER_ID = window.CUSTOMER_ID || 0;
+    const CUSTOMER_NAME = window.CUSTOMER_NAME || "";
+    const CUSTOMER_MOBILE = window.CUSTOMER_MOBILE || "";
     const ADDRESS_TYPE = window.ADDRESS_TYPE || "apartment";
 
     /* Form */
@@ -80,6 +80,7 @@
     const successOverlay = document.getElementById("successOverlay");
     const successText = document.getElementById("successText");
     const successOkBtn = document.getElementById("successOkBtn");
+    const waShareBtn = document.getElementById("waShareBtn");
 
     const errorOverlay = document.getElementById("errorOverlay");
     const errorText = document.getElementById("errorText");
@@ -132,13 +133,33 @@
        POPUPS
        ========================================= */
     let successTimer = null;
-    function showSuccessPopup(message) {
+    function showSuccessPopup(message, newPassword) {
         if (!successOverlay) return;
         if (successText) successText.textContent = message || "Success.";
+
+        // Determine which password to send
+        // If the admin typed a new password, use that. 
+        // If they left it blank, use the existing DB password.
+        let passwordToSend = newPassword;
+        if (!passwordToSend && typeof window.CUSTOMER_PASSWORD !== 'undefined') {
+            passwordToSend = window.CUSTOMER_PASSWORD;
+        }
+
+        // WhatsApp Share Logic
+        if (waShareBtn && passwordToSend && passwordToSend !== 'Error reading password.') {
+            const waNumber = String(CUSTOMER_MOBILE || "").replace(/[^0-9]/g, "");
+            const waMsgText = `Hello ${CUSTOMER_NAME},\n\nHere are your login details for Mrs Mill@:\n\nMobile: ${CUSTOMER_MOBILE}\nPassword: ${passwordToSend}\n\nPlease keep this safe.`;
+            
+            waShareBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsgText)}`;
+            waShareBtn.style.display = "inline-flex";
+        } else if (waShareBtn) {
+            waShareBtn.style.display = "none"; // Hide if no password is found
+        }
+
         successOverlay.classList.add("show");
         successOverlay.setAttribute("aria-hidden", "false");
         clearTimeout(successTimer);
-        successTimer = setTimeout(closeSuccessPopup, 2400);
+        successTimer = setTimeout(closeSuccessPopup, 5000);
     }
     function closeSuccessPopup() {
         if (!successOverlay) return;
@@ -619,7 +640,8 @@
             .then(data => {
                 setCustomerLoading(false);
                 if (data.success) {
-                    showSuccessPopup(data.message || "Customer updated successfully.");
+                    // Pass the new password to the popup
+                    showSuccessPopup(data.message || "Customer updated successfully.", password);
                 } else {
                     showErrorPopup(data.message || "Failed to update customer.");
                 }

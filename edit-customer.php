@@ -22,7 +22,7 @@ try {
         "SELECT id, customer_id, full_name, mobile_number,
                 address_type, address_json,
                 wallet_balance, profile_completed, status,
-                last_login_at, created_at, updated_at
+                last_login_at, created_at, updated_at, password_hash
          FROM customers WHERE id = ? LIMIT 1"
     );
     $stmt->execute([$customerId]);
@@ -148,7 +148,6 @@ $initials = strtoupper(
             margin-top: 2px;
         }
 
-        /* Tabs */
         .tabs-wrap {
             display: flex;
             gap: 4px;
@@ -359,7 +358,6 @@ $initials = strtoupper(
             }
         }
 
-        /* Apartment vs House badge */
         .type-badge {
             display: inline-flex;
             align-items: center;
@@ -383,7 +381,6 @@ $initials = strtoupper(
             color: #2e7d32;
         }
 
-        /* Searchable dropdown */
         .sd-wrap {
             position: relative;
         }
@@ -591,7 +588,6 @@ $initials = strtoupper(
             color: #948c82;
         }
 
-        /* Location + image */
         .loc-btn {
             margin-top: 10px;
             width: 100%;
@@ -664,7 +660,6 @@ $initials = strtoupper(
             object-fit: cover;
         }
 
-        /* Form actions */
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -717,7 +712,6 @@ $initials = strtoupper(
             cursor: not-allowed;
         }
 
-        /* Wallet tab */
         .wallet-balance-box {
             background: linear-gradient(135deg, #fdfaf4 0%, #fff5f5 100%);
             border: 1px solid #ece5da;
@@ -903,7 +897,6 @@ $initials = strtoupper(
             cursor: not-allowed;
         }
 
-        /* History */
         .history-section {
             background: #fff;
             border: 1px solid #eee7dc;
@@ -1194,7 +1187,7 @@ $initials = strtoupper(
             font-size: 11px;
         }
 
-        /* Popups */
+        /* MODAL CSS */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -1276,25 +1269,42 @@ $initials = strtoupper(
             line-height: 1.6;
         }
 
+        /* BUTTON ACTIONS */
         .mm-modal-actions {
             display: flex;
-            gap: 10px;
+            flex-direction: column;
+            gap: 12px;
+            margin-top: 8px;
         }
 
         .mm-btn {
-            flex: 1;
-            height: 44px;
-            border-radius: 11px;
+            width: 100%;
+            height: 46px;
+            border-radius: 12px;
             border: none;
-            font-size: 12px;
+            font-family: "DM Sans", sans-serif;
+            font-size: 13px;
             font-weight: 700;
             cursor: pointer;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 7px;
+            gap: 8px;
             text-decoration: none;
-            transition: .2s ease;
+            transition: all .2s ease;
+        }
+
+        .mm-btn-whatsapp {
+            background: #25D366;
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(37, 211, 102, 0.25);
+        }
+
+        .mm-btn-whatsapp:hover {
+            background: #1da851;
+            color: #fff;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(37, 211, 102, 0.35);
         }
 
         .mm-btn-primary {
@@ -1379,28 +1389,7 @@ $initials = strtoupper(
 
     <main class="main">
 
-        <header class="topbar">
-            <button class="mobile-menu" onclick="toggleSidebar()" aria-label="Open menu">
-                <i class="bi bi-list"></i>
-            </button>
-            <div class="search-box">
-                <i class="bi bi-search"></i>
-                <input type="text" placeholder="Search orders, products...">
-            </div>
-            <div class="top-right">
-                <button class="notification">
-                    <i class="bi bi-bell"></i>
-                    <span class="notification-dot"></span>
-                </button>
-                <div class="admin-profile">
-                    <div class="admin-avatar"><?= strtoupper(substr($_SESSION['admin_name'] ?? 'A', 0, 1)) ?></div>
-                    <div>
-                        <div class="admin-name"><?= htmlspecialchars($_SESSION['admin_name'] ?? 'User') ?></div>
-                        <div class="admin-role"><?= $isAdmin ? 'Admin' : 'Staff' ?></div>
-                    </div>
-                </div>
-            </div>
-        </header>
+        <?php include './templates/header.php'; ?>
 
 
         <div class="customer-page">
@@ -1775,9 +1764,15 @@ $initials = strtoupper(
             </div>
             <h3 class="mm-modal-title" id="successTitle">Success</h3>
             <p class="mm-modal-text" id="successText">Operation completed successfully.</p>
+
             <div class="mm-modal-actions">
-                <button type="button" class="mm-btn mm-btn-primary" id="successOkBtn">
-                    <i class="bi bi-check2"></i> OK
+                <!-- WhatsApp Share Button -->
+                <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank">
+                    <i class="bi bi-whatsapp"></i> Share on WhatsApp
+                </a>
+
+                <button type="button" class="mm-btn mm-btn-ghost" id="successOkBtn">
+                    OK
                 </button>
             </div>
         </div>
@@ -1794,7 +1789,7 @@ $initials = strtoupper(
             <p class="mm-modal-text" id="errorText">Please check the form and try again.</p>
             <div class="mm-modal-actions">
                 <button type="button" class="mm-btn mm-btn-danger" id="errorOkBtn">
-                    <i class="bi bi-check2"></i> Got it
+                    Got it
                 </button>
             </div>
         </div>
@@ -1809,6 +1804,9 @@ $initials = strtoupper(
         window.ADDRESS_TYPE = "<?= htmlspecialchars($addressType) ?>";
         window.HOUSE_DELIVERY_CHARGE = <?= (float)$houseCharge ?>;
         window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
+
+        // Get the decrypted password from the database
+        window.CUSTOMER_PASSWORD = "<?= htmlspecialchars(decryptPassword($customer['password_hash'] ?? ''), ENT_QUOTES) ?>";
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
