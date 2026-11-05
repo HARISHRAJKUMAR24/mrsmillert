@@ -694,7 +694,6 @@ $settings = getSettings($pdo);
             cursor: not-allowed;
         }
 
-        /* Modal */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -840,7 +839,7 @@ $settings = getSettings($pdo);
             color: #fff;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width:768px) {
             .customer-page {
                 padding: 20px 15px 30px;
             }
@@ -886,7 +885,6 @@ $settings = getSettings($pdo);
 
         <?php include './templates/header.php'; ?>
 
-
         <div class="customer-page">
 
             <div class="customer-header">
@@ -895,7 +893,6 @@ $settings = getSettings($pdo);
                     <p>Create a customer account with login details and optional wallet balance.</p>
                 </div>
             </div>
-
 
             <div class="customer-form-card">
 
@@ -1013,6 +1010,20 @@ $settings = getSettings($pdo);
                                 <p class="field-help" id="acDivisionHint"></p>
                             </div>
 
+                            <!-- NEW: Apartment house image -->
+                            <div class="col-12">
+                                <label>House / Building Image (optional)</label>
+                                <div class="img-drop" id="aptImgDrop">
+                                    <input type="file" id="aptImg" accept="image/*"
+                                        style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
+                                    <div id="aptImgPreview" class="img-drop-empty">
+                                        <i class="bi bi-image"></i>
+                                        <span>Tap to upload a photo of the apartment building / flat</span>
+                                    </div>
+                                </div>
+                                <p class="field-help">Optional — helps delivery boys identify the location.</p>
+                            </div>
+
                         </div>
                     </div>
 
@@ -1031,7 +1042,8 @@ $settings = getSettings($pdo);
                             </div>
 
                             <div class="col-12">
-                                <label>Google Maps Location <span class="required">*</span></label>
+                                <!-- Google Maps label — * removed -->
+                                <label>Google Maps Location</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-pin-map"></i>
                                     <input type="text" id="houseMap" class="customer-input"
@@ -1048,7 +1060,7 @@ $settings = getSettings($pdo);
                                         <span>Open Google Maps</span>
                                     </button>
                                 </div>
-                                <p class="field-help" style="margin-top:6px;">Paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
+                                <p class="field-help" style="margin-top:6px;">Optional — paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
                                 <p class="field-help" id="houseLocHint"></p>
                             </div>
 
@@ -1065,7 +1077,8 @@ $settings = getSettings($pdo);
                             <div class="col-12 col-md-6">
                                 <label>House Image (optional)</label>
                                 <div class="img-drop" id="houseImgDrop">
-                                    <input type="file" id="houseImg" accept="image/*" style="display:none;">
+                                    <input type="file" id="houseImg" accept="image/*"
+                                        style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
                                     <div id="houseImgPreview" class="img-drop-empty">
                                         <i class="bi bi-image"></i>
                                         <span>Tap to upload a photo of the house</span>
@@ -1147,7 +1160,6 @@ $settings = getSettings($pdo);
             <div class="mm-modal-code" id="successCode" style="display:none;"></div>
 
             <div class="mm-modal-actions">
-                <!-- WhatsApp Share Button -->
                 <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank">
                     <i class="bi bi-whatsapp"></i> Share Details on WhatsApp
                 </a>

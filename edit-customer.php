@@ -15,7 +15,6 @@ if ($customerId <= 0) {
     exit;
 }
 
-/* Fetch customer */
 $customer = null;
 try {
     $stmt = $pdo->prepare(
@@ -35,7 +34,6 @@ if (!$customer) {
     exit;
 }
 
-/* Decode address JSON */
 $addr = [];
 if (!empty($customer['address_json'])) {
     $decoded = json_decode($customer['address_json'], true);
@@ -54,7 +52,6 @@ $aptFloor  = $addr['floor']   ?? '';
 $aptLabel  = $addr['division_label'] ?? '';
 $aptCharge = (float)($addr['charge'] ?? 0);
 
-/* If label missing, rebuild from parts */
 if ($aptLabel === '') {
     $parts = [];
     if ($aptBlock) $parts[] = "Blk " . $aptBlock;
@@ -68,6 +65,21 @@ $houseAddress = $addr['full_address'] ?? '';
 $houseMap     = $addr['map_link'] ?? '';
 $houseImage   = $addr['house_image'] ?? '';
 $houseCharge  = (float)($addr['delivery_charge'] ?? 0);
+
+/* Apartment image uses the same house_image field */
+$aptImage = ($addressType === 'apartment') ? $houseImage : '';
+
+/* Normalize stored image path → full URL.
+   Handles both relative ("uploads/...") and absolute ("http://...") stored paths. */
+function customerImageUrl($path)
+{
+    $path = trim((string)$path);
+    if ($path === '') return '';
+    if (preg_match('#^https?://#i', $path) || strpos($path, '//') === 0) {
+        return $path; // already absolute
+    }
+    return rtrim(MAIN_URL, '/') . '/' . ltrim($path, '/');
+}
 
 /* Initials */
 $parts = preg_split('/\s+/', trim($customer['full_name']));
@@ -1187,7 +1199,6 @@ $initials = strtoupper(
             font-size: 11px;
         }
 
-        /* MODAL CSS */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -1269,7 +1280,6 @@ $initials = strtoupper(
             line-height: 1.6;
         }
 
-        /* BUTTON ACTIONS */
         .mm-modal-actions {
             display: flex;
             flex-direction: column;
@@ -1338,7 +1348,7 @@ $initials = strtoupper(
             color: #fff;
         }
 
-        @media (max-width: 768px) {
+        @media (max-width:768px) {
             .customer-page {
                 padding: 20px 15px 30px;
             }
@@ -1391,7 +1401,6 @@ $initials = strtoupper(
 
         <?php include './templates/header.php'; ?>
 
-
         <div class="customer-page">
 
             <div class="customer-header">
@@ -1410,8 +1419,6 @@ $initials = strtoupper(
                 </div>
             </div>
 
-
-            <!-- TABS -->
             <div class="tabs-wrap">
                 <button type="button" class="tab-btn active" data-tab="details">
                     <i class="bi bi-person-gear"></i> Customer Details
@@ -1421,8 +1428,6 @@ $initials = strtoupper(
                 </button>
             </div>
 
-
-            <!-- TAB 1 — DETAILS -->
             <div class="tab-panel active" id="panel-details">
                 <div class="customer-form-card">
                     <div class="form-card-header">
@@ -1492,8 +1497,7 @@ $initials = strtoupper(
                             </div>
                         </div>
 
-
-                        <!-- ================= APARTMENT BLOCK ================= -->
+                        <!-- APARTMENT BLOCK -->
                         <div id="aptBlock" style="margin-top:22px; <?= $addressType !== 'apartment' ? 'display:none;' : '' ?>">
                             <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">
                                 <i class="bi bi-house-door" style="width:34px;height:34px;border-radius:10px;background:#fbe8e9;color:#b51f2c;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:2px;"></i>
@@ -1555,11 +1559,27 @@ $initials = strtoupper(
                                     <input type="hidden" id="acDivisionCharge" name="division_charge" value="<?= $aptCharge ?>">
                                     <p class="field-help" id="acDivisionHint"><?= $aptLabel ? 'Charge: ₹' . number_format($aptCharge, 0) : '' ?></p>
                                 </div>
+
+                                <!-- Apartment image upload -->
+                                <div class="col-12">
+                                    <label>House / Building Image (optional)</label>
+                                    <div class="img-drop" id="aptImgDrop">
+                                        <input type="file" id="aptImg" accept="image/*" style="display:none;">
+                                        <div id="aptImgPreview" class="<?= $aptImage ? '' : 'img-drop-empty' ?>">
+                                            <?php if ($aptImage): ?>
+                                                <img src="<?= htmlspecialchars(customerImageUrl($aptImage)) ?>" alt="Apartment">
+                                            <?php else: ?>
+                                                <i class="bi bi-image"></i>
+                                                <span>Tap to upload a photo of the apartment building / flat</span>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                    <p class="field-help">Optional — helps delivery boys identify the location.</p>
+                                </div>
                             </div>
                         </div>
 
-
-                        <!-- ================= INDIVIDUAL HOUSE BLOCK ================= -->
+                        <!-- INDIVIDUAL HOUSE BLOCK -->
                         <div id="houseBlock" style="margin-top:22px; <?= $addressType !== 'individual_house' ? 'display:none;' : '' ?>">
                             <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:14px;">
                                 <i class="bi bi-house-door" style="width:34px;height:34px;border-radius:10px;background:#e8f1e8;color:#2e7d32;display:inline-flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0;margin-top:2px;"></i>
@@ -1580,7 +1600,7 @@ $initials = strtoupper(
                                 </div>
 
                                 <div class="col-12">
-                                    <label>Google Maps Location <span class="required">*</span></label>
+                                    <label>Google Maps Location</label>
                                     <div class="input-icon-wrap">
                                         <i class="bi bi-pin-map"></i>
                                         <input type="text" id="houseMap" class="customer-input"
@@ -1597,7 +1617,7 @@ $initials = strtoupper(
                                             <span>Open Google Maps</span>
                                         </button>
                                     </div>
-                                    <p class="field-help" style="margin-top:6px;">Paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
+                                    <p class="field-help" style="margin-top:6px;">Optional — paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
                                     <p class="field-help" id="houseLocHint"></p>
                                 </div>
 
@@ -1618,7 +1638,7 @@ $initials = strtoupper(
                                         <input type="file" id="houseImg" accept="image/*" style="display:none;">
                                         <div id="houseImgPreview" class="<?= $houseImage ? '' : 'img-drop-empty' ?>">
                                             <?php if ($houseImage): ?>
-                                                <img src="<?= htmlspecialchars(ADMIN_URL . $houseImage) ?>" alt="House">
+                                                <img src="<?= htmlspecialchars(customerImageUrl($houseImage)) ?>" alt="House">
                                             <?php else: ?>
                                                 <i class="bi bi-image"></i>
                                                 <span>Tap to upload a photo of the house</span>
@@ -1630,8 +1650,6 @@ $initials = strtoupper(
                             </div>
                         </div>
 
-
-                        <!-- ACTIONS (Delete removed) -->
                         <div class="form-actions">
                             <a href="customers.php" class="btn-cancel">
                                 <i class="bi bi-x-lg"></i> Cancel
@@ -1645,7 +1663,6 @@ $initials = strtoupper(
                     </form>
                 </div>
             </div>
-
 
             <!-- TAB 2 — WALLET -->
             <div class="tab-panel" id="panel-wallet">
@@ -1755,7 +1772,6 @@ $initials = strtoupper(
 
     </main>
 
-
     <!-- SUCCESS POPUP -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
@@ -1766,7 +1782,6 @@ $initials = strtoupper(
             <p class="mm-modal-text" id="successText">Operation completed successfully.</p>
 
             <div class="mm-modal-actions">
-                <!-- WhatsApp Share Button -->
                 <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank">
                     <i class="bi bi-whatsapp"></i> Share on WhatsApp
                 </a>
@@ -1777,7 +1792,6 @@ $initials = strtoupper(
             </div>
         </div>
     </div>
-
 
     <!-- ERROR POPUP -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
@@ -1795,7 +1809,6 @@ $initials = strtoupper(
         </div>
     </div>
 
-
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
         window.CUSTOMER_ID = <?= (int)$customer['id'] ?>;
@@ -1804,8 +1817,6 @@ $initials = strtoupper(
         window.ADDRESS_TYPE = "<?= htmlspecialchars($addressType) ?>";
         window.HOUSE_DELIVERY_CHARGE = <?= (float)$houseCharge ?>;
         window.IS_ADMIN = <?= $isAdmin ? 'true' : 'false' ?>;
-
-        // Get the decrypted password from the database
         window.CUSTOMER_PASSWORD = "<?= htmlspecialchars(decryptPassword($customer['password_hash'] ?? ''), ENT_QUOTES) ?>";
     </script>
 

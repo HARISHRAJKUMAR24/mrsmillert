@@ -8,45 +8,45 @@
 
     const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL) ? window.ADMIN_URL : "./";
 
-    const listEl         = document.getElementById("arTbody");
-    const search         = document.getElementById("arSearch");
-    const refreshBtn     = document.getElementById("arRefresh");
+    const listEl = document.getElementById("arTbody");
+    const search = document.getElementById("arSearch");
+    const refreshBtn = document.getElementById("arRefresh");
     const paginationWrap = document.getElementById("arPagination");
-    const pagInfo        = document.getElementById("arPagInfo");
-    const pagControls    = document.getElementById("arPagControls");
-    const perPageSelect  = document.getElementById("arPerPage");
-    const toastWrap      = document.getElementById("arToastWrap");
+    const pagInfo = document.getElementById("arPagInfo");
+    const pagControls = document.getElementById("arPagControls");
+    const perPageSelect = document.getElementById("arPerPage");
+    const toastWrap = document.getElementById("arToastWrap");
 
-    const filterDate     = document.getElementById("arFilterDate");
-    const filterStatus   = document.getElementById("arFilterStatus");
-    const customRange    = document.getElementById("arCustomRange");
-    const dateFrom       = document.getElementById("arDateFrom");
-    const dateTo         = document.getElementById("arDateTo");
+    const filterDate = document.getElementById("arFilterDate");
+    const filterStatus = document.getElementById("arFilterStatus");
+    const customRange = document.getElementById("arCustomRange");
+    const dateFrom = document.getElementById("arDateFrom");
+    const dateTo = document.getElementById("arDateTo");
 
     /* Modal elements */
     const approveOverlay = document.getElementById("arApproveOverlay");
-    const approveClose   = document.getElementById("arApproveClose");
-    const approveCancel  = document.getElementById("arApproveCancel");
-    const approveForm    = document.getElementById("arApproveForm");
-    const approveSubmit  = document.getElementById("arApproveSubmit");
-    const reqIdEl        = document.getElementById("arReqId");
-    const nameEl         = document.getElementById("arName");
-    const mobileEl       = document.getElementById("arMobile");
-    const pwdEl          = document.getElementById("arPassword");
-    const typeEl         = document.getElementById("arReqType");
-    const aptBlock       = document.getElementById("arAptBlock");
-    const aptEl          = document.getElementById("arApartment");
-    const aptAddrEl      = document.getElementById("arApartmentAddress");
-    const branchEl       = document.getElementById("arBranch");
-    const divEl          = document.getElementById("arDivision");
-    const deliveryEl     = document.getElementById("arDeliveryCharge");
-    const houseBlock     = document.getElementById("arHouseBlock");
-    const houseAddrEl    = document.getElementById("arHouseAddress");
-    const mapEl          = document.getElementById("arMapLink");
-    const houseChargeEl  = document.getElementById("arHouseDeliveryCharge");
-    const houseImgEl     = document.getElementById("arHouseImage");
-    const mapPreview     = document.getElementById("arMapPreview");
-    const imgPreview     = document.getElementById("arImagePreview");
+    const approveClose = document.getElementById("arApproveClose");
+    const approveCancel = document.getElementById("arApproveCancel");
+    const approveForm = document.getElementById("arApproveForm");
+    const approveSubmit = document.getElementById("arApproveSubmit");
+    const reqIdEl = document.getElementById("arReqId");
+    const nameEl = document.getElementById("arName");
+    const mobileEl = document.getElementById("arMobile");
+    const pwdEl = document.getElementById("arPassword");
+    const typeEl = document.getElementById("arReqType");
+    const aptBlock = document.getElementById("arAptBlock");
+    const aptEl = document.getElementById("arApartment");
+    const aptAddrEl = document.getElementById("arApartmentAddress");
+    const branchEl = document.getElementById("arBranch");
+    const divEl = document.getElementById("arDivision");
+    const deliveryEl = document.getElementById("arDeliveryCharge");
+    const houseBlock = document.getElementById("arHouseBlock");
+    const houseAddrEl = document.getElementById("arHouseAddress");
+    const mapEl = document.getElementById("arMapLink");
+    const houseChargeEl = document.getElementById("arHouseDeliveryCharge");
+    const houseImgEl = document.getElementById("arHouseImage");
+    const mapPreview = document.getElementById("arMapPreview");
+    const imgPreview = document.getElementById("arImagePreview");
 
     const DEFAULT_PAGE_SIZE = 10;
     let pageSize = DEFAULT_PAGE_SIZE;
@@ -58,7 +58,7 @@
     const openIds = new Set();
 
     const STATUS_LABELS = { "0": "Pending", "1": "Approved", "2": "Rejected" };
-    const STATUS_CLASS  = { "0": "pending", "1": "approved", "2": "rejected" };
+    const STATUS_CLASS = { "0": "pending", "1": "approved", "2": "rejected" };
 
     /* -------- helpers -------- */
     function esc(s) {
@@ -111,35 +111,31 @@
     /* Convert a maps link into an embed URL for iframe preview */
     function mapsEmbedUrl(url) {
         if (!url) return "";
-        // If already an embed link, use as-is
         if (/google\.com\/maps\/embed/i.test(url)) return url;
-        // Extract lat,lng from ?q=lat,lng
         const m = url.match(/[?&]q=([-0-9.]+),([-0-9.]+)/);
         if (m) return `https://maps.google.com/maps?q=${m[1]},${m[2]}&z=15&output=embed`;
-        // If "place" style
         const pm = url.match(/place\/([^\/]+)/);
         if (pm) return `https://maps.google.com/maps?q=${encodeURIComponent(pm[1])}&output=embed`;
-        // Last resort: just output=embed on the raw link
         return url.includes("output=embed") ? url : url + (url.includes("?") ? "&" : "?") + "output=embed";
     }
 
     /* -------- date filters -------- */
-    function startOfDay(d) { const x = new Date(d); x.setHours(0,0,0,0); return x; }
-    function endOfDay(d)   { const x = new Date(d); x.setHours(23,59,59,999); return x; }
+    function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
+    function endOfDay(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
     function getDateRange() {
         const v = filterDate ? filterDate.value : "all";
         const now = new Date();
         if (v === "all") return null;
         if (v === "today") return [startOfDay(now), endOfDay(now)];
-        if (v === "yesterday") { const y = new Date(now); y.setDate(y.getDate()-1); return [startOfDay(y), endOfDay(y)]; }
-        if (v === "7d")  { const s = new Date(now); s.setDate(s.getDate()-6);  return [startOfDay(s), endOfDay(now)]; }
-        if (v === "30d") { const s = new Date(now); s.setDate(s.getDate()-29); return [startOfDay(s), endOfDay(now)]; }
+        if (v === "yesterday") { const y = new Date(now); y.setDate(y.getDate() - 1); return [startOfDay(y), endOfDay(y)]; }
+        if (v === "7d") { const s = new Date(now); s.setDate(s.getDate() - 6); return [startOfDay(s), endOfDay(now)]; }
+        if (v === "30d") { const s = new Date(now); s.setDate(s.getDate() - 29); return [startOfDay(s), endOfDay(now)]; }
         if (v === "custom") {
             const from = dateFrom && dateFrom.value ? startOfDay(new Date(dateFrom.value)) : null;
-            const to   = dateTo   && dateTo.value   ? endOfDay(new Date(dateTo.value))     : null;
+            const to = dateTo && dateTo.value ? endOfDay(new Date(dateTo.value)) : null;
             if (from && to) return [from, to];
             if (from) return [from, endOfDay(now)];
-            if (to)   return [startOfDay(new Date(0)), to];
+            if (to) return [startOfDay(new Date(0)), to];
         }
         return null;
     }
@@ -207,10 +203,16 @@
                         ` : `
                             <div class="ar-acc-detail" style="grid-column:1/-1;"><div class="ar-acc-detail-label">Full Address</div><div class="ar-acc-detail-value">${esc(r.requested_apartment || "—")}</div></div>
                             <div class="ar-acc-detail"><div class="ar-acc-detail-label">Delivery Charge</div><div class="ar-acc-detail-value">₹${charge.toFixed(2)}</div></div>
-                            ${r.map_link ? `<div class="ar-acc-detail"><div class="ar-acc-detail-label">Google Maps</div><div class="ar-acc-detail-value"><a href="${esc(r.map_link)}" target="_blank" rel="noopener"><i class="bi bi-geo-alt-fill"></i> Open location</a></div></div>` : ""}
-                            ${mapEmbed ? `<div class="ar-mini-map"><iframe src="${esc(mapEmbed)}" loading="lazy"></iframe></div>` : ""}
-                            ${r.house_image ? `<div class="ar-mini-img"><img src="${esc(r.house_image)}" alt="House" loading="lazy"></div>` : ""}
                         `}
+
+                        <!-- MAP LINK (for both types) -->
+                        ${r.map_link ? `<div class="ar-acc-detail" style="grid-column:1/-1;"><div class="ar-acc-detail-label">Google Maps</div><div class="ar-acc-detail-value"><a href="${esc(r.map_link)}" target="_blank" rel="noopener"><i class="bi bi-geo-alt-fill"></i> Open location</a></div></div>` : ""}
+                        
+                        <!-- MINI MAP EMBED (for both types) -->
+                        ${mapEmbed ? `<div class="ar-mini-map" style="grid-column:1/-1;"><iframe src="${esc(mapEmbed)}" loading="lazy"></iframe></div>` : ""}
+
+                        <!-- HOUSE IMAGE (for both types) -->
+                        ${r.house_image ? `<div class="ar-mini-img" style="grid-column:1/-1;"><img src="${esc(r.house_image)}" alt="House" loading="lazy"></div>` : ""}
 
                         <div class="ar-acc-detail"><div class="ar-acc-detail-label">Requested On</div><div class="ar-acc-detail-value">${esc(dt.d)}${dt.t ? " · " + esc(dt.t) : ""}</div></div>
                         ${r.approved_at ? `<div class="ar-acc-detail"><div class="ar-acc-detail-label">Approved On</div><div class="ar-acc-detail-value">${esc(formatDate(r.approved_at).d)}</div></div>` : ""}
@@ -317,7 +319,7 @@
         else { if (customRange) customRange.style.display = "none"; applyFilterAndRender(); }
     });
     if (dateFrom) dateFrom.addEventListener("change", () => applyFilterAndRender());
-    if (dateTo)   dateTo.addEventListener("change",   () => applyFilterAndRender());
+    if (dateTo) dateTo.addEventListener("change", () => applyFilterAndRender());
 
     /* -------- load -------- */
     function populateBranches(branches) {
@@ -507,8 +509,8 @@
         fd.append("apartment_address", aptAddr);
         if (branchId) fd.append("branch_id", branchId);
         fd.append("requested_division", div);
-        fd.append("map_link", mapLink);
-        fd.append("house_image", houseImg);
+        fd.append("map_link", mapLink);       /* SEND MAP LINK */
+        fd.append("house_image", houseImg);   /* SEND HOUSE IMAGE */
         fd.append("delivery_charge", deliveryCharge || "0");
 
         approveSubmit.disabled = true;

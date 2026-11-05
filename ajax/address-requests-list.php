@@ -27,7 +27,7 @@ try {
         $full = '';
         if ($raw !== '') {
             if (preg_match('#^https?://#i', $raw)) {
-                $full = $raw; // already absolute
+                $full = $raw;
             } else {
                 $full = rtrim(MAIN_URL, '/') . '/' . ltrim($raw, '/');
             }
@@ -42,8 +42,8 @@ try {
             'delivery_charge'      => (float)($r['delivery_charge'] ?? 0),
             'request_type'         => $r['request_type'],
             'map_link'             => $r['map_link'],
-            'house_image'          => $full,   // ✅ full URL for <img>
-            'house_image_raw'      => $raw,    // raw path for DB updates
+            'house_image'          => $full,
+            'house_image_raw'      => $raw,
             'status'               => (int)$r['status'],
             'created_customer_id'  => $r['created_customer_id'] !== null ? (int)$r['created_customer_id'] : null,
             'created_apartment_id' => $r['created_apartment_id'] !== null ? (int)$r['created_apartment_id'] : null,
@@ -64,7 +64,6 @@ try {
             return ['id' => (int)$b['id'], 'branch_name' => $b['branch_name']];
         }, $branches)
     ]);
-
 } catch (PDOException $e) {
     jsonResponse(false, 'Failed to load requests: ' . $e->getMessage());
 }

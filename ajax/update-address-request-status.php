@@ -169,7 +169,9 @@ try {
                 if ($matchedIndex >= 0) {
                     $existingDivs[$matchedIndex]['charge'] = $deliveryCharge;
                 } else {
-                    $block = ''; $doorNo = ''; $floor = '';
+                    $block = '';
+                    $doorNo = '';
+                    $floor = '';
                     if (preg_match('/Blk\s*([^\/]+)/i', $division, $m))  $block  = trim($m[1]);
                     if (preg_match('/Door\s*([^\/]+)/i', $division, $m)) $doorNo = trim($m[1]);
                     if (preg_match('/Fl\s*([^\/]+)/i', $division, $m))   $floor  = trim($m[1]);
@@ -193,7 +195,9 @@ try {
 
             $initialDivs = [];
             if ($division !== '') {
-                $block = ''; $doorNo = ''; $floor = '';
+                $block = '';
+                $doorNo = '';
+                $floor = '';
                 if (preg_match('/Blk\s*([^\/]+)/i', $division, $m))  $block  = trim($m[1]);
                 if (preg_match('/Door\s*([^\/]+)/i', $division, $m)) $doorNo = trim($m[1]);
                 if (preg_match('/Fl\s*([^\/]+)/i', $division, $m))   $floor  = trim($m[1]);
@@ -229,8 +233,9 @@ try {
             'apartment_name'  => $aptName,
             'division_label'  => $division,
             'delivery_charge' => $deliveryCharge,
+            'map_link'        => $mapLink,      /* ✅ ADD THIS */
+            'house_image'     => $houseImg,     /* ✅ ADD THIS */
         ];
-
     } else {
         /* Individual house */
         $addressJson = [
@@ -261,8 +266,12 @@ try {
                  profile_completed, status)
              VALUES (?, ?, ?, ?, ?, ?, 1, 1)"
         )->execute([
-            $customerCode, $name, $mobile,
-            $passwordHash, $reqType, $addressJsonFinal
+            $customerCode,
+            $name,
+            $mobile,
+            $passwordHash,
+            $reqType,
+            $addressJsonFinal
         ]);
         $custId = (int)$pdo->lastInsertId();
     }
@@ -295,7 +304,6 @@ try {
         'apartment_id'    => $apartmentIdCreated,
         'delivery_charge' => $deliveryCharge
     ]);
-
 } catch (PDOException $e) {
     $pdo->rollBack();
     jsonResponse(false, 'Failed to approve: ' . $e->getMessage());

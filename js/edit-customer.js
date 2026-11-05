@@ -38,6 +38,11 @@
     const aptCodeInput = document.getElementById("acApartmentCode");
     const aptNameInput = document.getElementById("acApartmentName");
 
+    /* Apartment image (NEW) */
+    const aptImgDrop = document.getElementById("aptImgDrop");
+    const aptImg = document.getElementById("aptImg");
+    const aptImgPreview = document.getElementById("aptImgPreview");
+
     /* Division */
     const divDdWrap = document.getElementById("acDivDdWrap");
     const divDdToggle = document.getElementById("acDivDdToggle");
@@ -76,7 +81,7 @@
     const sumDebit = document.getElementById("sumDebit");
     const sumEntries = document.getElementById("sumEntries");
 
-    /* Success / error popups */
+    /* Popups */
     const successOverlay = document.getElementById("successOverlay");
     const successText = document.getElementById("successText");
     const successOkBtn = document.getElementById("successOkBtn");
@@ -93,6 +98,7 @@
     let currentBalance = 0;
     let historyLoaded = false;
     let houseImgData = "";
+    let aptImgData = ""; /* NEW */
 
     let hxCurrentPage = 1;
     let hxPerPage = 10;
@@ -129,31 +135,25 @@
         return /(google\.[a-z.]+\/maps|maps\.google\.|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(url);
     }
 
-    /* =========================================
-       POPUPS
-       ========================================= */
+    /* Popups */
     let successTimer = null;
     function showSuccessPopup(message, newPassword) {
         if (!successOverlay) return;
         if (successText) successText.textContent = message || "Success.";
 
-        // Determine which password to send
-        // If the admin typed a new password, use that. 
-        // If they left it blank, use the existing DB password.
         let passwordToSend = newPassword;
         if (!passwordToSend && typeof window.CUSTOMER_PASSWORD !== 'undefined') {
             passwordToSend = window.CUSTOMER_PASSWORD;
         }
 
-        // WhatsApp Share Logic
         if (waShareBtn && passwordToSend && passwordToSend !== 'Error reading password.') {
             const waNumber = String(CUSTOMER_MOBILE || "").replace(/[^0-9]/g, "");
             const waMsgText = `Hello ${CUSTOMER_NAME},\n\nHere are your login details for Mrs Mill@:\n\nMobile: ${CUSTOMER_MOBILE}\nPassword: ${passwordToSend}\n\nPlease keep this safe.`;
-            
+
             waShareBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsgText)}`;
             waShareBtn.style.display = "inline-flex";
         } else if (waShareBtn) {
-            waShareBtn.style.display = "none"; // Hide if no password is found
+            waShareBtn.style.display = "none";
         }
 
         successOverlay.classList.add("show");
@@ -190,9 +190,7 @@
         if (errorOverlay?.classList.contains("show")) closeErrorPopup();
     });
 
-    /* =========================================
-       TABS
-       ========================================= */
+    /* Tabs */
     document.querySelectorAll(".tab-btn").forEach(btn => {
         btn.addEventListener("click", function () {
             const tab = this.dataset.tab;
@@ -245,9 +243,7 @@
         }
     });
 
-    /* =========================================
-       APARTMENT DROPDOWN
-       ========================================= */
+    /* Apartment dropdown */
     function loadApartments() {
         if (!aptDdList) return;
         aptDdList.innerHTML = `<div class="sd-empty">Loading apartments…</div>`;
@@ -463,9 +459,29 @@
         if (!e.target.closest("#acDivDdWrap")) closeDivDd();
     });
 
-    /* =========================================
-       HOUSE — MAP + IMAGE
-       ========================================= */
+    /* Apartment image (NEW) */
+    if (aptImgDrop) {
+        aptImgDrop.addEventListener("click", () => { if (aptImg) aptImg.click(); });
+    }
+    if (aptImg) {
+        aptImg.addEventListener("change", function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+            if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
+            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                aptImgData = evt.target.result;
+                if (aptImgPreview) {
+                    aptImgPreview.classList.remove("img-drop-empty");
+                    aptImgPreview.innerHTML = '<img src="' + aptImgData + '" alt="Apartment preview">';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    /* House map + image */
     if (houseMap) {
         houseMap.addEventListener("input", function () {
             const v = this.value.trim();
@@ -543,9 +559,7 @@
         });
     }
 
-    /* =========================================
-       SAVE CUSTOMER
-       ========================================= */
+    /* Save customer */
     form.addEventListener("submit", function (e) {
         e.preventDefault();
 
@@ -557,7 +571,6 @@
         if (!/^[0-9]{10,15}$/.test(mobile)) return showErrorPopup("Please enter a valid mobile number.");
         if (password !== "" && password.length < 3) return showErrorPopup("New password must be at least 3 characters.");
 
-        /* Build address_json */
         let addressJson = {};
 
         if (ADDRESS_TYPE === "apartment") {
@@ -588,14 +601,27 @@
                 division_label: div,
                 charge: charge
             };
+
+            /* Preserve existing apartment image if no new one */
+            if (!aptImgData) {
+                const existingImgEl = aptImgPreview && aptImgPreview.querySelector("img");
+                if (existingImgEl && existingImgEl.src) {
+                    const src = existingImgEl.src;
+                    if (src.indexOf(BASE_URL) === 0) {
+                        addressJson.house_image = src.substring(BASE_URL.length);
+                    }
+                }
+            }
         } else {
             const addr = (houseAddress.value || "").trim();
             const mapVal = (houseMap.value || "").trim();
             const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
-            if (!mapVal) return showErrorPopup("Please pin the location or paste a Google Maps link.");
-            if (!isValidMapLink(mapVal)) return showErrorPopup("Invalid Google Maps link.");
+            /* Map optional */
+            if (mapVal && !isValidMapLink(mapVal)) {
+                return showErrorPopup("The Google Maps link doesn't look valid. Leave it empty or paste a proper link.");
+            }
             if (isNaN(chargeVal) || chargeVal < 0) return showErrorPopup("Delivery charge must be 0 or more.");
 
             addressJson = {
@@ -604,7 +630,6 @@
                 delivery_charge: chargeVal
             };
 
-            /* Preserve existing house_image if there is one */
             if (!houseImgData) {
                 const existingImgEl = houseImgPreview && houseImgPreview.querySelector("img");
                 if (existingImgEl && existingImgEl.src) {
@@ -630,6 +655,9 @@
         if (ADDRESS_TYPE === "individual_house" && houseImgData) {
             fd.append("house_image_data", houseImgData);
         }
+        if (ADDRESS_TYPE === "apartment" && aptImgData) {
+            fd.append("apt_house_image_data", aptImgData);
+        }
 
         fetch(BASE_URL + "ajax/add-customer-save.php", {
             method: "POST",
@@ -640,7 +668,6 @@
             .then(data => {
                 setCustomerLoading(false);
                 if (data.success) {
-                    // Pass the new password to the popup
                     showSuccessPopup(data.message || "Customer updated successfully.", password);
                 } else {
                     showErrorPopup(data.message || "Failed to update customer.");
@@ -652,9 +679,7 @@
             });
     });
 
-    /* =========================================
-       WALLET
-       ========================================= */
+    /* Wallet */
     document.querySelectorAll(".wallet-tab").forEach(tab => {
         tab.addEventListener("click", function () { setWalletTab(this.dataset.tab); });
     });
@@ -729,9 +754,6 @@
         loadWalletHistory();
     });
 
-    /* =========================================
-       WALLET HISTORY
-       ========================================= */
     function loadWalletHistory() {
         if (!walletHistory) return;
 
@@ -909,9 +931,7 @@
         loadWalletHistory();
     });
 
-    /* =========================================
-       INIT
-       ========================================= */
+    /* INIT */
     if (ADDRESS_TYPE === "apartment") {
         loadApartments();
     }

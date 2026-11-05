@@ -38,6 +38,11 @@
     const aptCodeInput = document.getElementById("acApartmentCode");
     const aptNameInput = document.getElementById("acApartmentName");
 
+    /* Apartment image */
+    const aptImgDrop = document.getElementById("aptImgDrop");
+    const aptImg = document.getElementById("aptImg");
+    const aptImgPreview = document.getElementById("aptImgPreview");
+
     /* Division */
     const divDdWrap = document.getElementById("acDivDdWrap");
     const divDdToggle = document.getElementById("acDivDdToggle");
@@ -71,7 +76,7 @@
     const successOverlay = document.getElementById("successOverlay");
     const successText = document.getElementById("successText");
     const successCode = document.getElementById("successCode");
-    const waShareBtn = document.getElementById("waShareBtn"); // WhatsApp Button
+    const waShareBtn = document.getElementById("waShareBtn");
     const errorOverlay = document.getElementById("errorOverlay");
     const errorText = document.getElementById("errorText");
     const errorOkBtn = document.getElementById("errorOkBtn");
@@ -85,6 +90,9 @@
     let addressType = "apartment";
     let houseMapLink = "";
     let houseImgData = "";
+    let aptImgData = "";
+    let aptBusy = false;
+    let houseBusy = false;
 
     /* Helpers */
     function esc(s) {
@@ -116,13 +124,12 @@
             }
         }
 
-        // Generate WhatsApp Message
         if (waShareBtn) {
             const waNumber = String(mobile || "").replace(/[^0-9]/g, "");
             const waMsgText = `Hello ${name},\n\nHere are your login details for Mrs Mill@:\n\nMobile: ${mobile}\nPassword: ${password}\n\nPlease keep this safe.`;
 
             waShareBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsgText)}`;
-            waShareBtn.style.display = "inline-flex"; // Show the button
+            waShareBtn.style.display = "inline-flex";
         }
 
         successOverlay.classList.add("show");
@@ -400,6 +407,37 @@
         if (!e.target.closest("#acDivDdWrap")) closeDivDd();
     });
 
+    /* ---- APARTMENT IMAGE ---- */
+    if (aptImgDrop && aptImg) {
+        aptImgDrop.addEventListener("click", function (e) {
+            if (e.target === aptImg) return;
+            if (aptBusy) return;
+            aptBusy = true;
+            try { aptImg.value = ""; aptImg.click(); }
+            finally { setTimeout(() => { aptBusy = false; }, 400); }
+        });
+
+        aptImg.addEventListener("click", function (e) {
+            e.stopPropagation();
+        });
+
+        aptImg.addEventListener("change", function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+            if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
+            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                aptImgData = evt.target.result;
+                if (aptImgPreview) {
+                    aptImgPreview.classList.remove("img-drop-empty");
+                    aptImgPreview.innerHTML = '<img src="' + aptImgData + '" alt="Apartment preview">';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
     /* ---- HOUSE MAP + IMAGE ---- */
     if (houseMap) {
         houseMap.addEventListener("input", function () {
@@ -459,10 +497,19 @@
         });
     }
 
-    if (houseImgDrop) {
-        houseImgDrop.addEventListener("click", () => { if (houseImg) houseImg.click(); });
-    }
-    if (houseImg) {
+    if (houseImgDrop && houseImg) {
+        houseImgDrop.addEventListener("click", function (e) {
+            if (e.target === houseImg) return;
+            if (houseBusy) return;
+            houseBusy = true;
+            try { houseImg.value = ""; houseImg.click(); }
+            finally { setTimeout(() => { houseBusy = false; }, 400); }
+        });
+
+        houseImg.addEventListener("click", function (e) {
+            e.stopPropagation();
+        });
+
         houseImg.addEventListener("change", function () {
             const file = this.files && this.files[0];
             if (!file) return;
@@ -548,8 +595,10 @@
             const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
-            if (!mapVal) return showErrorPopup("Please pin the location or paste a Google Maps link.");
-            if (!isValidMapLink(mapVal)) return showErrorPopup("Invalid Google Maps link.");
+            /* Map is OPTIONAL — only validate if typed */
+            if (mapVal && !isValidMapLink(mapVal)) {
+                return showErrorPopup("The Google Maps link doesn't look valid. Leave it empty or paste a proper link.");
+            }
             if (isNaN(chargeVal) || chargeVal < 0) return showErrorPopup("Delivery charge must be 0 or more.");
 
             addressJson = {
@@ -585,6 +634,9 @@
         if (addressType === "individual_house" && houseImgData) {
             fd.append("house_image_data", houseImgData);
         }
+        if (addressType === "apartment" && aptImgData) {
+            fd.append("apt_house_image_data", aptImgData);
+        }
 
         fetch(BASE_URL + "ajax/add-customer-save.php", {
             method: "POST",
@@ -595,7 +647,6 @@
             .then(data => {
                 if (data.success) {
                     const code = data.data && data.data.code ? data.data.code : "";
-                    // Pass name, mobile, and password to the popup
                     showSuccessPopup(data.message || "Customer added successfully.", code, mobile, password, name);
                     setLoading(false);
                     form.reset();
@@ -610,6 +661,13 @@
                     aptDdLabel.textContent = "— Type or select apartment —";
                     aptDdLabel.classList.add("placeholder");
                     aptDdToggle.classList.remove("has-value");
+
+                    aptImgData = "";
+                    if (aptImg) aptImg.value = "";
+                    if (aptImgPreview) {
+                        aptImgPreview.classList.add("img-drop-empty");
+                        aptImgPreview.innerHTML = '<i class="bi bi-image"></i><span>Tap to upload a photo of the apartment building / flat</span>';
+                    }
 
                     divisionsCache = [];
                     divInput.value = "";

@@ -2,7 +2,8 @@
 /* =========================================================
    MRS MILL@ — AJAX: ADD / UPDATE CUSTOMER
    File: ./ajax/add-customer-save.php
-   Auto-generates customer_id like MRSMC123456
+   Saves images to BOTH admin + customer app folders so
+   MAIN_URL can serve them.
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -13,16 +14,17 @@ header('Content-Type: application/json; charset=utf-8');
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') jsonResponse(false, 'Method not allowed.');
 if (!isset($_SESSION['admin_id']) || (int)$_SESSION['admin_id'] <= 0) jsonResponse(false, 'Not logged in.');
 
-$id            = (int)($_POST['id'] ?? 0);
-$fullName      = trim($_POST['full_name'] ?? '');
-$mobileNumber  = trim($_POST['mobile_number'] ?? '');
-$password      = trim($_POST['password'] ?? '');
-$status        = (int)($_POST['status'] ?? 1);
-$addressType   = trim($_POST['address_type'] ?? 'apartment');
-$addressJsonRaw= trim($_POST['address_json'] ?? '{}');
-$initWallet    = (float)($_POST['init_wallet'] ?? 0);
-$initNote      = trim($_POST['init_wallet_note'] ?? '');
-$houseImgB64   = trim($_POST['house_image_data'] ?? '');
+$id             = (int)($_POST['id'] ?? 0);
+$fullName       = trim($_POST['full_name'] ?? '');
+$mobileNumber   = trim($_POST['mobile_number'] ?? '');
+$password       = trim($_POST['password'] ?? '');
+$status         = (int)($_POST['status'] ?? 1);
+$addressType    = trim($_POST['address_type'] ?? 'apartment');
+$addressJsonRaw = trim($_POST['address_json'] ?? '{}');
+$initWallet     = (float)($_POST['init_wallet'] ?? 0);
+$initNote       = trim($_POST['init_wallet_note'] ?? '');
+$houseImgB64    = trim($_POST['house_image_data'] ?? '');
+$aptImgB64      = trim($_POST['apt_house_image_data'] ?? '');
 
 if ($fullName === '')     jsonResponse(false, 'Full name is required.');
 if ($mobileNumber === '') jsonResponse(false, 'Mobile number is required.');
@@ -39,56 +41,98 @@ if (!is_array($addressJson)) {
     jsonResponse(false, 'Invalid address data.');
 }
 
-/* Validate apartment */
+/* Validate */
 if ($addressType === 'apartment') {
     if (empty($addressJson['apartment_id'])) jsonResponse(false, 'Please select an apartment.');
     if (empty($addressJson['division_label'])) jsonResponse(false, 'Please select a division.');
 } else {
     if (empty($addressJson['full_address'])) jsonResponse(false, 'Full address is required.');
-    if (empty($addressJson['map_link'])) jsonResponse(false, 'Map link is required.');
+    /* map_link is OPTIONAL */
 }
 
 /* =========================================================
-   AUTO-GENERATE CUSTOMER ID — MRSMC + random digits
+   AUTO-GENERATE CUSTOMER ID
    ========================================================= */
 function generateCustomerId($pdo)
 {
     $maxTries = 20;
-
     for ($i = 0; $i < $maxTries; $i++) {
-
-        /* 4 to 7 random digits, no leading zero */
         $digits = random_int(4, 7);
         $num    = random_int((int)pow(10, $digits - 1), (int)pow(10, $digits) - 1);
-
         $candidate = 'MRSMC' . $num;
-
-        /* Check collision */
         $chk = $pdo->prepare("SELECT id FROM customers WHERE customer_id = ? LIMIT 1");
         $chk->execute([$candidate]);
-
         if (!$chk->fetch()) return $candidate;
     }
-
-    /* Fallback: timestamp-based, guaranteed unique enough */
     return 'MRSMC' . date('ymdHis') . random_int(10, 99);
 }
 
-/* Save house image if provided */
-if ($addressType === 'individual_house' && $houseImgB64 !== '') {
-    if (preg_match('/^data:image\/(png|jpe?g|webp|gif);base64,/i', $houseImgB64, $m)) {
-        $ext  = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
-        $data = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $houseImgB64));
-        if ($data !== false && strlen($data) <= 3 * 1024 * 1024) {
-            $folder = 'uploads/houses/' . date('Ymd') . '/' . bin2hex(random_bytes(5));
-            $absDir = rtrim(__DIR__ . '/../', '/\\') . '/' . $folder;
-            if (!is_dir($absDir)) @mkdir($absDir, 0775, true);
-            $fileName = 'house.' . $ext;
-            if (@file_put_contents($absDir . '/' . $fileName, $data) !== false) {
-                $addressJson['house_image'] = $folder . '/' . $fileName;
-            }
+/* =========================================================
+   Save base64 image to admin + customer app folders
+   Returns the relative path (e.g. uploads/houses/20261105/xxx/house.jpg)
+   ========================================================= */
+function saveBase64Image($b64, $folderRoot = 'uploads/houses/')
+{
+    if ($b64 === '') return null;
+    if (!preg_match('/^data:image\/(png|jpe?g|webp|gif);base64,/i', $b64, $m)) return null;
+
+    $ext  = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
+    $data = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $b64));
+    if ($data === false || strlen($data) > 3 * 1024 * 1024) return null;
+
+    $folder  = $folderRoot . date('Ymd') . '/' . bin2hex(random_bytes(5));
+    $fileName = 'house.' . $ext;
+
+    /* --- Admin app folder (where this script lives) --- */
+    $adminBase = rtrim(__DIR__ . '/../', '/\\') . '/' . $folder;
+    if (!is_dir($adminBase)) @mkdir($adminBase, 0775, true);
+    $adminFile = $adminBase . '/' . $fileName;
+
+    $adminOk = @file_put_contents($adminFile, $data) !== false;
+
+    /* --- Customer app folder (sibling of admin app) ---
+       Try several common locations.
+       Expected layout: /htdocs/mrs.millet.admin/  and  /htdocs/mrs.millet.customer/
+       __DIR__ = /htdocs/mrs.millet.admin/ajax
+       Customer app root = __DIR__/../../mrs.millet.customer
+    */
+    $candidates = [
+        // sibling folder next to admin app
+        rtrim(__DIR__ . '/../../mrs.millet.customer/', '/\\'),
+        // in case docroot layout differs
+        rtrim(__DIR__ . '/../../../mrs.millet.customer/', '/\\'),
+        // try to derive from MAIN_URL
+        (function () {
+            if (!defined('MAIN_URL')) return '';
+            $u = parse_url(MAIN_URL);
+            if (empty($u['path'])) return '';
+            $docroot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/\\');
+            return $docroot . rtrim($u['path'], '/');
+        })(),
+    ];
+
+    foreach ($candidates as $custRoot) {
+        if ($custRoot === '') continue;
+        $custDir = rtrim($custRoot, '/\\') . '/' . $folder;
+        if (!is_dir($custDir)) @mkdir($custDir, 0775, true);
+        if (is_dir($custDir)) {
+            @file_put_contents($custDir . '/' . $fileName, $data);
         }
     }
+
+    return $adminOk ? ($folder . '/' . $fileName) : null;
+}
+
+/* Save apartment image */
+if ($addressType === 'apartment' && $aptImgB64 !== '') {
+    $path = saveBase64Image($aptImgB64);
+    if ($path) $addressJson['house_image'] = $path;
+}
+
+/* Save individual house image */
+if ($addressType === 'individual_house' && $houseImgB64 !== '') {
+    $path = saveBase64Image($houseImgB64);
+    if ($path) $addressJson['house_image'] = $path;
 }
 
 $addressJsonFinal = json_encode($addressJson, JSON_UNESCAPED_UNICODE);
@@ -106,9 +150,7 @@ try {
     $dup->execute($dupParams);
     if ($dup->fetch()) jsonResponse(false, 'A customer with this mobile already exists.');
 
-    /* =========================================
-       UPDATE
-       ========================================= */
+    /* UPDATE */
     if ($id > 0) {
         $check = $pdo->prepare("SELECT id, customer_id FROM customers WHERE id = ? LIMIT 1");
         $check->execute([$id]);
@@ -119,7 +161,6 @@ try {
             jsonResponse(false, 'New password must be at least 3 characters.');
         }
 
-        /* Backfill customer_id if missing */
         $customerId = $existing['customer_id'] ?? '';
         if ($customerId === '' || $customerId === null) {
             $customerId = generateCustomerId($pdo);
@@ -151,9 +192,7 @@ try {
         ]);
     }
 
-    /* =========================================
-       INSERT
-       ========================================= */
+    /* INSERT */
     if ($password === '')      jsonResponse(false, 'Password is required.');
     if (strlen($password) < 3) jsonResponse(false, 'Password must be at least 3 characters.');
 
