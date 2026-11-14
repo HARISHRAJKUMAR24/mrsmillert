@@ -23,14 +23,9 @@ $branches = $branchStmt->fetchAll();
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
 
     <style>
-        /* =====================================================
-           APARTMENT EDIT PAGE
-        ===================================================== */
-
         .apartment-page {
             padding: 30px 32px 40px;
         }
@@ -227,11 +222,6 @@ $branches = $branchStmt->fetchAll();
             }
         }
 
-
-        /* =====================================================
-           VARIANTS SECTION (was: divisions)
-        ===================================================== */
-
         .divisions-section {
             margin-top: 22px;
             padding-top: 20px;
@@ -284,13 +274,6 @@ $branches = $branchStmt->fetchAll();
             line-height: 1.2;
         }
 
-        .divisions-header-title h4 .required {
-            color: #b51f2c;
-            font-weight: 800;
-            font-size: 13px;
-            line-height: 1;
-        }
-
         .divisions-header-title span.subtitle {
             display: block;
             font-size: 10px;
@@ -325,7 +308,6 @@ $branches = $branchStmt->fetchAll();
             gap: 10px;
         }
 
-        /* Variant row: Block | Door No | Floor | Charge | Remove */
         .division-row {
             display: grid;
             grid-template-columns: 1.4fr 1fr 1fr 160px 42px;
@@ -418,11 +400,6 @@ $branches = $branchStmt->fetchAll();
             border-color: #f1c8cc;
         }
 
-        .remove-division:disabled {
-            opacity: .35;
-            cursor: not-allowed;
-        }
-
         .divisions-empty {
             text-align: center;
             padding: 22px;
@@ -479,11 +456,6 @@ $branches = $branchStmt->fetchAll();
             }
         }
 
-
-        /* =====================================================
-           FORM ACTIONS
-        ===================================================== */
-
         .form-actions {
             display: flex;
             justify-content: flex-end;
@@ -527,11 +499,6 @@ $branches = $branchStmt->fetchAll();
             opacity: .7;
             cursor: not-allowed;
         }
-
-
-        /* =====================================================
-           SUCCESS POPUP
-        ===================================================== */
 
         .mm-modal-overlay {
             position: fixed;
@@ -665,7 +632,6 @@ $branches = $branchStmt->fetchAll();
             color: #302923;
         }
 
-
         @media (max-width: 768px) {
             .apartment-page {
                 padding: 20px 15px 30px;
@@ -692,7 +658,6 @@ $branches = $branchStmt->fetchAll();
             }
         }
     </style>
-
 </head>
 
 <body>
@@ -703,18 +668,14 @@ $branches = $branchStmt->fetchAll();
 
         <?php include './templates/header.php'; ?>
 
-
         <div class="apartment-page">
 
             <div class="apartment-header">
-
                 <div class="apartment-title">
                     <h1>Edit Apartment</h1>
-                    <p>Update apartment info, variants (Block / Door No / Floor) and delivery charges.</p>
+                    <p>Update apartment info and optionally modify its variants.</p>
                 </div>
-
             </div>
-
 
             <div class="apartment-form-card">
 
@@ -724,7 +685,7 @@ $branches = $branchStmt->fetchAll();
                     </div>
                     <div>
                         <h3>Apartment Details</h3>
-                        <span>Edit info then update each variant's delivery charge.</span>
+                        <span>Only the apartment name is required. Everything else is optional.</span>
                     </div>
                     <span class="apt-code-badge" id="aptCodeBadge">—</span>
                 </div>
@@ -737,11 +698,7 @@ $branches = $branchStmt->fetchAll();
                     <div>Loading apartment details...</div>
                 </div>
 
-                <form id="apartmentForm"
-                    class="apartment-form"
-                    method="POST"
-                    novalidate
-                    style="display:none;">
+                <form id="apartmentForm" class="apartment-form" method="POST" novalidate style="display:none;">
 
                     <input type="hidden" id="apartment_id" name="apartment_id" value="">
 
@@ -749,16 +706,11 @@ $branches = $branchStmt->fetchAll();
 
                         <!-- BRANCH -->
                         <div class="col-12 col-md-6">
-                            <label>
-                                Branch <span class="required">*</span>
-                            </label>
+                            <label>Branch</label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-shop"></i>
-                                <select name="branch_id"
-                                    id="branch_id"
-                                    class="apartment-select"
-                                    required>
-                                    <option value="">— Select Branch —</option>
+                                <select name="branch_id" id="branch_id" class="apartment-select">
+                                    <option value="">— Select Branch (Optional) —</option>
                                     <?php foreach ($branches as $b): ?>
                                         <option value="<?= (int)$b['id'] ?>">
                                             <?= htmlspecialchars($b['branch_name']) ?>
@@ -770,26 +722,17 @@ $branches = $branchStmt->fetchAll();
 
                         <!-- NAME -->
                         <div class="col-12 col-md-6">
-                            <label>
-                                Apartment Name <span class="required">*</span>
-                            </label>
+                            <label>Apartment Name <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-building"></i>
-                                <input type="text"
-                                    name="apartment_name"
-                                    id="apartment_name"
-                                    class="apartment-input"
-                                    placeholder="Eg: Green Valley Apartments"
-                                    required>
+                                <input type="text" name="apartment_name" id="apartment_name" class="apartment-input" placeholder="Eg: Green Valley Apartments" required>
                             </div>
                         </div>
 
                         <!-- STATUS -->
                         <div class="col-12 col-md-6">
                             <label>Status</label>
-                            <select name="status"
-                                id="status"
-                                class="apartment-select">
+                            <select name="status" id="status" class="apartment-select">
                                 <option value="1">Active</option>
                                 <option value="0">Inactive</option>
                             </select>
@@ -797,65 +740,45 @@ $branches = $branchStmt->fetchAll();
 
                         <!-- ADDRESS -->
                         <div class="col-12">
-                            <label>
-                                Apartment Address <span class="required">*</span>
-                            </label>
+                            <label>Apartment Address</label>
                             <div class="input-icon-wrap">
-                                <textarea name="apartment_address"
-                                    id="apartment_address"
-                                    class="apartment-textarea"
-                                    placeholder="Enter complete apartment address..."
-                                    required></textarea>
+                                <textarea name="apartment_address" id="apartment_address" class="apartment-textarea" placeholder="Enter complete apartment address..."></textarea>
                             </div>
                         </div>
 
                     </div>
 
-
                     <!-- VARIANTS -->
-
                     <div class="divisions-section">
 
                         <div class="divisions-header">
-
                             <div class="divisions-header-title">
                                 <i class="bi bi-grid-3x3-gap"></i>
                                 <div class="title-text">
-                                    <h4>Apartment Variants <span class="required">*</span></h4>
-                                    <span class="subtitle">Each variant = Block + Door No + Floor, with its own delivery charge.</span>
+                                    <h4>Apartment Variants</h4>
+                                    <span class="subtitle">Optional — Each variant = Block + Door No + Floor, with its own delivery charge.</span>
                                 </div>
                             </div>
-
-                            <button type="button"
-                                class="add-division-btn"
-                                id="addDivisionBtn">
-                                <i class="bi bi-plus-lg"></i>
-                                Add Variant
+                            <button type="button" class="add-division-btn" id="addDivisionBtn">
+                                <i class="bi bi-plus-lg"></i> Add Variant
                             </button>
-
                         </div>
 
                         <div class="division-rows" id="divisionRows"></div>
 
                         <div class="divisions-empty" id="divisionsEmpty" style="display:none;">
                             <i class="bi bi-grid"></i>
-                            No variants. Click <strong>Add Variant</strong> to begin.
+                            No variants added yet. Click <strong>Add Variant</strong> if you want to add them.
                         </div>
 
                     </div>
 
-
                     <div class="form-actions">
-
                         <a href="apartment.php" class="btn-cancel">Cancel</a>
-
-                        <button type="submit"
-                            class="btn-save"
-                            id="saveBtn">
+                        <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Update Apartment</span>
                         </button>
-
                     </div>
 
                 </form>
@@ -866,43 +789,19 @@ $branches = $branchStmt->fetchAll();
 
     </main>
 
-
     <!-- SUCCESS POPUP -->
-
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="successTitle">
-
-            <div class="mm-modal-icon">
-                <i class="bi bi-check-lg"></i>
-            </div>
-
-            <h3 class="mm-modal-title" id="successTitle">
-                Apartment Updated!
-            </h3>
-
-            <p class="mm-modal-text" id="successText">
-                Your apartment has been updated successfully.
-            </p>
-
+            <div class="mm-modal-icon"><i class="bi bi-check-lg"></i></div>
+            <h3 class="mm-modal-title" id="successTitle">Apartment Updated!</h3>
+            <p class="mm-modal-text" id="successText">Your apartment has been updated successfully.</p>
             <div class="mm-modal-code" id="successCode" style="display:none;"></div>
-
             <div class="mm-modal-actions">
-
-                <a href="apartment.php" class="mm-btn mm-btn-ghost">
-                    <i class="bi bi-list-ul"></i>
-                    Back to List
-                </a>
-
-                <a href="#" id="editAgainBtn" class="mm-btn mm-btn-primary">
-                    <i class="bi bi-pencil"></i>
-                    Stay Here
-                </a>
-
+                <a href="apartment.php" class="mm-btn mm-btn-ghost"><i class="bi bi-list-ul"></i> Back to List</a>
+                <a href="#" id="editAgainBtn" class="mm-btn mm-btn-primary"><i class="bi bi-pencil"></i> Stay Here</a>
             </div>
-
         </div>
     </div>
-
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";

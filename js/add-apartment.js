@@ -6,10 +6,7 @@
 (function () {
     "use strict";
 
-    const BASE_URL =
-        (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
-            ? window.ADMIN_URL
-            : "./";
+    const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL) ? window.ADMIN_URL : "./";
 
     /* ========== SUCCESS POPUP ========== */
     const successOverlay = document.getElementById("successOverlay");
@@ -129,13 +126,6 @@
             : 'Save Apartment';
     }
 
-    function getFirstVariantCharge() {
-        const firstCharge = divisionRows.querySelector(".variant-charge");
-        if (!firstCharge) return "";
-        const val = firstCharge.value.trim();
-        return val === "" ? "" : val;
-    }
-
     function createDivisionRow(data) {
         data = data || {};
         const row = document.createElement("div");
@@ -168,9 +158,6 @@
 
     function addDivisionRow(data) {
         data = data || {};
-        if (data.charge === undefined || data.charge === null || data.charge === "") {
-            data.charge = getFirstVariantCharge();
-        }
         divisionRows.appendChild(createDivisionRow(data));
         refreshEmptyState();
     }
@@ -192,6 +179,7 @@
         const rows = divisionRows.querySelectorAll(".division-row");
         const out = [];
         const seen = {};
+        
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
             const block  = row.querySelector(".variant-block").value.trim();
@@ -199,10 +187,18 @@
             const floor  = row.querySelector(".variant-floor").value.trim();
             const charge = row.querySelector(".variant-charge").value.trim();
 
+            // Skip completely empty rows
+            if (!block && !door && !floor && !charge) {
+                continue;
+            }
+
+            // If any field is filled, all must be filled (charge can default to 0)
             if (!block) return { ok: false, message: "Block name is required for variant row " + (i + 1) + "." };
             if (!door)  return { ok: false, message: "Door No is required for variant row " + (i + 1) + "." };
             if (!floor) return { ok: false, message: "Floor is required for variant row " + (i + 1) + "." };
-            if (charge === "" || isNaN(charge) || Number(charge) < 0) {
+            
+            const chargeVal = charge === "" ? 0 : Number(charge);
+            if (isNaN(chargeVal) || chargeVal < 0) {
                 return { ok: false, message: "Valid delivery charge is required for variant row " + (i + 1) + "." };
             }
 
@@ -210,7 +206,7 @@
             if (seen[key]) return { ok: false, message: 'Duplicate variant: Block "' + block + '", Door No "' + door + '", Floor "' + floor + '".' };
             seen[key] = true;
 
-            out.push({ block, door_no: door, floor, charge: Number(charge) });
+            out.push({ block, door_no: door, floor, charge: chargeVal });
         }
         return { ok: true, divisions: out };
     }
@@ -223,13 +219,11 @@
         const address = document.getElementById("apartment_address").value.trim();
         const status = document.getElementById("status").value;
 
-        if (!branchId) return showError("Please select a branch.");
+        // ONLY Name is strictly required
         if (!name) return showError("Apartment name is required.");
-        if (!address) return showError("Apartment address is required.");
 
         const collected = collectDivisions();
         if (!collected.ok) return showError(collected.message);
-        if (collected.divisions.length === 0) return showError("Please add at least one variant with a charge.");
 
         setLoading(true);
         const formData = new FormData();
@@ -264,7 +258,5 @@
             });
     });
 
-    addDivisionRow();
     refreshEmptyState();
-
 })();

@@ -18,7 +18,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
     <?php include './includes/head.php'; ?>
 
     <style>
-        /* ================= Page layout ================= */
+        /* ============ same styles as before ============ */
         .ar-page {
             padding: 30px 32px 60px;
         }
@@ -57,7 +57,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
-            transition: .2s;
         }
 
         .ar-refresh-btn:hover {
@@ -120,7 +119,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-family: "DM Sans", sans-serif;
             font-size: 11px;
             background: #fffdf9;
-            transition: .15s;
         }
 
         .ar-search input:focus {
@@ -128,7 +126,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             background: #fff;
         }
 
-        /* ================= Filters ================= */
         .ar-filters {
             display: flex;
             gap: 10px;
@@ -165,21 +162,13 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 11.5px;
             color: #4c4640;
             outline: none;
-            transition: .15s;
             min-width: 130px;
-        }
-
-        .ar-filters select:focus,
-        .ar-filters input[type=date]:focus {
-            border-color: #d98a91;
-            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
         #arCustomRange {
             display: none;
         }
 
-        /* ================= Accordion ================= */
         .ar-acc-list {
             display: flex;
             flex-direction: column;
@@ -191,7 +180,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             border: 1.5px solid #eee7dc;
             border-radius: 14px;
             overflow: hidden;
-            transition: .2s;
         }
 
         .ar-acc-item.open {
@@ -207,7 +195,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             padding: 14px 16px;
             cursor: pointer;
             user-select: none;
-            transition: background .15s;
         }
 
         .ar-acc-head:hover {
@@ -232,12 +219,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
         }
 
         .ar-acc-head .ar-col-label {
-            font-size: 9px;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: .7px;
-            color: #938a80;
-            margin-bottom: 3px;
             display: none;
         }
 
@@ -277,7 +258,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 10.5px;
             color: #948c82;
             margin-top: 2px;
-            white-space: nowrap;
         }
 
         .ar-apartment {
@@ -297,7 +277,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            transition: .25s;
             flex-shrink: 0;
             cursor: pointer;
         }
@@ -372,12 +351,11 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
         .ar-acc-body {
             max-height: 0;
             overflow: hidden;
-            transition: max-height .3s cubic-bezier(.4, 0, .2, 1);
-            background: #fff;
+            transition: max-height .3s;
         }
 
         .ar-acc-item.open .ar-acc-body {
-            max-height: 2200px;
+            max-height: 2600px;
         }
 
         .ar-acc-body-inner {
@@ -427,7 +405,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             margin-top: 4px;
         }
 
-        /* Mini previews in body */
         .ar-mini-map {
             grid-column: 1/-1;
             border: 1px solid #f0ebe4;
@@ -456,16 +433,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             display: block;
         }
 
-        .ar-mini-label {
-            font-size: 9.5px;
-            font-weight: 800;
-            letter-spacing: .6px;
-            color: #948c82;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-        }
-
-        /* ================= Buttons ================= */
         .ar-btn {
             display: inline-flex;
             align-items: center;
@@ -480,7 +447,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-weight: 800;
             cursor: pointer;
             text-decoration: none;
-            transition: .15s;
             white-space: nowrap;
         }
 
@@ -519,12 +485,9 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             border: 1.5px solid #eee7dc;
             background: #fff;
             color: #6f675f;
-            font-family: "DM Sans", sans-serif;
             font-size: 11px;
             font-weight: 800;
-            cursor: pointer;
             text-decoration: none;
-            transition: .15s;
         }
 
         .ar-call:hover {
@@ -544,12 +507,9 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             border: 1.5px solid #c8e6c9;
             background: #e8f6ea;
             color: #1f7a3d;
-            font-family: "DM Sans", sans-serif;
             font-size: 11px;
             font-weight: 800;
-            cursor: pointer;
             text-decoration: none;
-            transition: .15s;
         }
 
         .ar-whatsapp:hover {
@@ -558,7 +518,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #fff;
         }
 
-        /* ================= Misc ================= */
         .ar-empty {
             text-align: center;
             padding: 50px 20px;
@@ -578,11 +537,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             color: #6f675f;
             margin: 0 0 6px;
             font-weight: 700;
-        }
-
-        .ar-empty p {
-            margin: 0;
-            font-size: 12px;
         }
 
         .ar-pagination {
@@ -657,7 +611,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             justify-content: center;
             padding: 0 8px;
             font-family: inherit;
-            transition: .2s;
         }
 
         .ar-pag-controls button:hover:not(:disabled):not(.active) {
@@ -758,7 +711,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             line-height: 1;
         }
 
-        /* ================= Modal ================= */
         .ar-modal-overlay {
             position: fixed;
             inset: 0;
@@ -874,7 +826,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 12px;
             color: #292521;
             outline: none;
-            transition: .15s;
         }
 
         .ar-modal-field textarea {
@@ -914,7 +865,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             font-size: 12px;
             font-weight: 800;
             cursor: pointer;
-            transition: .15s;
             display: inline-flex;
             align-items: center;
             gap: 6px;
@@ -944,7 +894,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
             cursor: not-allowed;
         }
 
-        /* Map + image preview inside modal */
         .ar-preview {
             margin-top: 6px;
             border: 1px solid #f0ebe4;
@@ -1080,7 +1029,6 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
                     </div>
                 </div>
 
-                <!-- FILTERS -->
                 <div class="ar-filters">
                     <div class="ar-fgroup">
                         <label><i class="bi bi-calendar3"></i> Date</label>
@@ -1134,12 +1082,12 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
 
     <div class="ar-toast-wrap" id="arToastWrap"></div>
 
-    <!-- APPROVE MODAL -->
+    <!-- ========== APPROVE MODAL ========== -->
     <div class="ar-modal-overlay" id="arApproveOverlay" aria-hidden="true">
         <div class="ar-modal" role="dialog" aria-modal="true">
             <div class="ar-modal-head">
                 <div>
-                    <h3>Approve & Create Customer</h3>
+                    <h3>Approve &amp; Create Customer</h3>
                     <p>Edit any detail, then click <strong>Approve</strong>. A customer account will be created.</p>
                 </div>
                 <button type="button" class="ar-modal-close" id="arApproveClose"><i class="bi bi-x-lg"></i></button>
@@ -1162,7 +1110,7 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
                         </div>
                     </div>
 
-                    <!-- ===== APARTMENT BLOCK ===== -->
+                    <!-- ============= APARTMENT BLOCK ============= -->
                     <div id="arAptBlock">
                         <div class="ar-modal-row">
                             <div class="ar-modal-field">
@@ -1177,10 +1125,19 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
                                 </select>
                             </div>
                         </div>
+
                         <div class="ar-modal-field">
                             <label>Apartment Address</label>
-                            <textarea id="arApartmentAddress" maxlength="500" placeholder="Full apartment address (only used when creating a new apartment)"></textarea>
+                            <textarea id="arApartmentAddress" maxlength="500" placeholder="Full apartment address (used when creating a new apartment)"></textarea>
                         </div>
+
+                        <!-- ✅ NEW: Full Address typed by customer for apartment -->
+                        <div class="ar-modal-field">
+                            <label>Full Address (Customer)</label>
+                            <textarea id="arAptFullAddress" maxlength="300" placeholder="Door No, Street, Area, City"></textarea>
+                            <p class="ar-modal-hint">This will be saved to the customer's profile and shown on delivery pages.</p>
+                        </div>
+
                         <div class="ar-modal-row">
                             <div class="ar-modal-field">
                                 <label>Division / Block / Door / Floor</label>
@@ -1193,9 +1150,16 @@ $siteName = $settings['username'] ?? 'Mrs Mill@';
                                 <p class="ar-modal-hint">Saved per division on the apartment.</p>
                             </div>
                         </div>
+
+                        <!-- ✅ NEW: Google Maps Link for apartment -->
+                        <div class="ar-modal-field">
+                            <label>Google Maps Link</label>
+                            <input type="text" id="arAptMapLink" maxlength="600" placeholder="https://maps.google.com/...">
+                        </div>
+                        <div id="arAptMapPreview" class="ar-preview" style="display:none;"></div>
                     </div>
 
-                    <!-- ===== HOUSE BLOCK ===== -->
+                    <!-- ============= HOUSE BLOCK ============= -->
                     <div id="arHouseBlock" style="display:none;">
                         <div class="ar-modal-field">
                             <label>Full Address</label>

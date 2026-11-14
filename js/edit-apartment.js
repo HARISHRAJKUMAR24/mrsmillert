@@ -1,25 +1,16 @@
 /* =========================================================
    MRS MILL@ — EDIT APARTMENT UX
    File: ./js/edit-apartment.js
-   Variant rows: Block + Door No + Floor + Delivery Charge
-   Backward-compatible with old {division, charge} rows.
    ========================================================= */
 
 (function () {
     "use strict";
 
-    const BASE_URL =
-        (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
-            ? window.ADMIN_URL
-            : "./";
-
+    const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL) ? window.ADMIN_URL : "./";
     const APARTMENT_ID   = Number(window.APARTMENT_ID || 0);
     const APARTMENT_CODE = String(window.APARTMENT_CODE || "");
 
-    /* =========================================
-       DOM
-    ========================================= */
-
+    /* DOM */
     const form         = document.getElementById("apartmentForm");
     const formLoading  = document.getElementById("formLoading");
     const saveBtn      = document.getElementById("saveBtn");
@@ -41,76 +32,38 @@
         return document.getElementById("branch_id");
     }
 
-    /* =========================================
-       ERROR POPUP
-    ========================================= */
-
+    /* ERROR POPUP */
     let errorOverlay = null;
     let errorText    = null;
 
     function buildErrorPopup() {
-
         if (errorOverlay) return;
-
         errorOverlay = document.createElement("div");
         errorOverlay.className = "mm-modal-overlay";
         errorOverlay.setAttribute("aria-hidden", "true");
         errorOverlay.id = "errorOverlay";
-
         errorOverlay.innerHTML = `
             <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="errorTitle">
-
-                <div class="mm-modal-icon mm-modal-icon-error">
-                    <i class="bi bi-exclamation-lg"></i>
-                </div>
-
-                <h3 class="mm-modal-title" id="errorTitle">
-                    Oops! Something's missing
-                </h3>
-
-                <p class="mm-modal-text" id="errorText">
-                    Please check the form and try again.
-                </p>
-
+                <div class="mm-modal-icon mm-modal-icon-error"><i class="bi bi-exclamation-lg"></i></div>
+                <h3 class="mm-modal-title" id="errorTitle">Oops! Something's missing</h3>
+                <p class="mm-modal-text" id="errorText">Please check the form and try again.</p>
                 <div class="mm-modal-actions">
-                    <button type="button"
-                            class="mm-btn mm-btn-danger"
-                            id="errorOkBtn">
-                        <i class="bi bi-check2"></i>
-                        Got it
-                    </button>
+                    <button type="button" class="mm-btn mm-btn-danger" id="errorOkBtn"><i class="bi bi-check2"></i> Got it</button>
                 </div>
-
             </div>
         `;
-
         document.body.appendChild(errorOverlay);
         errorText = errorOverlay.querySelector("#errorText");
-
-        errorOverlay.addEventListener("click", function (e) {
-            if (e.target === errorOverlay) closeErrorPopup();
-        });
-
-        document.addEventListener("keydown", function (e) {
-            if (e.key === "Escape" &&
-                errorOverlay.classList.contains("show")) {
-                closeErrorPopup();
-            }
-        });
-
-        errorOverlay.querySelector("#errorOkBtn")
-            .addEventListener("click", closeErrorPopup);
+        errorOverlay.addEventListener("click", function (e) { if (e.target === errorOverlay) closeErrorPopup(); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && errorOverlay.classList.contains("show")) closeErrorPopup(); });
+        errorOverlay.querySelector("#errorOkBtn").addEventListener("click", closeErrorPopup);
 
         if (!document.getElementById("mmErrorStyles")) {
             const style = document.createElement("style");
             style.id = "mmErrorStyles";
             style.textContent = `
                 .mm-modal-icon-error { background: #fdecec; color: #b51f2c; }
-                .mm-btn-danger {
-                    background: #b51f2c;
-                    color: #fff;
-                    box-shadow: 0 8px 20px rgba(181, 31, 44, .22);
-                }
+                .mm-btn-danger { background: #b51f2c; color: #fff; box-shadow: 0 8px 20px rgba(181, 31, 44, .22); }
                 .mm-btn-danger:hover { background: #8e1722; color: #fff; }
             `;
             document.head.appendChild(style);
@@ -119,9 +72,7 @@
 
     function showError(message) {
         buildErrorPopup();
-        if (errorText) {
-            errorText.textContent = message || "Please check the form and try again.";
-        }
+        if (errorText) errorText.textContent = message || "Please check the form and try again.";
         errorOverlay.classList.add("show");
         errorOverlay.setAttribute("aria-hidden", "false");
         const ok = errorOverlay.querySelector("#errorOkBtn");
@@ -134,26 +85,14 @@
         errorOverlay.setAttribute("aria-hidden", "true");
     }
 
-    /* =========================================
-       SUCCESS POPUP
-    ========================================= */
-
+    /* SUCCESS POPUP */
     function showSuccessPopup(message, code) {
         if (!successOverlay) return;
-
-        if (successText) {
-            successText.textContent = message || "Apartment updated successfully.";
-        }
-
+        if (successText) successText.textContent = message || "Apartment updated successfully.";
         if (successCode) {
-            if (code) {
-                successCode.textContent = "CODE: " + code;
-                successCode.style.display = "inline-block";
-            } else {
-                successCode.style.display = "none";
-            }
+            if (code) { successCode.textContent = "CODE: " + code; successCode.style.display = "inline-block"; } 
+            else { successCode.style.display = "none"; }
         }
-
         successOverlay.classList.add("show");
         successOverlay.setAttribute("aria-hidden", "false");
     }
@@ -165,308 +104,153 @@
     }
 
     if (successOverlay) {
-        successOverlay.addEventListener("click", function (e) {
-            if (e.target === successOverlay) closeSuccessPopup();
-        });
-
-        document.addEventListener("keydown", function (e) {
-            if (e.key === "Escape" &&
-                successOverlay.classList.contains("show")) closeSuccessPopup();
-        });
+        successOverlay.addEventListener("click", function (e) { if (e.target === successOverlay) closeSuccessPopup(); });
+        document.addEventListener("keydown", function (e) { if (e.key === "Escape" && successOverlay.classList.contains("show")) closeSuccessPopup(); });
     }
+    if (editAgainBtn) editAgainBtn.addEventListener("click", function (e) { e.preventDefault(); closeSuccessPopup(); });
 
-    if (editAgainBtn) {
-        editAgainBtn.addEventListener("click", function (e) {
-            e.preventDefault();
-            closeSuccessPopup();
-        });
-    }
-
-    /* =========================================
-       BUTTON STATE
-    ========================================= */
-
+    /* BUTTON STATE */
     function setLoading(isLoading) {
         if (saveBtn) saveBtn.disabled = isLoading;
-        if (saveText) saveText.innerHTML = isLoading
-            ? '<span class="btn-spinner"></span> Updating...'
-            : 'Update Apartment';
+        if (saveText) saveText.innerHTML = isLoading ? '<span class="btn-spinner"></span> Updating...' : 'Update Apartment';
     }
-
-    /* =========================================
-       HELPERS
-    ========================================= */
 
     function escapeAttr(str) {
-        return String(str)
-            .replace(/&/g, "&amp;")
-            .replace(/"/g, "&quot;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;");
+        return String(str || "").replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
     }
 
-    function getFirstVariantCharge() {
-        const firstCharge = divisionRows.querySelector(".variant-charge");
-        if (!firstCharge) return "";
-        const val = firstCharge.value.trim();
-        return val === "" ? "" : val;
-    }
-
-    /* =========================================
-       VARIANT ROW
-       data = { block, door_no, floor, charge }
-       Legacy fallback: if only {division, charge} exists,
-       treat division as door_no.
-    ========================================= */
-
+    /* VARIANT ROW */
     function createDivisionRow(data) {
-
         data = data || {};
-
-        /* Migrate old shape: {division, charge} → door_no */
-        if (
-            (data.block === undefined) &&
-            (data.door_no === undefined) &&
-            (data.floor === undefined) &&
-            (data.division !== undefined)
-        ) {
-            data = {
-                block: "",
-                door_no: String(data.division || ""),
-                floor: "",
-                charge: data.charge
-            };
+        if ((data.block === undefined) && (data.door_no === undefined) && (data.floor === undefined) && (data.division !== undefined)) {
+            data = { block: "", door_no: String(data.division || ""), floor: "", charge: data.charge };
         }
 
         const row = document.createElement("div");
         row.className = "division-row";
-
         row.innerHTML = `
             <div class="division-field">
                 <i class="bi bi-signpost-2"></i>
-                <input type="text"
-                       class="variant-block"
-                       placeholder="Block (Eg: A, B)"
-                       maxlength="30"
-                       value="${escapeAttr(data.block || "")}">
+                <input type="text" class="variant-block" placeholder="Block (Eg: A, B)" maxlength="30" value="${escapeAttr(data.block || "")}">
             </div>
-
             <div class="division-field">
                 <i class="bi bi-door-closed"></i>
-                <input type="text"
-                       class="variant-door"
-                       placeholder="Door No (Eg: 101)"
-                       maxlength="30"
-                       value="${escapeAttr(data.door_no || "")}">
+                <input type="text" class="variant-door" placeholder="Door No (Eg: 101)" maxlength="30" value="${escapeAttr(data.door_no || "")}">
             </div>
-
             <div class="division-field">
                 <i class="bi bi-layers"></i>
-                <input type="text"
-                       class="variant-floor"
-                       placeholder="Floor (Eg: 1, G)"
-                       maxlength="30"
-                       value="${escapeAttr(data.floor || "")}">
+                <input type="text" class="variant-floor" placeholder="Floor (Eg: 1, G)" maxlength="30" value="${escapeAttr(data.floor || "")}">
             </div>
-
             <div class="division-field charge">
                 <span class="rupee">₹</span>
-                <input type="number"
-                       class="variant-charge"
-                       placeholder="0.00"
-                       min="0"
-                       step="0.01"
-                       value="${escapeAttr(data.charge || "")}">
+                <input type="number" class="variant-charge" placeholder="0.00" min="0" step="0.01" value="${escapeAttr(data.charge || "")}">
             </div>
-
-            <button type="button"
-                    class="remove-division"
-                    title="Remove">
-                <i class="bi bi-x-lg"></i>
-            </button>
+            <button type="button" class="remove-division" title="Remove"><i class="bi bi-x-lg"></i></button>
         `;
-
-        row.querySelector(".remove-division")
-            .addEventListener("click", function () {
-                row.remove();
-                refreshEmptyState();
-            });
-
+        row.querySelector(".remove-division").addEventListener("click", function () {
+            row.remove();
+            refreshEmptyState();
+        });
         return row;
     }
 
-    function addDivisionRow(data, skipAutoFill) {
-
-        data = data || {};
-
-        if (!skipAutoFill &&
-            (data.charge === undefined || data.charge === null || data.charge === "")) {
-            data.charge = getFirstVariantCharge();
-        }
-
-        divisionRows.appendChild(createDivisionRow(data));
+    function addDivisionRow(data) {
+        divisionRows.appendChild(createDivisionRow(data || {}));
         refreshEmptyState();
     }
 
     function refreshEmptyState() {
         const count = divisionRows.querySelectorAll(".division-row").length;
-        if (emptyState) {
-            emptyState.style.display = count === 0 ? "block" : "none";
-        }
+        if (emptyState) emptyState.style.display = count === 0 ? "block" : "none";
     }
 
-    if (addDivBtn) {
-        addDivBtn.addEventListener("click", function () {
-            addDivisionRow();
-            const inputs = divisionRows.querySelectorAll(".variant-block");
-            if (inputs.length) inputs[inputs.length - 1].focus();
-        });
-    }
+    if (addDivBtn) addDivBtn.addEventListener("click", function () {
+        addDivisionRow();
+        const inputs = divisionRows.querySelectorAll(".variant-block");
+        if (inputs.length) inputs[inputs.length - 1].focus();
+    });
 
-    /* =========================================
-       COLLECT VARIANTS
-    ========================================= */
-
+    /* COLLECT VARIANTS */
     function collectDivisions() {
-
         const rows = divisionRows.querySelectorAll(".division-row");
         const out  = [];
         const seen = {};
 
         for (let i = 0; i < rows.length; i++) {
-
             const row    = rows[i];
             const block  = row.querySelector(".variant-block").value.trim();
             const door   = row.querySelector(".variant-door").value.trim();
             const floor  = row.querySelector(".variant-floor").value.trim();
             const charge = row.querySelector(".variant-charge").value.trim();
 
-            if (!block) {
-                return { ok: false, message: "Block name is required for variant row " + (i + 1) + "." };
+            // Skip completely empty rows
+            if (!block && !door && !floor && !charge) {
+                continue;
             }
 
-            if (!door) {
-                return { ok: false, message: "Door No is required for variant row " + (i + 1) + "." };
-            }
-
-            if (!floor) {
-                return { ok: false, message: "Floor is required for variant row " + (i + 1) + "." };
-            }
-
-            if (charge === "" || isNaN(charge) || Number(charge) < 0) {
+            // No strict validation on block/door/floor anymore
+            const chargeVal = charge === "" ? 0 : Number(charge);
+            if (isNaN(chargeVal) || chargeVal < 0) {
                 return { ok: false, message: "Valid delivery charge is required for variant row " + (i + 1) + "." };
             }
 
             const key = (block + "|" + door + "|" + floor).toLowerCase();
-            if (seen[key]) {
-                return { ok: false, message: 'Duplicate variant: Block "' + block + '", Door No "' + door + '", Floor "' + floor + '".' };
-            }
+            if (seen[key]) return { ok: false, message: 'Duplicate variant: Block "' + block + '", Door No "' + door + '", Floor "' + floor + '".' };
             seen[key] = true;
 
-            out.push({
-                block: block,
-                door_no: door,
-                floor: floor,
-                charge: Number(charge)
-            });
+            out.push({ block: block, door_no: door, floor: floor, charge: chargeVal });
         }
-
         return { ok: true, divisions: out };
     }
 
-    /* =========================================
-       LOAD APARTMENT
-    ========================================= */
-
+    /* LOAD APARTMENT */
     function loadApartment() {
+        const params = APARTMENT_ID > 0 ? "id=" + encodeURIComponent(APARTMENT_ID) : "code=" + encodeURIComponent(APARTMENT_CODE);
 
-        const params = APARTMENT_ID > 0
-            ? "id=" + encodeURIComponent(APARTMENT_ID)
-            : "code=" + encodeURIComponent(APARTMENT_CODE);
-
-        fetch(BASE_URL + "ajax/get-apartment.php?" + params, {
-            credentials: "same-origin"
-        })
-            .then(r => r.json().catch(() => ({
-                success: false,
-                message: "Unexpected server response."
-            })))
+        fetch(BASE_URL + "ajax/get-apartment.php?" + params, { credentials: "same-origin" })
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
             .then(data => {
-
                 if (!data.success || !data.data) {
-                    if (formLoading) {
-                        formLoading.innerHTML =
-                            '<div style="color:#d71920;font-size:12px;">' +
-                            (data.message || "Apartment not found.") +
-                            '</div>';
-                    }
+                    if (formLoading) formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">' + (data.message || "Apartment not found.") + '</div>';
                     return;
                 }
 
                 const apt = data.data;
-                console.log("[edit-apartment] Loaded apartment:", apt);
-
                 document.getElementById("apartment_id").value      = apt.id;
                 document.getElementById("apartment_name").value    = apt.apartment_name || "";
                 document.getElementById("apartment_address").value = apt.apartment_address || "";
                 document.getElementById("status").value            = String(apt.status ?? 1);
 
-                /* Set branch dropdown */
                 const sel = getBranchSelect();
                 if (sel) {
-                    const bid = (apt.branch_id === null || apt.branch_id === undefined)
-                        ? ""
-                        : String(apt.branch_id).trim();
-
+                    const bid = (apt.branch_id === null || apt.branch_id === undefined) ? "" : String(apt.branch_id).trim();
                     if (bid !== "" && bid !== "0") {
                         const exists = Array.from(sel.options).some(o => o.value === bid);
                         if (exists) sel.value = bid;
                     }
                 }
 
-                if (aptCodeBadge) {
-                    aptCodeBadge.textContent = "#" + (apt.apartment_code || "");
-                }
+                if (aptCodeBadge) aptCodeBadge.textContent = "#" + (apt.apartment_code || "");
 
-                /* Fill variants */
                 divisionRows.innerHTML = "";
                 const divs = Array.isArray(apt.divisions) ? apt.divisions : [];
-
-                if (divs.length === 0) {
-                    addDivisionRow({}, true);
-                } else {
-                    divs.forEach(function (d) {
-                        addDivisionRow(d, true);
-                    });
+                if (divs.length > 0) {
+                    divs.forEach(function (d) { addDivisionRow(d); });
                 }
-
                 refreshEmptyState();
 
                 if (formLoading) formLoading.style.display = "none";
                 form.style.display = "";
-
             })
-            .catch((err) => {
-                console.error("[edit-apartment] Load error:", err);
-                if (formLoading) {
-                    formLoading.innerHTML =
-                        '<div style="color:#d71920;font-size:12px;">' +
-                        'Unable to connect to server.' +
-                        '</div>';
-                }
+            .catch(() => {
+                if (formLoading) formLoading.innerHTML = '<div style="color:#d71920;font-size:12px;">Unable to connect to server.</div>';
             });
     }
 
-    /* =========================================
-       SUBMIT
-    ========================================= */
-
+    /* SUBMIT */
     form.addEventListener("submit", function (e) {
-
         e.preventDefault();
-
         const sel = getBranchSelect();
-
         const id       = Number(document.getElementById("apartment_id").value || 0);
         const branchId = sel ? String(sel.value || "").trim() : "";
         const name     = document.getElementById("apartment_name").value.trim();
@@ -474,19 +258,10 @@
         const status   = document.getElementById("status").value;
 
         if (id <= 0)       return showError("Invalid apartment ID.");
-        if (!branchId)     return showError("Please select a branch.");
         if (!name)         return showError("Apartment name is required.");
-        if (!address)      return showError("Apartment address is required.");
 
         const collected = collectDivisions();
-
-        if (!collected.ok) {
-            return showError(collected.message);
-        }
-
-        if (collected.divisions.length === 0) {
-            return showError("Please add at least one variant with a charge.");
-        }
+        if (!collected.ok) return showError(collected.message);
 
         setLoading(true);
 
@@ -499,41 +274,24 @@
         formData.append("divisions", JSON.stringify(collected.divisions));
 
         fetch(BASE_URL + "ajax/update-apartment.php", {
-            method: "POST",
-            body: formData,
-            credentials: "same-origin"
+            method: "POST", body: formData, credentials: "same-origin"
         })
-            .then(r => r.json().catch(() => ({
-                success: false,
-                message: "Unexpected server response."
-            })))
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
             .then(data => {
-
-                console.log("[edit-apartment] Update response:", data);
-
                 if (data.success) {
                     const code = data.data && data.data.code ? data.data.code : "";
-                    showSuccessPopup(
-                        data.message || "Apartment updated successfully.",
-                        code
-                    );
+                    showSuccessPopup(data.message || "Apartment updated successfully.", code);
                     setLoading(false);
                 } else {
                     showError(data.message || "Failed to update.");
                     setLoading(false);
                 }
             })
-            .catch((err) => {
-                console.error("[edit-apartment] Submit error:", err);
+            .catch(() => {
                 showError("Unable to connect to server.");
                 setLoading(false);
             });
     });
 
-    /* =========================================
-       INIT
-    ========================================= */
-
     loadApartment();
-
 })();

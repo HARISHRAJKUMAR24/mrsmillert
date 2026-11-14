@@ -13,9 +13,7 @@ $settings = getSettings($pdo);
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
-
     <style>
         .customer-page {
             padding: 30px 32px 40px;
@@ -107,7 +105,6 @@ $settings = getSettings($pdo);
             font-size: 12px;
             color: #292521;
             outline: none;
-            transition: .2s ease;
         }
 
         .customer-input,
@@ -213,7 +210,6 @@ $settings = getSettings($pdo);
             display: inline-flex;
             align-items: center;
             gap: 7px;
-            transition: .15s ease;
             font-family: inherit;
         }
 
@@ -245,7 +241,6 @@ $settings = getSettings($pdo);
             text-align: left;
             cursor: pointer;
             outline: none;
-            transition: .2s ease;
             display: flex;
             align-items: center;
             position: relative;
@@ -315,7 +310,7 @@ $settings = getSettings($pdo);
             opacity: 0;
             visibility: hidden;
             transform: translateY(-6px);
-            transition: .18s ease;
+            transition: .18s;
             overflow: hidden;
         }
 
@@ -375,7 +370,6 @@ $settings = getSettings($pdo);
             font-size: 12px;
             color: #4e4841;
             cursor: pointer;
-            transition: .12s ease;
         }
 
         .sd-option:hover {
@@ -439,7 +433,6 @@ $settings = getSettings($pdo);
             align-items: center;
             justify-content: center;
             gap: 8px;
-            transition: .15s ease;
             font-family: inherit;
         }
 
@@ -465,7 +458,6 @@ $settings = getSettings($pdo);
             border-radius: 12px;
             background: #fffdf9;
             overflow: hidden;
-            transition: .15s ease;
             cursor: pointer;
         }
 
@@ -543,7 +535,6 @@ $settings = getSettings($pdo);
             display: block;
             font-size: 10px;
             color: #817a71;
-            margin: 0;
             line-height: 1.4;
         }
 
@@ -564,7 +555,6 @@ $settings = getSettings($pdo);
             background: #d5cbbd;
             border-radius: 999px;
             cursor: pointer;
-            transition: .2s ease;
             flex-shrink: 0;
         }
 
@@ -578,7 +568,7 @@ $settings = getSettings($pdo);
             background: #fff;
             border-radius: 50%;
             box-shadow: 0 2px 5px rgba(0, 0, 0, .15);
-            transition: .2s ease;
+            transition: .2s;
         }
 
         .wallet-toggle.on {
@@ -682,7 +672,6 @@ $settings = getSettings($pdo);
             align-items: center;
             gap: 7px;
             cursor: pointer;
-            transition: .2s;
         }
 
         .btn-save:hover {
@@ -794,7 +783,6 @@ $settings = getSettings($pdo);
             justify-content: center;
             gap: 7px;
             text-decoration: none;
-            transition: .2s ease;
         }
 
         .mm-btn-primary {
@@ -839,6 +827,21 @@ $settings = getSettings($pdo);
             color: #fff;
         }
 
+        .ar-preview {
+            margin-top: 6px;
+            border: 1px solid #f0ebe4;
+            border-radius: 10px;
+            overflow: hidden;
+            background: #fdfaf4;
+        }
+
+        .ar-preview iframe {
+            width: 100%;
+            height: 180px;
+            border: 0;
+            display: block;
+        }
+
         @media (max-width:768px) {
             .customer-page {
                 padding: 20px 15px 30px;
@@ -874,19 +877,15 @@ $settings = getSettings($pdo);
             }
         }
     </style>
-
 </head>
 
 <body>
-
     <?php include './templates/sidebar.php'; ?>
 
     <main class="main">
-
         <?php include './templates/header.php'; ?>
 
         <div class="customer-page">
-
             <div class="customer-header">
                 <div class="customer-title">
                     <h1>Add Customer</h1>
@@ -895,7 +894,6 @@ $settings = getSettings($pdo);
             </div>
 
             <div class="customer-form-card">
-
                 <div class="form-card-header">
                     <div class="form-card-icon"><i class="bi bi-person-plus"></i></div>
                     <div>
@@ -905,40 +903,30 @@ $settings = getSettings($pdo);
                 </div>
 
                 <form id="customerForm" class="customer-form" method="POST" novalidate>
-
                     <div class="row g-3">
-
                         <div class="col-12 col-md-6">
                             <label>Full Name <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-person"></i>
-                                <input type="text" name="full_name" id="full_name"
-                                    class="customer-input" placeholder="Eg: Ravi Kumar" maxlength="150" required>
+                                <input type="text" name="full_name" id="full_name" class="customer-input" placeholder="Eg: Ravi Kumar" maxlength="150" required>
                             </div>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label>Mobile Number <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-telephone"></i>
-                                <input type="tel" name="mobile_number" id="mobile_number"
-                                    class="customer-input" placeholder="10-digit mobile"
-                                    maxlength="15" inputmode="numeric" required>
+                                <input type="tel" name="mobile_number" id="mobile_number" class="customer-input" placeholder="10-digit mobile" maxlength="15" inputmode="numeric" required>
                             </div>
                             <p class="field-help" id="mobileHelp">Enter a 10-digit mobile number.</p>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label>Password <span class="required">*</span></label>
                             <div class="input-icon-wrap">
                                 <i class="bi bi-key"></i>
-                                <input type="text" name="password" id="password"
-                                    class="customer-input" placeholder="Minimum 3 characters"
-                                    minlength="3" required>
+                                <input type="text" name="password" id="password" class="customer-input" placeholder="Minimum 3 characters" minlength="3" required>
                             </div>
                             <p class="field-help" id="passwordHelp">Password must be at least 3 characters.</p>
                         </div>
-
                         <div class="col-12 col-md-6">
                             <label>Status</label>
                             <select name="status" id="status" class="customer-select">
@@ -946,11 +934,8 @@ $settings = getSettings($pdo);
                                 <option value="0">Inactive</option>
                             </select>
                         </div>
-
                     </div>
 
-
-                    <!-- ADDRESS TYPE TOGGLE -->
                     <div style="margin-top:22px;">
                         <label>Address Type <span class="required">*</span></label>
                         <div class="addr-type-toggle" role="tablist">
@@ -963,8 +948,7 @@ $settings = getSettings($pdo);
                         </div>
                     </div>
 
-
-                    <!-- APARTMENT BLOCK -->
+                    <!-- ===================== APARTMENT BLOCK ===================== -->
                     <div id="aptBlock" style="margin-top:16px;">
                         <div class="row g-3">
 
@@ -1010,12 +994,42 @@ $settings = getSettings($pdo);
                                 <p class="field-help" id="acDivisionHint"></p>
                             </div>
 
-                            <!-- NEW: Apartment house image -->
+                            <!-- ✅ NEW: Apartment Full Address -->
+                            <div class="col-12">
+                                <label>Full Address <span class="required">*</span></label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-geo-alt"></i>
+                                    <textarea id="aptFullAddress" class="customer-textarea" placeholder="Door No, Street, Area, City" maxlength="250"></textarea>
+                                </div>
+                                <p class="field-help">Exact customer address for delivery.</p>
+                            </div>
+
+                            <!-- ✅ NEW: Apartment Google Maps Link -->
+                            <div class="col-12">
+                                <label>Google Maps Location</label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-pin-map"></i>
+                                    <input type="text" id="aptMap" class="customer-input" placeholder="Paste Google Maps link OR tap the button below" maxlength="600">
+                                </div>
+                                <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+                                    <button type="button" class="loc-btn" id="aptLocBtn" style="margin-top:0; flex:1; min-width:180px;">
+                                        <i class="bi bi-crosshair"></i>
+                                        <span id="aptLocBtnText">Get My Current Location</span>
+                                    </button>
+                                    <button type="button" class="loc-btn" id="aptOpenMapBtn" style="margin-top:0; flex:1; min-width:180px;">
+                                        <i class="bi bi-box-arrow-up-right"></i>
+                                        <span>Open Google Maps</span>
+                                    </button>
+                                </div>
+                                <p class="field-help" style="margin-top:6px;">Optional — paste any google.com/maps link or use the button.</p>
+                                <p class="field-help" id="aptLocHint"></p>
+                                <div id="aptMapPreview" class="ar-preview" style="display:none;"></div>
+                            </div>
+
                             <div class="col-12">
                                 <label>House / Building Image (optional)</label>
                                 <div class="img-drop" id="aptImgDrop">
-                                    <input type="file" id="aptImg" accept="image/*"
-                                        style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
+                                    <input type="file" id="aptImg" accept="image/*" style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
                                     <div id="aptImgPreview" class="img-drop-empty">
                                         <i class="bi bi-image"></i>
                                         <span>Tap to upload a photo of the apartment building / flat</span>
@@ -1027,28 +1041,21 @@ $settings = getSettings($pdo);
                         </div>
                     </div>
 
-
-                    <!-- INDIVIDUAL HOUSE BLOCK -->
+                    <!-- ===================== INDIVIDUAL HOUSE BLOCK ===================== -->
                     <div id="houseBlock" style="margin-top:16px; display:none;">
                         <div class="row g-3">
-
                             <div class="col-12">
                                 <label>Full Address <span class="required">*</span></label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-geo-alt"></i>
-                                    <textarea id="houseAddress" class="customer-textarea"
-                                        placeholder="Door No, Street, Area, City" maxlength="250"></textarea>
+                                    <textarea id="houseAddress" class="customer-textarea" placeholder="Door No, Street, Area, City" maxlength="250"></textarea>
                                 </div>
                             </div>
-
                             <div class="col-12">
-                                <!-- Google Maps label — * removed -->
                                 <label>Google Maps Location</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-pin-map"></i>
-                                    <input type="text" id="houseMap" class="customer-input"
-                                        placeholder="Paste Google Maps link OR tap the button below"
-                                        maxlength="600">
+                                    <input type="text" id="houseMap" class="customer-input" placeholder="Paste Google Maps link OR tap the button below" maxlength="600">
                                 </div>
                                 <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
                                     <button type="button" class="loc-btn" id="houseLocBtn" style="margin-top:0; flex:1; min-width:180px;">
@@ -1060,35 +1067,29 @@ $settings = getSettings($pdo);
                                         <span>Open Google Maps</span>
                                     </button>
                                 </div>
-                                <p class="field-help" style="margin-top:6px;">Optional — paste any <strong>google.com/maps/...</strong> link, or click <em>Get My Current Location</em>.</p>
+                                <p class="field-help" style="margin-top:6px;">Optional — paste any google.com/maps link or use the button.</p>
                                 <p class="field-help" id="houseLocHint"></p>
                             </div>
-
                             <div class="col-12 col-md-6">
                                 <label>Delivery Charge (₹)</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-truck"></i>
-                                    <input type="number" id="houseDeliveryCharge" class="customer-input"
-                                        min="0" step="0.01" placeholder="0.00" value="0">
+                                    <input type="number" id="houseDeliveryCharge" class="customer-input" min="0" step="0.01" placeholder="0.00" value="0">
                                 </div>
                                 <p class="field-help">Applies only to this individual-house customer.</p>
                             </div>
-
                             <div class="col-12 col-md-6">
                                 <label>House Image (optional)</label>
                                 <div class="img-drop" id="houseImgDrop">
-                                    <input type="file" id="houseImg" accept="image/*"
-                                        style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
+                                    <input type="file" id="houseImg" accept="image/*" style="position:fixed;left:-9999px;top:-9999px;opacity:0;width:1px;height:1px;pointer-events:none;">
                                     <div id="houseImgPreview" class="img-drop-empty">
                                         <i class="bi bi-image"></i>
                                         <span>Tap to upload a photo of the house</span>
                                     </div>
                                 </div>
                             </div>
-
                         </div>
                     </div>
-
 
                     <!-- WALLET -->
                     <div class="wallet-section">
@@ -1105,22 +1106,19 @@ $settings = getSettings($pdo);
                                 <span class="wallet-toggle-label">Add wallet money</span>
                             </div>
                         </div>
-
                         <div class="wallet-fields" id="walletFields">
                             <div>
                                 <label>Amount (₹)</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-currency-rupee"></i>
-                                    <input type="number" id="walletAmount" class="customer-input"
-                                        min="1" step="0.01" placeholder="0.00">
+                                    <input type="number" id="walletAmount" class="customer-input" min="1" step="0.01" placeholder="0.00">
                                 </div>
                             </div>
                             <div>
                                 <label>Note (optional)</label>
                                 <div class="input-icon-wrap">
                                     <i class="bi bi-chat-left-text"></i>
-                                    <input type="text" id="walletNote" class="customer-input"
-                                        maxlength="250" placeholder="e.g. Cash received at counter">
+                                    <input type="text" id="walletNote" class="customer-input" maxlength="250" placeholder="e.g. Cash received at counter">
                                 </div>
                             </div>
                             <div class="wallet-preview" style="grid-column: 1 / -1;">
@@ -1131,25 +1129,17 @@ $settings = getSettings($pdo);
                         </div>
                     </div>
 
-
                     <div class="form-actions">
-                        <a href="customers.php" class="btn-cancel">
-                            <i class="bi bi-x-lg"></i> Cancel
-                        </a>
+                        <a href="customers.php" class="btn-cancel"><i class="bi bi-x-lg"></i> Cancel</a>
                         <button type="submit" class="btn-save" id="saveBtn">
                             <i class="bi bi-check-lg"></i>
                             <span id="saveBtnText">Save Customer</span>
                         </button>
                     </div>
-
                 </form>
-
             </div>
-
         </div>
-
     </main>
-
 
     <!-- SUCCESS MODAL -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
@@ -1158,18 +1148,10 @@ $settings = getSettings($pdo);
             <h3 class="mm-modal-title" id="successTitle">Customer Added!</h3>
             <p class="mm-modal-text" id="successText">The customer account has been created successfully.</p>
             <div class="mm-modal-code" id="successCode" style="display:none;"></div>
-
             <div class="mm-modal-actions">
-                <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank">
-                    <i class="bi bi-whatsapp"></i> Share Details on WhatsApp
-                </a>
-
-                <a href="add-customer.php" class="mm-btn mm-btn-ghost">
-                    <i class="bi bi-plus-lg"></i> Add Another
-                </a>
-                <a href="customers.php" class="mm-btn mm-btn-primary">
-                    <i class="bi bi-list-ul"></i> View List
-                </a>
+                <a href="#" id="waShareBtn" class="mm-btn mm-btn-whatsapp" target="_blank"><i class="bi bi-whatsapp"></i> Share Details on WhatsApp</a>
+                <a href="add-customer.php" class="mm-btn mm-btn-ghost"><i class="bi bi-plus-lg"></i> Add Another</a>
+                <a href="customers.php" class="mm-btn mm-btn-primary"><i class="bi bi-list-ul"></i> View List</a>
             </div>
         </div>
     </div>
@@ -1177,19 +1159,14 @@ $settings = getSettings($pdo);
     <!-- ERROR MODAL -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon mm-modal-icon-error">
-                <i class="bi bi-exclamation-lg"></i>
-            </div>
+            <div class="mm-modal-icon mm-modal-icon-error"><i class="bi bi-exclamation-lg"></i></div>
             <h3 class="mm-modal-title">Oops! Something's missing</h3>
             <p class="mm-modal-text" id="errorText">Please check the form and try again.</p>
             <div class="mm-modal-actions">
-                <button type="button" class="mm-btn mm-btn-danger" id="errorOkBtn">
-                    <i class="bi bi-check2"></i> Got it
-                </button>
+                <button type="button" class="mm-btn mm-btn-danger" id="errorOkBtn"><i class="bi bi-check2"></i> Got it</button>
             </div>
         </div>
     </div>
-
 
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL ?>";
@@ -1197,7 +1174,6 @@ $settings = getSettings($pdo);
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
     <script src="<?= ADMIN_URL ?>js/add-customer.js"></script>
-
 </body>
 
 </html>

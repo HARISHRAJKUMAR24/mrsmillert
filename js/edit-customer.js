@@ -1,15 +1,12 @@
 /* =========================================================
-   MRS MILL@ — EDIT CUSTOMER
-   File: ./js/edit-customer.js
+   MRS MILL@ — EDIT CUSTOMER  (v2026-11-14a)
+   Apartment full address + map link added
    ========================================================= */
 
 (function () {
     "use strict";
 
-    const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL)
-        ? window.ADMIN_URL
-        : "./";
-
+    const BASE_URL = (typeof window.ADMIN_URL === "string" && window.ADMIN_URL) ? window.ADMIN_URL : "./";
     const CUSTOMER_ID = window.CUSTOMER_ID || 0;
     const CUSTOMER_NAME = window.CUSTOMER_NAME || "";
     const CUSTOMER_MOBILE = window.CUSTOMER_MOBILE || "";
@@ -38,7 +35,16 @@
     const aptCodeInput = document.getElementById("acApartmentCode");
     const aptNameInput = document.getElementById("acApartmentName");
 
-    /* Apartment image (NEW) */
+    /* ✅ NEW apartment full address + map */
+    const aptFullAddress = document.getElementById("aptFullAddress");
+    const aptMap = document.getElementById("aptMap");
+    const aptLocBtn = document.getElementById("aptLocBtn");
+    const aptLocBtnText = document.getElementById("aptLocBtnText");
+    const aptLocHint = document.getElementById("aptLocHint");
+    const aptOpenMapBtn = document.getElementById("aptOpenMapBtn");
+    const aptMapPreview = document.getElementById("aptMapPreview");
+
+    /* Apartment image */
     const aptImgDrop = document.getElementById("aptImgDrop");
     const aptImg = document.getElementById("aptImg");
     const aptImgPreview = document.getElementById("aptImgPreview");
@@ -66,7 +72,7 @@
     const houseImg = document.getElementById("houseImg");
     const houseImgPreview = document.getElementById("houseImgPreview");
 
-    /* Wallet */
+    /* Wallet (unchanged) */
     const walletDisplay = document.getElementById("walletDisplay");
     const wForm = document.getElementById("walletForm");
     const wTxnType = document.getElementById("wTxnType");
@@ -86,7 +92,6 @@
     const successText = document.getElementById("successText");
     const successOkBtn = document.getElementById("successOkBtn");
     const waShareBtn = document.getElementById("waShareBtn");
-
     const errorOverlay = document.getElementById("errorOverlay");
     const errorText = document.getElementById("errorText");
     const errorOkBtn = document.getElementById("errorOkBtn");
@@ -98,7 +103,7 @@
     let currentBalance = 0;
     let historyLoaded = false;
     let houseImgData = "";
-    let aptImgData = ""; /* NEW */
+    let aptImgData = "";
 
     let hxCurrentPage = 1;
     let hxPerPage = 10;
@@ -124,16 +129,36 @@
         try {
             const dt = new Date(s.replace(" ", "T"));
             if (isNaN(dt.getTime())) return s;
-            return dt.toLocaleString("en-IN", {
-                day: "2-digit", month: "short", year: "numeric",
-                hour: "2-digit", minute: "2-digit"
-            });
+            return dt.toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
         } catch (e) { return s; }
     }
     function isValidMapLink(url) {
         if (!url) return false;
         return /(google\.[a-z.]+\/maps|maps\.google\.|maps\.app\.goo\.gl|goo\.gl\/maps)/i.test(url);
     }
+function mapsEmbedUrl(url) {
+    if (!url) return "";
+    
+    // If it's already a proper embed link
+    if (/google\.com\/maps\/embed/i.test(url)) return url;
+    
+    // Try to extract coordinates like 10.77,79.13
+    const coordMatch = url.match(/[?&]q=([-0-9.]+),([-0-9.]+)/);
+    if (coordMatch) {
+        // Use OpenStreetMap for a perfect, free iframe without warning banners
+        const lat = coordMatch[1];
+        const lng = coordMatch[2];
+        return `https://www.openstreetmap.org/export/embed.html?bbox=${lng-0.005},${lat-0.005},${lng+0.005},${lat+0.005}&layer=mapnik&marker=${lat},${lng}`;
+    }
+    
+    // Try to extract place name
+    const placeMatch = url.match(/place\/([^\/]+)/);
+    if (placeMatch) {
+        return `https://maps.google.com/maps?q=${encodeURIComponent(placeMatch[1])}&output=embed`;
+    }
+    
+    return url.includes("output=embed") ? url : url + (url.includes("?") ? "&" : "?") + "output=embed";
+}
 
     /* Popups */
     let successTimer = null;
@@ -149,7 +174,6 @@
         if (waShareBtn && passwordToSend && passwordToSend !== 'Error reading password.') {
             const waNumber = String(CUSTOMER_MOBILE || "").replace(/[^0-9]/g, "");
             const waMsgText = `Hello ${CUSTOMER_NAME},\n\nHere are your login details for Mrs Mill@:\n\nMobile: ${CUSTOMER_MOBILE}\nPassword: ${passwordToSend}\n\nPlease keep this safe.`;
-
             waShareBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsgText)}`;
             waShareBtn.style.display = "inline-flex";
         } else if (waShareBtn) {
@@ -179,7 +203,6 @@
         errorOverlay.classList.remove("show");
         errorOverlay.setAttribute("aria-hidden", "true");
     }
-
     successOkBtn?.addEventListener("click", closeSuccessPopup);
     errorOkBtn?.addEventListener("click", closeErrorPopup);
     successOverlay?.addEventListener("click", e => { if (e.target === successOverlay) closeSuccessPopup(); });
@@ -209,45 +232,28 @@
     function setCustomerLoading(isLoading) {
         if (!saveBtn) return;
         saveBtn.disabled = isLoading;
-        saveBtnText.innerHTML = isLoading
-            ? '<span class="btn-spinner"></span> Saving...'
-            : 'Update Customer';
+        saveBtnText.innerHTML = isLoading ? '<span class="btn-spinner"></span> Saving...' : 'Update Customer';
     }
 
-    /* Hints */
     mobileInput?.addEventListener("input", function () {
         this.value = this.value.replace(/[^0-9]/g, "").slice(0, 15);
         const m = this.value.trim();
         if (!mobileHelp) return;
-        if (m.length < 10) {
-            mobileHelp.textContent = "Needs at least 10 digits.";
-            mobileHelp.className = "field-help";
-        } else {
-            mobileHelp.textContent = "Looks good.";
-            mobileHelp.className = "field-help success";
-        }
+        if (m.length < 10) { mobileHelp.textContent = "Needs at least 10 digits."; mobileHelp.className = "field-help"; }
+        else { mobileHelp.textContent = "Looks good."; mobileHelp.className = "field-help success"; }
     });
-
     passwordInput?.addEventListener("input", function () {
         const v = this.value;
         if (!passwordHelp) return;
-        if (!v) {
-            passwordHelp.textContent = "Leave blank to keep the current password.";
-            passwordHelp.className = "field-help";
-        } else if (v.length < 3) {
-            passwordHelp.textContent = "Too short — minimum 3 characters.";
-            passwordHelp.className = "field-help error";
-        } else {
-            passwordHelp.textContent = "New password will be set on save.";
-            passwordHelp.className = "field-help success";
-        }
+        if (!v) { passwordHelp.textContent = "Leave blank to keep the current password."; passwordHelp.className = "field-help"; }
+        else if (v.length < 3) { passwordHelp.textContent = "Too short — minimum 3 characters."; passwordHelp.className = "field-help error"; }
+        else { passwordHelp.textContent = "New password will be set on save."; passwordHelp.className = "field-help success"; }
     });
 
     /* Apartment dropdown */
     function loadApartments() {
         if (!aptDdList) return;
         aptDdList.innerHTML = `<div class="sd-empty">Loading apartments…</div>`;
-
         fetch(BASE_URL + "ajax/manual-get-apartments.php", { credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
             .then(res => {
@@ -257,7 +263,6 @@
                 }
                 apartmentsCache = res.data;
                 renderAptOptions("");
-
                 const curId = Number(aptIdInput.value || 0);
                 if (curId > 0) {
                     const apt = apartmentsCache.find(a => Number(a.id) === curId);
@@ -267,45 +272,26 @@
                     }
                 }
             })
-            .catch(() => {
-                aptDdList.innerHTML = `<div class="sd-empty">Unable to connect.</div>`;
-            });
+            .catch(() => { aptDdList.innerHTML = `<div class="sd-empty">Unable to connect.</div>`; });
     }
-
     function renderAptOptions(query) {
         if (!aptDdList) return;
-        if (!apartmentsCache.length) {
-            aptDdList.innerHTML = `<div class="sd-empty">No apartments available.</div>`;
-            return;
-        }
+        if (!apartmentsCache.length) { aptDdList.innerHTML = `<div class="sd-empty">No apartments available.</div>`; return; }
         const q = (query || "").trim().toLowerCase();
-        const list = q
-            ? apartmentsCache.filter(a =>
-                (a.apartment_name || "").toLowerCase().includes(q) ||
-                (a.apartment_code || "").toLowerCase().includes(q) ||
-                (a.apartment_address || "").toLowerCase().includes(q))
-            : apartmentsCache;
-
-        if (!list.length) {
-            aptDdList.innerHTML = `<div class="sd-empty">No apartments match "${esc(query)}".</div>`;
-            return;
-        }
-
+        const list = q ? apartmentsCache.filter(a =>
+            (a.apartment_name || "").toLowerCase().includes(q) ||
+            (a.apartment_code || "").toLowerCase().includes(q) ||
+            (a.apartment_address || "").toLowerCase().includes(q)) : apartmentsCache;
+        if (!list.length) { aptDdList.innerHTML = `<div class="sd-empty">No apartments match "${esc(query)}".</div>`; return; }
         aptDdList.innerHTML = list.slice(0, 60).map(a => {
             const selected = Number(aptIdInput.value) === Number(a.id);
-            return `
-                <div class="sd-option ${selected ? 'selected' : ''}"
-                     data-id="${a.id}"
-                     data-code="${esc(a.apartment_code)}"
-                     data-name="${esc(a.apartment_name)}">
-                    <i class="bi bi-building"></i>
-                    <div class="name">${esc(a.apartment_name)}</div>
-                    <div class="meta">#${esc(a.apartment_code || '')}</div>
-                </div>
-            `;
+            return `<div class="sd-option ${selected ? 'selected' : ''}" data-id="${a.id}" data-code="${esc(a.apartment_code)}" data-name="${esc(a.apartment_name)}">
+                <i class="bi bi-building"></i>
+                <div class="name">${esc(a.apartment_name)}</div>
+                <div class="meta">#${esc(a.apartment_code || '')}</div>
+            </div>`;
         }).join("");
     }
-
     function openAptDd() {
         aptDdWrap.classList.add("open");
         closeDivDd();
@@ -313,11 +299,9 @@
         renderAptOptions("");
     }
     function closeAptDd() { if (aptDdWrap) aptDdWrap.classList.remove("open"); }
-
     aptDdToggle?.addEventListener("click", function (e) {
         e.stopPropagation();
-        if (aptDdWrap.classList.contains("open")) closeAptDd();
-        else openAptDd();
+        if (aptDdWrap.classList.contains("open")) closeAptDd(); else openAptDd();
     });
     aptDdSearch?.addEventListener("input", function () { renderAptOptions(this.value); });
     aptDdList?.addEventListener("click", function (e) {
@@ -350,7 +334,6 @@
         if (d.floor) parts.push("Fl " + d.floor);
         return parts.length ? parts.join(" / ") : String(d.division || "");
     }
-
     function populateDivisions(apt, preselect) {
         if (!apt || !Array.isArray(apt.divisions) || !apt.divisions.length) {
             divisionsCache = [];
@@ -366,7 +349,6 @@
         }
         divisionsCache = apt.divisions;
         divDdToggle.disabled = false;
-
         if (preselect) {
             const match = divisionsCache.find(d => divValueText(d) === String(preselect));
             if (match) {
@@ -379,7 +361,6 @@
                 return;
             }
         }
-
         divInput.value = "";
         divChargeInput.value = 0;
         divDdLabel.textContent = "— Type or select division —";
@@ -388,44 +369,27 @@
         divDdList.innerHTML = "";
         divHint.textContent = "";
     }
-
     function renderDivOptions(query) {
         if (!divDdList) return;
-        if (!divisionsCache.length) {
-            divDdList.innerHTML = `<div class="sd-empty">No divisions available.</div>`;
-            return;
-        }
+        if (!divisionsCache.length) { divDdList.innerHTML = `<div class="sd-empty">No divisions available.</div>`; return; }
         const q = (query || "").trim().toLowerCase();
-        const list = q
-            ? divisionsCache.filter(d => {
-                const label = divLabelText(d).toLowerCase();
-                const value = divValueText(d).toLowerCase();
-                return label.includes(q) || value.includes(q);
-            })
-            : divisionsCache;
-
-        if (!list.length) {
-            divDdList.innerHTML = `<div class="sd-empty">No divisions match "${esc(query)}".</div>`;
-            return;
-        }
-
+        const list = q ? divisionsCache.filter(d => {
+            const label = divLabelText(d).toLowerCase();
+            const value = divValueText(d).toLowerCase();
+            return label.includes(q) || value.includes(q);
+        }) : divisionsCache;
+        if (!list.length) { divDdList.innerHTML = `<div class="sd-empty">No divisions match "${esc(query)}".</div>`; return; }
         divDdList.innerHTML = list.map(d => {
             const v = divValueText(d);
             const l = divLabelText(d);
             const selected = String(divInput.value) === v;
-            return `
-                <div class="sd-option ${selected ? 'selected' : ''}"
-                     data-division="${esc(v)}"
-                     data-label="${esc(l)}"
-                     data-charge="${Number(d.charge || 0)}">
-                    <i class="bi bi-grid-3x3-gap"></i>
-                    <div class="name">${esc(l)}</div>
-                    <div class="meta">₹${Math.round(Number(d.charge || 0))}</div>
-                </div>
-            `;
+            return `<div class="sd-option ${selected ? 'selected' : ''}" data-division="${esc(v)}" data-label="${esc(l)}" data-charge="${Number(d.charge || 0)}">
+                <i class="bi bi-grid-3x3-gap"></i>
+                <div class="name">${esc(l)}</div>
+                <div class="meta">₹${Math.round(Number(d.charge || 0))}</div>
+            </div>`;
         }).join("");
     }
-
     function openDivDd() {
         if (divDdToggle.disabled) return;
         divDdWrap.classList.add("open");
@@ -434,12 +398,10 @@
         renderDivOptions("");
     }
     function closeDivDd() { if (divDdWrap) divDdWrap.classList.remove("open"); }
-
     divDdToggle?.addEventListener("click", function (e) {
         e.stopPropagation();
         if (divDdToggle.disabled) return;
-        if (divDdWrap.classList.contains("open")) closeDivDd();
-        else openDivDd();
+        if (divDdWrap.classList.contains("open")) closeDivDd(); else openDivDd();
     });
     divDdSearch?.addEventListener("input", function () { renderDivOptions(this.value); });
     divDdList?.addEventListener("click", function (e) {
@@ -453,56 +415,72 @@
         divHint.textContent = "Charge: ₹" + Math.round(Number(opt.dataset.charge || 0));
         closeDivDd();
     });
-
     document.addEventListener("click", function (e) {
         if (!e.target.closest("#acAptDdWrap")) closeAptDd();
         if (!e.target.closest("#acDivDdWrap")) closeDivDd();
     });
 
-    /* Apartment image (NEW) */
-    if (aptImgDrop) {
-        aptImgDrop.addEventListener("click", () => { if (aptImg) aptImg.click(); });
+    /* ================= ✅ APARTMENT FULL ADDRESS + MAP ================= */
+    if (aptMap) {
+        aptMap.addEventListener("input", function () {
+            const v = this.value.trim();
+            if (aptLocHint) {
+                if (!v) { aptLocHint.textContent = ""; aptLocHint.className = "field-help"; }
+                else if (isValidMapLink(v)) { aptLocHint.textContent = "✓ Google Maps link accepted."; aptLocHint.className = "field-help success"; }
+                else { aptLocHint.textContent = "This doesn't look like a Google Maps link."; aptLocHint.className = "field-help error"; }
+            }
+            if (aptMapPreview) {
+                if (!v) { aptMapPreview.style.display = "none"; aptMapPreview.innerHTML = ""; }
+                else { aptMapPreview.innerHTML = `<iframe src="${esc(mapsEmbedUrl(v))}" loading="lazy"></iframe>`; aptMapPreview.style.display = "block"; }
+            }
+        });
     }
-    if (aptImg) {
-        aptImg.addEventListener("change", function () {
-            const file = this.files && this.files[0];
-            if (!file) return;
-            if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
-            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
-            const reader = new FileReader();
-            reader.onload = function (evt) {
-                aptImgData = evt.target.result;
-                if (aptImgPreview) {
-                    aptImgPreview.classList.remove("img-drop-empty");
-                    aptImgPreview.innerHTML = '<img src="' + aptImgData + '" alt="Apartment preview">';
-                }
-            };
-            reader.readAsDataURL(file);
+    if (aptOpenMapBtn) aptOpenMapBtn.addEventListener("click", () => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer"));
+    if (aptLocBtn) {
+        aptLocBtn.addEventListener("click", function () {
+            if (!navigator.geolocation) {
+                if (aptLocHint) { aptLocHint.textContent = "Browser doesn't support location."; aptLocHint.className = "field-help error"; }
+                return;
+            }
+            aptLocBtn.disabled = true;
+            if (aptLocBtnText) aptLocBtnText.textContent = "Fetching location…";
+            if (aptLocHint) { aptLocHint.textContent = "Please allow location permission."; aptLocHint.className = "field-help"; }
+            navigator.geolocation.getCurrentPosition(
+                function (pos) {
+                    const lat = pos.coords.latitude, lng = pos.coords.longitude;
+                    const link = "https://www.google.com/maps?q=" + lat + "," + lng;
+                    if (aptMap) aptMap.value = link;
+                    aptLocBtn.disabled = false;
+                    aptLocBtn.classList.add("success");
+                    if (aptLocBtnText) aptLocBtnText.textContent = "Location Pinned ✓";
+                    if (aptLocHint) { aptLocHint.textContent = "Location saved."; aptLocHint.className = "field-help success"; }
+                    if (aptMapPreview) { aptMapPreview.innerHTML = `<iframe src="${esc(mapsEmbedUrl(link))}" loading="lazy"></iframe>`; aptMapPreview.style.display = "block"; }
+                },
+                function (err) {
+                    aptLocBtn.disabled = false;
+                    if (aptLocBtnText) aptLocBtnText.textContent = "Get My Current Location";
+                    let msg = "Unable to fetch location.";
+                    if (err.code === 1) msg = "Permission denied. Paste a link manually.";
+                    else if (err.code === 2) msg = "Location unavailable. Paste a link manually.";
+                    else if (err.code === 3) msg = "Timed out. Paste a link manually.";
+                    if (aptLocHint) { aptLocHint.textContent = msg; aptLocHint.className = "field-help error"; }
+                },
+                { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
         });
     }
 
-    /* House map + image */
+    /* House map */
     if (houseMap) {
         houseMap.addEventListener("input", function () {
             const v = this.value.trim();
             if (!houseLocHint) return;
             if (!v) { houseLocHint.textContent = ""; houseLocHint.className = "field-help"; return; }
-            if (isValidMapLink(v)) {
-                houseLocHint.textContent = "✓ Google Maps link accepted.";
-                houseLocHint.className = "field-help success";
-            } else {
-                houseLocHint.textContent = "This doesn't look like a Google Maps link.";
-                houseLocHint.className = "field-help error";
-            }
+            if (isValidMapLink(v)) { houseLocHint.textContent = "✓ Google Maps link accepted."; houseLocHint.className = "field-help success"; }
+            else { houseLocHint.textContent = "This doesn't look like a Google Maps link."; houseLocHint.className = "field-help error"; }
         });
     }
-
-    if (houseOpenMapBtn) {
-        houseOpenMapBtn.addEventListener("click", () => {
-            window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer");
-        });
-    }
-
+    if (houseOpenMapBtn) houseOpenMapBtn.addEventListener("click", () => window.open("https://www.google.com/maps", "_blank", "noopener,noreferrer"));
     if (houseLocBtn) {
         houseLocBtn.addEventListener("click", function () {
             if (!navigator.geolocation) {
@@ -512,11 +490,9 @@
             houseLocBtn.disabled = true;
             if (houseLocBtnText) houseLocBtnText.textContent = "Fetching location…";
             if (houseLocHint) { houseLocHint.textContent = "Please allow location permission."; houseLocHint.className = "field-help"; }
-
             navigator.geolocation.getCurrentPosition(
                 function (pos) {
-                    const lat = pos.coords.latitude;
-                    const lng = pos.coords.longitude;
+                    const lat = pos.coords.latitude, lng = pos.coords.longitude;
                     const link = "https://www.google.com/maps?q=" + lat + "," + lng;
                     if (houseMap) houseMap.value = link;
                     houseLocBtn.disabled = false;
@@ -538,9 +514,26 @@
         });
     }
 
-    if (houseImgDrop) {
-        houseImgDrop.addEventListener("click", () => { if (houseImg) houseImg.click(); });
+    /* Images */
+    if (aptImgDrop) aptImgDrop.addEventListener("click", () => { if (aptImg) aptImg.click(); });
+    if (aptImg) {
+        aptImg.addEventListener("change", function () {
+            const file = this.files && this.files[0];
+            if (!file) return;
+            if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
+            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                aptImgData = evt.target.result;
+                if (aptImgPreview) {
+                    aptImgPreview.classList.remove("img-drop-empty");
+                    aptImgPreview.innerHTML = '<img src="' + aptImgData + '" alt="Apartment preview">';
+                }
+            };
+            reader.readAsDataURL(file);
+        });
     }
+    if (houseImgDrop) houseImgDrop.addEventListener("click", () => { if (houseImg) houseImg.click(); });
     if (houseImg) {
         houseImg.addEventListener("change", function () {
             const file = this.files && this.files[0];
@@ -559,7 +552,7 @@
         });
     }
 
-    /* Save customer */
+    /* Save */
     form.addEventListener("submit", function (e) {
         e.preventDefault();
 
@@ -579,9 +572,13 @@
             const aptName = aptNameInput.value;
             const div = divInput.value;
             const charge = Number(divChargeInput.value || 0);
+            const fullAddr = aptFullAddress ? aptFullAddress.value.trim() : "";
+            const mapVal = aptMap ? aptMap.value.trim() : "";
 
             if (!aptId) return showErrorPopup("Please select an apartment.");
             if (!div) return showErrorPopup("Please select a division.");
+            if (!fullAddr) return showErrorPopup("Apartment full address is required.");
+            if (mapVal && !isValidMapLink(mapVal)) return showErrorPopup("The Google Maps link doesn't look valid.");
 
             let block = "", door = "", floor = "";
             const parts = div.split("/").map(s => s.trim());
@@ -599,10 +596,11 @@
                 floor: floor,
                 door_no: door,
                 division_label: div,
-                charge: charge
+                charge: charge,
+                full_address: fullAddr,
+                map_link: mapVal
             };
 
-            /* Preserve existing apartment image if no new one */
             if (!aptImgData) {
                 const existingImgEl = aptImgPreview && aptImgPreview.querySelector("img");
                 if (existingImgEl && existingImgEl.src) {
@@ -618,10 +616,7 @@
             const chargeVal = houseChargeInput ? parseFloat(houseChargeInput.value || "0") : 0;
 
             if (!addr) return showErrorPopup("Please enter the full address.");
-            /* Map optional */
-            if (mapVal && !isValidMapLink(mapVal)) {
-                return showErrorPopup("The Google Maps link doesn't look valid. Leave it empty or paste a proper link.");
-            }
+            if (mapVal && !isValidMapLink(mapVal)) return showErrorPopup("The Google Maps link doesn't look valid.");
             if (isNaN(chargeVal) || chargeVal < 0) return showErrorPopup("Delivery charge must be 0 or more.");
 
             addressJson = {
@@ -652,26 +647,15 @@
         fd.append("address_type", ADDRESS_TYPE);
         fd.append("address_json", JSON.stringify(addressJson));
 
-        if (ADDRESS_TYPE === "individual_house" && houseImgData) {
-            fd.append("house_image_data", houseImgData);
-        }
-        if (ADDRESS_TYPE === "apartment" && aptImgData) {
-            fd.append("apt_house_image_data", aptImgData);
-        }
+        if (ADDRESS_TYPE === "individual_house" && houseImgData) fd.append("house_image_data", houseImgData);
+        if (ADDRESS_TYPE === "apartment" && aptImgData) fd.append("apt_house_image_data", aptImgData);
 
-        fetch(BASE_URL + "ajax/add-customer-save.php", {
-            method: "POST",
-            body: fd,
-            credentials: "same-origin"
-        })
+        fetch(BASE_URL + "ajax/add-customer-save.php", { method: "POST", body: fd, credentials: "same-origin" })
             .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
             .then(data => {
                 setCustomerLoading(false);
-                if (data.success) {
-                    showSuccessPopup(data.message || "Customer updated successfully.", password);
-                } else {
-                    showErrorPopup(data.message || "Failed to update customer.");
-                }
+                if (data.success) showSuccessPopup(data.message || "Customer updated successfully.", password);
+                else showErrorPopup(data.message || "Failed to update customer.");
             })
             .catch(() => {
                 setCustomerLoading(false);
@@ -679,65 +663,44 @@
             });
     });
 
-    /* Wallet */
+    /* Wallet (unchanged) */
     document.querySelectorAll(".wallet-tab").forEach(tab => {
         tab.addEventListener("click", function () { setWalletTab(this.dataset.tab); });
     });
-
     function setWalletTab(tab) {
         wTxnType.value = tab;
-        document.querySelectorAll(".wallet-tab").forEach(t => {
-            t.classList.toggle("active", t.dataset.tab === tab);
-        });
+        document.querySelectorAll(".wallet-tab").forEach(t => { t.classList.toggle("active", t.dataset.tab === tab); });
         wSubmitText.textContent = "Save Wallet";
     }
-
     document.querySelectorAll(".wallet-preset").forEach(p => {
-        p.addEventListener("click", function () {
-            wAmount.value = this.dataset.amt;
-            wAmount.focus();
-        });
+        p.addEventListener("click", function () { wAmount.value = this.dataset.amt; wAmount.focus(); });
     });
-
     wForm?.addEventListener("submit", function (e) {
         e.preventDefault();
         const type = wTxnType.value;
         const amt = parseFloat(wAmount.value || "0");
         const note = wNote.value.trim();
-
         if (!amt || amt <= 0) return showErrorPopup("Enter a valid amount.");
-
         wSubmitBtn.disabled = true;
         wSubmitText.innerHTML = '<span class="btn-spinner"></span> Saving...';
-
         const fd = new FormData();
         fd.append("customer_id", String(CUSTOMER_ID));
         fd.append("txn_type", type);
         fd.append("amount", amt);
         fd.append("note", note);
-
-        fetch(BASE_URL + "ajax/wallet-update.php", {
-            method: "POST", body: fd, credentials: "same-origin"
-        })
+        fetch(BASE_URL + "ajax/wallet-update.php", { method: "POST", body: fd, credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
             .then(res => {
                 wSubmitBtn.disabled = false;
                 wSubmitText.innerHTML = '<i class="bi bi-check-lg"></i> Save Wallet';
-
-                if (!res || !res.success) {
-                    showErrorPopup((res && res.message) || "Wallet update failed.");
-                    return;
-                }
-
+                if (!res || !res.success) { showErrorPopup((res && res.message) || "Wallet update failed."); return; }
                 if (res.data && typeof res.data.balance_after !== "undefined") {
                     currentBalance = Number(res.data.balance_after);
                     walletDisplay.textContent = money(currentBalance);
                 }
-
                 wAmount.value = "";
                 wNote.value = "";
                 showSuccessPopup(res.message || "Wallet updated successfully.");
-
                 hxCurrentPage = 1;
                 historyLoaded = true;
                 loadWalletHistory();
@@ -748,45 +711,24 @@
                 showErrorPopup("Unable to connect.");
             });
     });
-
-    wRefreshBtn?.addEventListener("click", () => {
-        hxCurrentPage = 1;
-        loadWalletHistory();
-    });
-
+    wRefreshBtn?.addEventListener("click", () => { hxCurrentPage = 1; loadWalletHistory(); });
     function loadWalletHistory() {
         if (!walletHistory) return;
-
-        walletHistory.innerHTML = `
-            <div class="history-empty">
-                <i class="bi bi-hourglass-split"></i>
-                <h4>Loading transactions…</h4>
-                <p>Please wait</p>
-            </div>`;
-
+        walletHistory.innerHTML = `<div class="history-empty"><i class="bi bi-hourglass-split"></i><h4>Loading transactions…</h4><p>Please wait</p></div>`;
         if (historyPagination) historyPagination.innerHTML = "";
-
         const params = new URLSearchParams();
         params.set("customer_id", CUSTOMER_ID);
         params.set("page", hxCurrentPage);
         params.set("per_page", hxPerPage);
         if (hxFilter) params.set("filter", hxFilter);
-
         fetch(BASE_URL + "ajax/wallet-history.php?" + params.toString(), { credentials: "same-origin" })
             .then(r => r.json().catch(() => null))
             .then(res => {
                 if (!res || !res.success) {
-                    walletHistory.innerHTML = `
-                    <div class="history-empty">
-                        <i class="bi bi-exclamation-triangle"></i>
-                        <h4>Failed to load</h4>
-                        <p>${esc((res && res.message) || "Please try again.")}</p>
-                    </div>`;
+                    walletHistory.innerHTML = `<div class="history-empty"><i class="bi bi-exclamation-triangle"></i><h4>Failed to load</h4><p>${esc((res && res.message) || "Please try again.")}</p></div>`;
                     return;
                 }
-
                 let rows = [], totalCredit = 0, totalDebit = 0, totalEntries = 0, totalPages = 1;
-
                 if (Array.isArray(res.data)) {
                     rows = res.data;
                     rows.forEach(t => {
@@ -801,92 +743,37 @@
                     totalEntries = Number(res.data.total_entries) || Number(res.data.total_count) || 0;
                     totalPages = Number(res.data.total_pages) || 1;
                 }
-
                 hxTotalPages = totalPages;
-
                 if (sumCredit) sumCredit.textContent = "+" + money(totalCredit);
                 if (sumDebit) sumDebit.textContent = "−" + money(totalDebit);
                 if (sumEntries) sumEntries.textContent = totalEntries;
-
                 if (rows.length === 0) {
-                    walletHistory.innerHTML = `
-                    <div class="history-empty">
-                        <i class="bi bi-inbox"></i>
-                        <h4>No transactions yet</h4>
-                        <p>Start by adding money to the wallet.</p>
-                    </div>`;
+                    walletHistory.innerHTML = `<div class="history-empty"><i class="bi bi-inbox"></i><h4>No transactions yet</h4><p>Start by adding money to the wallet.</p></div>`;
                     if (historyPagination) historyPagination.innerHTML = "";
                     return;
                 }
-
-                walletHistory.innerHTML = `
-                <table class="wallet-history-table">
-                    <thead>
-                        <tr>
-                            <th>Date</th><th>Type</th><th>Amount</th>
-                            <th>Balance</th><th>Note</th><th>By</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${rows.map(t => {
+                walletHistory.innerHTML = `<table class="wallet-history-table"><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Balance</th><th>Note</th><th>By</th></tr></thead><tbody>${rows.map(t => {
                     const isCredit = t.txn_type === "credit";
-                    return `
-                                <tr>
-                                    <td>
-                                        <div style="font-weight:700;color:#302923;font-size:11px;">
-                                            ${esc(fmtDate(t.created_at))}
-                                        </div>
-                                        <div style="font-size:9px;color:#948c82;margin-top:2px;">
-                                            ${esc(t.txn_code || "")}
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <span class="wallet-txn-badge ${isCredit ? 'credit' : 'debit'}">
-                                            <i class="bi bi-${isCredit ? 'arrow-down' : 'arrow-up'}"></i>
-                                            ${isCredit ? 'Credit' : 'Debit'}
-                                        </span>
-                                    </td>
-                                    <td class="${isCredit ? 'wallet-amount-credit' : 'wallet-amount-debit'}">
-                                        ${isCredit ? '+' : '−'} ${money(t.amount)}
-                                    </td>
-                                    <td class="wallet-balance-cell">${money(t.balance_after)}</td>
-                                    <td>
-                                        <div style="font-size:11px;color:#4c4640;">${esc(t.note || "—")}</div>
-                                        <div style="font-size:9px;color:#948c82;margin-top:2px;">${esc(t.source || "")}</div>
-                                    </td>
-                                    <td>
-                                        <div style="font-size:11px;font-weight:700;color:#4c4640;">
-                                            ${esc(t.created_by_name || "—")}
-                                        </div>
-                                    </td>
-                                </tr>`;
-                }).join("")}
-                    </tbody>
-                </table>`;
-
+                    return `<tr>
+                        <td><div style="font-weight:700;color:#302923;font-size:11px;">${esc(fmtDate(t.created_at))}</div><div style="font-size:9px;color:#948c82;margin-top:2px;">${esc(t.txn_code || "")}</div></td>
+                        <td><span class="wallet-txn-badge ${isCredit ? 'credit' : 'debit'}"><i class="bi bi-${isCredit ? 'arrow-down' : 'arrow-up'}"></i>${isCredit ? 'Credit' : 'Debit'}</span></td>
+                        <td class="${isCredit ? 'wallet-amount-credit' : 'wallet-amount-debit'}">${isCredit ? '+' : '−'} ${money(t.amount)}</td>
+                        <td class="wallet-balance-cell">${money(t.balance_after)}</td>
+                        <td><div style="font-size:11px;color:#4c4640;">${esc(t.note || "—")}</div><div style="font-size:9px;color:#948c82;margin-top:2px;">${esc(t.source || "")}</div></td>
+                        <td><div style="font-size:11px;font-weight:700;color:#4c4640;">${esc(t.created_by_name || "—")}</div></td>
+                    </tr>`;
+                }).join("")}</tbody></table>`;
                 renderHistoryPagination();
             })
             .catch(() => {
-                walletHistory.innerHTML = `
-                <div class="history-empty">
-                    <i class="bi bi-wifi-off"></i>
-                    <h4>Unable to connect</h4>
-                    <p>Please check your network.</p>
-                </div>`;
+                walletHistory.innerHTML = `<div class="history-empty"><i class="bi bi-wifi-off"></i><h4>Unable to connect</h4><p>Please check your network.</p></div>`;
             });
     }
-
     function renderHistoryPagination() {
         if (!historyPagination) return;
         if (hxTotalPages <= 1) { historyPagination.innerHTML = ""; return; }
-
         const pages = getPageList(hxCurrentPage, hxTotalPages);
-        const btnHtml = (page, label, disabled, active) => `
-            <button type="button" class="hx-page-btn ${active ? 'active' : ''}"
-                    data-page="${page}" ${disabled ? 'disabled' : ''}>
-                ${label}
-            </button>`;
-
+        const btnHtml = (page, label, disabled, active) => `<button type="button" class="hx-page-btn ${active ? 'active' : ''}" data-page="${page}" ${disabled ? 'disabled' : ''}>${label}</button>`;
         const html = [];
         html.push(btnHtml(hxCurrentPage - 1, '<i class="bi bi-chevron-left"></i>', hxCurrentPage === 1, false));
         pages.forEach(p => {
@@ -894,34 +781,17 @@
             else html.push(btnHtml(p, p, false, p === hxCurrentPage));
         });
         html.push(btnHtml(hxCurrentPage + 1, '<i class="bi bi-chevron-right"></i>', hxCurrentPage === hxTotalPages, false));
-
-        historyPagination.innerHTML = `
-            <div class="hx-pagination">
-                <div class="hx-pagination-info">
-                    Page <strong>${hxCurrentPage}</strong> of <strong>${hxTotalPages}</strong>
-                </div>
-                <div class="hx-pagination-controls">${html.join("")}</div>
-            </div>`;
+        historyPagination.innerHTML = `<div class="hx-pagination"><div class="hx-pagination-info">Page <strong>${hxCurrentPage}</strong> of <strong>${hxTotalPages}</strong></div><div class="hx-pagination-controls">${html.join("")}</div></div>`;
     }
-
     function getPageList(current, total) {
-        const delta = 1;
-        const range = [];
-        const out = [];
+        const delta = 1, range = [], out = [];
         for (let i = 1; i <= total; i++) {
-            if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) {
-                range.push(i);
-            }
+            if (i === 1 || i === total || (i >= current - delta && i <= current + delta)) range.push(i);
         }
         let prev = 0;
-        range.forEach(i => {
-            if (prev && i - prev > 1) out.push("...");
-            out.push(i);
-            prev = i;
-        });
+        range.forEach(i => { if (prev && i - prev > 1) out.push("..."); out.push(i); prev = i; });
         return out;
     }
-
     historyPagination?.addEventListener("click", function (e) {
         const btn = e.target.closest(".hx-page-btn");
         if (!btn || btn.disabled) return;
@@ -932,8 +802,6 @@
     });
 
     /* INIT */
-    if (ADDRESS_TYPE === "apartment") {
-        loadApartments();
-    }
+    if (ADDRESS_TYPE === "apartment") loadApartments();
 
 })();

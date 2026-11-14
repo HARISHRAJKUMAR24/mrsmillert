@@ -1,6 +1,6 @@
 /* =========================================================
-   MRS MILL@ — ADDRESS REQUESTS (accordion + filters + branch + delivery + previews)
-   File: ./js/address-requests.js   v2026-11-03g
+   MRS MILL@ — ADDRESS REQUESTS  (v2026-11-14a)
+   Apartment Full Address + Map Link added
    ========================================================= */
 
 (function () {
@@ -40,6 +40,12 @@
     const branchEl = document.getElementById("arBranch");
     const divEl = document.getElementById("arDivision");
     const deliveryEl = document.getElementById("arDeliveryCharge");
+
+    // ✅ NEW — apartment full address + map
+    const aptFullAddrEl = document.getElementById("arAptFullAddress");
+    const aptMapLinkEl = document.getElementById("arAptMapLink");
+    const aptMapPreview = document.getElementById("arAptMapPreview");
+
     const houseBlock = document.getElementById("arHouseBlock");
     const houseAddrEl = document.getElementById("arHouseAddress");
     const mapEl = document.getElementById("arMapLink");
@@ -60,7 +66,6 @@
     const STATUS_LABELS = { "0": "Pending", "1": "Approved", "2": "Rejected" };
     const STATUS_CLASS = { "0": "pending", "1": "approved", "2": "rejected" };
 
-    /* -------- helpers -------- */
     function esc(s) {
         return String(s == null ? "" : s)
             .replace(/&/g, "&amp;").replace(/</g, "&lt;")
@@ -108,7 +113,6 @@
         el.querySelector(".ar-toast-close").addEventListener("click", close);
         setTimeout(close, timeout || 3200);
     }
-    /* Convert a maps link into an embed URL for iframe preview */
     function mapsEmbedUrl(url) {
         if (!url) return "";
         if (/google\.com\/maps\/embed/i.test(url)) return url;
@@ -119,7 +123,6 @@
         return url.includes("output=embed") ? url : url + (url.includes("?") ? "&" : "?") + "output=embed";
     }
 
-    /* -------- date filters -------- */
     function startOfDay(d) { const x = new Date(d); x.setHours(0, 0, 0, 0); return x; }
     function endOfDay(d) { const x = new Date(d); x.setHours(23, 59, 59, 999); return x; }
     function getDateRange() {
@@ -145,7 +148,6 @@
         return isNaN(d) ? null : d;
     }
 
-    /* -------- render -------- */
     function statusPill(st) {
         const cls = STATUS_CLASS[String(st)] || "pending";
         const label = STATUS_LABELS[String(st)] || "Unknown";
@@ -171,8 +173,12 @@
         const isOpen = openIds.has(String(r.id));
         const stateClass = st === "1" ? "is-approved" : st === "2" ? "is-rejected" : "is-pending";
         const charge = Number(r.delivery_charge || 0);
-
         const mapEmbed = r.map_link ? mapsEmbedUrl(r.map_link) : "";
+
+        /* Apartment-only full address + map preview.
+           They come from row.full_address + row.map_link if server sends them.
+           We check both: fallback to requested_division/apartment. */
+        const aptFullAddr = r.full_address || "";
 
         return `
             <div class="ar-acc-item ${isOpen ? "open" : ""} ${stateClass}" data-id="${r.id}">
@@ -199,19 +205,15 @@
                         ${typeLabel === "Apartment" ? `
                             <div class="ar-acc-detail"><div class="ar-acc-detail-label">Apartment</div><div class="ar-acc-detail-value">${esc(r.requested_apartment || "—")}</div></div>
                             <div class="ar-acc-detail"><div class="ar-acc-detail-label">Division</div><div class="ar-acc-detail-value">${esc(r.requested_division || "—")}</div></div>
+                            ${aptFullAddr ? `<div class="ar-acc-detail" style="grid-column:1/-1;"><div class="ar-acc-detail-label">Full Address</div><div class="ar-acc-detail-value">${esc(aptFullAddr)}</div></div>` : ""}
                             <div class="ar-acc-detail"><div class="ar-acc-detail-label">Delivery Charge</div><div class="ar-acc-detail-value">₹${charge.toFixed(2)}</div></div>
                         ` : `
                             <div class="ar-acc-detail" style="grid-column:1/-1;"><div class="ar-acc-detail-label">Full Address</div><div class="ar-acc-detail-value">${esc(r.requested_apartment || "—")}</div></div>
                             <div class="ar-acc-detail"><div class="ar-acc-detail-label">Delivery Charge</div><div class="ar-acc-detail-value">₹${charge.toFixed(2)}</div></div>
                         `}
 
-                        <!-- MAP LINK (for both types) -->
                         ${r.map_link ? `<div class="ar-acc-detail" style="grid-column:1/-1;"><div class="ar-acc-detail-label">Google Maps</div><div class="ar-acc-detail-value"><a href="${esc(r.map_link)}" target="_blank" rel="noopener"><i class="bi bi-geo-alt-fill"></i> Open location</a></div></div>` : ""}
-                        
-                        <!-- MINI MAP EMBED (for both types) -->
                         ${mapEmbed ? `<div class="ar-mini-map" style="grid-column:1/-1;"><iframe src="${esc(mapEmbed)}" loading="lazy"></iframe></div>` : ""}
-
-                        <!-- HOUSE IMAGE (for both types) -->
                         ${r.house_image ? `<div class="ar-mini-img" style="grid-column:1/-1;"><img src="${esc(r.house_image)}" alt="House" loading="lazy"></div>` : ""}
 
                         <div class="ar-acc-detail"><div class="ar-acc-detail-label">Requested On</div><div class="ar-acc-detail-value">${esc(dt.d)}${dt.t ? " · " + esc(dt.t) : ""}</div></div>
@@ -293,7 +295,7 @@
 
         filteredRows = allRows.filter(r => {
             if (q) {
-                const hay = [r.customer_name, r.customer_mobile, r.requested_apartment, r.requested_division, r.request_type].join(" ").toLowerCase();
+                const hay = [r.customer_name, r.customer_mobile, r.requested_apartment, r.requested_division, r.request_type, r.full_address].join(" ").toLowerCase();
                 if (hay.indexOf(q) === -1) return false;
             }
             if (stVal !== "all" && String(r.status) !== stVal) return false;
@@ -321,7 +323,6 @@
     if (dateFrom) dateFrom.addEventListener("change", () => applyFilterAndRender());
     if (dateTo) dateTo.addEventListener("change", () => applyFilterAndRender());
 
-    /* -------- load -------- */
     function populateBranches(branches) {
         if (!branchEl) return;
         allBranches = branches || [];
@@ -363,7 +364,6 @@
         loadRequests();
     });
 
-    /* -------- accordion + actions -------- */
     document.addEventListener("click", function (e) {
         const toggle = e.target.closest("[data-toggle]");
         if (toggle && !e.target.closest("[data-action]") && !e.target.closest("a")) {
@@ -407,7 +407,7 @@
         }
     });
 
-    /* -------- approve modal -------- */
+    /* ---------- previews ---------- */
     function renderMapPreview() {
         if (!mapPreview) return;
         const url = mapEl.value.trim();
@@ -423,6 +423,14 @@
         imgPreview.innerHTML = `<img src="${esc(url)}" alt="House">`;
         imgPreview.style.display = "block";
     }
+    function renderAptMapPreview() {
+        if (!aptMapPreview || !aptMapLinkEl) return;
+        const url = aptMapLinkEl.value.trim();
+        if (!url) { aptMapPreview.style.display = "none"; aptMapPreview.innerHTML = ""; return; }
+        const embed = mapsEmbedUrl(url);
+        aptMapPreview.innerHTML = `<iframe src="${esc(embed)}" loading="lazy"></iframe>`;
+        aptMapPreview.style.display = "block";
+    }
 
     function openApproveModal(r) {
         reqIdEl.value = r.id;
@@ -435,14 +443,20 @@
         branchEl.value = r.created_branch_id ? String(r.created_branch_id) : "";
         divEl.value = r.requested_division || "";
         deliveryEl.value = r.delivery_charge ? Number(r.delivery_charge).toFixed(2) : "";
+
+        // ✅ NEW — apartment full address + map
+        aptFullAddrEl.value = r.full_address || (r.request_type === 'apartment' ? "" : "");
+        aptMapLinkEl.value = r.map_link || "";
+
         houseAddrEl.value = r.request_type === 'individual_house' ? (r.requested_apartment || "") : "";
         mapEl.value = r.map_link || "";
         houseChargeEl.value = r.delivery_charge ? Number(r.delivery_charge).toFixed(2) : "";
-        houseImgEl.value = r.house_image || "";
+        houseImgEl.value = r.house_image_raw || r.house_image || "";
 
         toggleModalType();
         renderMapPreview();
         renderImagePreview();
+        renderAptMapPreview();
 
         approveOverlay.classList.add("show");
         approveOverlay.setAttribute("aria-hidden", "false");
@@ -465,6 +479,7 @@
     typeEl.addEventListener("change", toggleModalType);
     if (mapEl) mapEl.addEventListener("input", renderMapPreview);
     if (houseImgEl) houseImgEl.addEventListener("input", renderImagePreview);
+    if (aptMapLinkEl) aptMapLinkEl.addEventListener("input", renderAptMapPreview);
 
     if (approveClose) approveClose.addEventListener("click", closeApproveModal);
     if (approveCancel) approveCancel.addEventListener("click", closeApproveModal);
@@ -483,8 +498,11 @@
         const mobile = mobileEl.value.trim();
         const password = pwdEl.value.trim();
         const type = typeEl.value;
+
         const apt = aptEl.value.trim();
         const aptAddr = aptAddrEl.value.trim();
+        const aptFullAddr = aptFullAddrEl.value.trim();  // ✅ NEW
+        const aptMapLink = aptMapLinkEl.value.trim();    // ✅ NEW
         const branchId = branchEl.value;
         const div = divEl.value.trim();
         const houseAddr = houseAddrEl.value.trim();
@@ -496,6 +514,7 @@
         if (name.length < 3) return showToast("error", "Name must be at least 3 characters.");
         if (!/^[0-9]{10,15}$/.test(mobile)) return showToast("error", "Mobile must be 10–15 digits.");
         if (type === 'apartment' && !apt) return showToast("error", "Apartment name is required.");
+
         if (type === 'individual_house' && !houseAddr) return showToast("error", "Full address is required.");
 
         const fd = new FormData();
@@ -509,8 +528,16 @@
         fd.append("apartment_address", aptAddr);
         if (branchId) fd.append("branch_id", branchId);
         fd.append("requested_division", div);
-        fd.append("map_link", mapLink);       /* SEND MAP LINK */
-        fd.append("house_image", houseImg);   /* SEND HOUSE IMAGE */
+
+        /* map_link is the same key for both types — apartment uses aptMapLink */
+        fd.append("map_link", type === 'apartment' ? aptMapLink : mapLink);
+
+        /* ✅ NEW: full address for apartment */
+        if (type === 'apartment') {
+            fd.append("full_address", aptFullAddr);
+        }
+
+        fd.append("house_image", houseImg);
         fd.append("delivery_charge", deliveryCharge || "0");
 
         approveSubmit.disabled = true;

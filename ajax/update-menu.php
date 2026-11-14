@@ -3,7 +3,7 @@
    MRS MILL@ — AJAX: UPDATE MENU
    File: ./ajax/update-menu.php
    - Updates menu name + status + time
-   - Skips variants that no longer exist in the DB
+   - Reads the new "variants" array (per-variant stock)
    - Deletes all menu_products for this menu, re-inserts
    ========================================================= */
 
@@ -47,28 +47,24 @@ if (!is_array($rows) || count($rows) === 0) {
 $flat = [];
 
 foreach ($rows as $i => $r) {
-
     $label = 'Product #' . ($i + 1);
-
     $pcode = trim((string)($r['product_code'] ?? ''));
-    $vids  = $r['variant_ids'] ?? [];
-    $unlim = !empty($r['stock_unlimited']) ? 1 : 0;
-    $count = (int)($r['stock_count'] ?? 0);
+    $variants = $r['variants'] ?? [];
 
     if ($pcode === '') jsonResponse(false, $label . ': product missing.');
-    if (!is_array($vids) || count($vids) === 0) {
+    if (!is_array($variants) || count($variants) === 0) {
         jsonResponse(false, $label . ': pick at least one variant.');
     }
 
-    $vids = array_values(array_unique(array_map('intval', $vids)));
-    $vids = array_values(array_filter($vids, fn($v) => $v > 0));
+    foreach ($variants as $v) {
+        $vid = (int)($v['variant_id'] ?? 0);
+        $unlim = !empty($v['stock_unlimited']) ? 1 : 0;
+        $count = (int)($v['stock_count'] ?? 0);
+        
+        if ($vid <= 0) continue;
+        if ($unlim) $count = 0;
+        if ($count < 0) $count = 0;
 
-    if (count($vids) === 0) jsonResponse(false, $label . ': no valid variants.');
-
-    if ($unlim) $count = 0;
-    if ($count < 0) $count = 0;
-
-    foreach ($vids as $vid) {
         $flat[] = [
             'product_code'    => $pcode,
             'variant_id'      => $vid,
@@ -83,7 +79,6 @@ if (count($flat) === 0) jsonResponse(false, 'No valid selections.');
 /* ---------------- VERIFY ---------------- */
 
 try {
-
     $menuStmt = $pdo->prepare("SELECT * FROM menus WHERE id = ? LIMIT 1");
     $menuStmt->execute([$id]);
     $existing = $menuStmt->fetch();
@@ -100,37 +95,19 @@ try {
     $validProducts = $pStmt->fetchAll(PDO::FETCH_COLUMN);
 
     /* Only include variants that still exist AND are active */
-    $vStmt = $pdo->prepare(
-        "SELECT id, product_code
-         FROM product_variants
-         WHERE id IN ($vPh) AND status = 1"
-    );
+    $vStmt = $pdo->prepare("SELECT id, product_code FROM product_variants WHERE id IN ($vPh) AND status = 1");
     $vStmt->execute($vids);
     $validVariants = [];
     foreach ($vStmt->fetchAll() as $v) {
         $validVariants[(int)$v['id']] = $v['product_code'];
     }
 
-    /* --------- SILENTLY SKIP DELETED PRODUCTS/VARIANTS --------- */
+    /* Silently skip deleted products/variants */
     $cleanFlat = [];
-
     foreach ($flat as $r) {
-
-        /* Product gone from DB — skip */
-        if (!in_array($r['product_code'], $validProducts, true)) {
-            continue;
-        }
-
-        /* Variant gone from DB — skip */
-        if (!isset($validVariants[$r['variant_id']])) {
-            continue;
-        }
-
-        /* Variant belongs to a different product — skip */
-        if ($validVariants[$r['variant_id']] !== $r['product_code']) {
-            continue;
-        }
-
+        if (!in_array($r['product_code'], $validProducts, true)) continue;
+        if (!isset($validVariants[$r['variant_id']])) continue;
+        if ($validVariants[$r['variant_id']] !== $r['product_code']) continue;
         $cleanFlat[] = $r;
     }
 
@@ -138,7 +115,6 @@ try {
         jsonResponse(false, 'None of the selected variants exist anymore. Please reload the page and try again.');
     }
 
-    /* Use the cleaned list from here on */
     $flat = $cleanFlat;
 
 } catch (PDOException $e) {
@@ -148,7 +124,6 @@ try {
 /* ---------------- UPDATE ---------------- */
 
 try {
-
     $pdo->beginTransaction();
 
     /* 1) menus — includes status */
