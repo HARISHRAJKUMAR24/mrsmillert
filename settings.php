@@ -1385,7 +1385,18 @@ $tomorrowOffer = $settings['tomorrow_offer_image'] ?? '';
                                         maxlength="150" required>
                                 </div>
                             </div>
-
+                            <!-- ✅ NEW: Header Top Content -->
+                            <div class="col-12">
+                                <label>Header Top Content</label>
+                                <div class="input-icon-wrap">
+                                    <i class="bi bi-type"></i>
+                                    <input type="text" name="header_top_content" id="header_top_content"
+                                        class="st-input" value="<?= htmlspecialchars($settings['header_top_content'] ?? '') ?>"
+                                        placeholder="Eg: Free delivery for orders above ₹500!"
+                                        maxlength="255">
+                                </div>
+                                <p class="field-help">Displays as a banner text at the very top of the customer site. Leave blank to hide.</p>
+                            </div>
                             <div class="col-12 col-md-6">
                                 <label>Mobile Number</label>
                                 <div class="input-icon-wrap">

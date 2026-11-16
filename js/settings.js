@@ -843,6 +843,7 @@
         const email = document.getElementById("email_address").value.trim();
         const currency = document.getElementById("currency").value.trim() || "₹";
         const currencyCode = document.getElementById("currency_code").value.trim() || "INR";
+        const topContent = document.getElementById("header_top_content").value.trim();
 
         if (!username) return showError("Site name is required.", "Missing name");
         if (mobile && !/^[0-9+\-\s()]{6,20}$/.test(mobile)) return showError("Invalid mobile number.", "Invalid mobile");
@@ -912,6 +913,7 @@
         fd.set("tax_type", taxType);
         fd.set("tax_rate", taxRate);
         fd.set("gst_number", gstNumber);
+        fd.set("header_top_content", topContent);
 
         fetch(BASE_URL + "ajax/settings-save.php", {
             method: "POST",

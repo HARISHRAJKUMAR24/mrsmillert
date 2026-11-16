@@ -2,7 +2,6 @@
 /* =========================================================
    MRS MILL@ — AJAX: SAVE ALL SETTINGS
    File: ./ajax/settings-save.php
-   Handles general + branches + banners + offers + payment + tax + branding
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -20,6 +19,7 @@ $mobile       = trim($_POST['mobile_number'] ?? '');
 $email        = trim($_POST['email_address'] ?? '');
 $currency     = trim($_POST['currency'] ?? '₹');
 $currencyCode = trim($_POST['currency_code'] ?? 'INR');
+$topContent   = trim($_POST['header_top_content'] ?? ''); // ✅ NEW
 
 $keyId     = trim($_POST['razorpay_key_id'] ?? '');
 $keySecret = trim($_POST['razorpay_key_secret'] ?? '');
@@ -143,7 +143,8 @@ for ($i = 1; $i <= 4; $i++) {
         if (!$exists) {
             $pdo->exec("ALTER TABLE settings ADD COLUMN {$col} VARCHAR(255) DEFAULT NULL");
         }
-    } catch (PDOException $e) { /* ignore */ }
+    } catch (PDOException $e) { /* ignore */
+    }
 }
 
 /* Ensure offer columns exist */
@@ -160,7 +161,8 @@ foreach (['today_offer_image', 'tomorrow_offer_image'] as $col) {
         if (!$exists) {
             $pdo->exec("ALTER TABLE settings ADD COLUMN {$col} VARCHAR(255) DEFAULT NULL");
         }
-    } catch (PDOException $e) { /* ignore */ }
+    } catch (PDOException $e) { /* ignore */
+    }
 }
 
 /* ---------- FAVICON ---------- */
@@ -211,9 +213,10 @@ for ($i = 1; $i <= 4; $i++) {
 $newTodayOffer = $settings['today_offer_image'] ?? null;
 if (!empty($_FILES['today_offer_image']['name'])) {
     $upload = uploadSettingsImage($_FILES['today_offer_image'], $baseDir, 'offer');
-    if (!$upload['success']) jsonResponse(false, 'Today Offer: ' . $upload['message']);
-    if (!empty($newTodayOffer)) deleteStoredFile($newTodayOffer, $baseDir);
-    $newTodayOffer = $upload['path'];
+    if ($upload['success']) {
+        if (!empty($newTodayOffer)) deleteStoredFile($newTodayOffer, $baseDir);
+        $newTodayOffer = $upload['path'];
+    }
 } elseif ($removeTodayOffer === 1) {
     if (!empty($newTodayOffer)) deleteStoredFile($newTodayOffer, $baseDir);
     $newTodayOffer = null;
@@ -223,9 +226,10 @@ if (!empty($_FILES['today_offer_image']['name'])) {
 $newTomorrowOffer = $settings['tomorrow_offer_image'] ?? null;
 if (!empty($_FILES['tomorrow_offer_image']['name'])) {
     $upload = uploadSettingsImage($_FILES['tomorrow_offer_image'], $baseDir, 'offer');
-    if (!$upload['success']) jsonResponse(false, 'Tomorrow Offer: ' . $upload['message']);
-    if (!empty($newTomorrowOffer)) deleteStoredFile($newTomorrowOffer, $baseDir);
-    $newTomorrowOffer = $upload['path'];
+    if ($upload['success']) {
+        if (!empty($newTomorrowOffer)) deleteStoredFile($newTomorrowOffer, $baseDir);
+        $newTomorrowOffer = $upload['path'];
+    }
 } elseif ($removeTomorrowOffer === 1) {
     if (!empty($newTomorrowOffer)) deleteStoredFile($newTomorrowOffer, $baseDir);
     $newTomorrowOffer = null;
@@ -237,36 +241,29 @@ try {
 
     $stmt = $pdo->prepare(
         "UPDATE settings SET
-            username = ?,
-            mobile_number = ?,
-            email_address = ?,
-            currency = ?,
-            currency_code = ?,
-            favicon_image = ?,
-            logo_image = ?,
-            banner_1 = ?,
-            banner_2 = ?,
-            banner_3 = ?,
-            banner_4 = ?,
-            today_offer_image = ?,
-            tomorrow_offer_image = ?,
-            razorpay_key_id = ?,
-            razorpay_key_secret = ?,
-            upi_id = ?,
-            gst_number = ?,
-            tax_status = ?,
-            tax_type = ?,
-            tax_rate = ?,
-            updated_at = NOW()
+            username = ?, mobile_number = ?, email_address = ?, header_top_content = ?,
+            currency = ?, currency_code = ?,
+            razorpay_key_id = ?, razorpay_key_secret = ?, upi_id = ?,
+            gst_number = ?, tax_status = ?, tax_type = ?, tax_rate = ?,
+            favicon_image = ?, logo_image = ?,
+            banner_1 = ?, banner_2 = ?, banner_3 = ?, banner_4 = ?,
+            today_offer_image = ?, tomorrow_offer_image = ?
          WHERE id = 1"
     );
-
     $stmt->execute([
         $username,
         $mobile,
         $email,
+        $topContent,
         $currency,
         $currencyCode,
+        $keyId,
+        $keySecret,
+        $upiId,
+        $gstNumber,
+        $taxStatus,
+        $taxType,
+        $taxRate,
         $newFavicon,
         $newLogo,
         $bannerUpdates[1],
@@ -274,47 +271,25 @@ try {
         $bannerUpdates[3],
         $bannerUpdates[4],
         $newTodayOffer,
-        $newTomorrowOffer,
-        $keyId,
-        $keySecret,
-        $upiId,
-        $gstNumber !== '' ? $gstNumber : null,
-        $taxStatus,
-        $taxType,
-        $taxRate
+        $newTomorrowOffer
     ]);
 
-    /* Replace branches */
+    /* Branches */
     $pdo->exec("DELETE FROM settings_branches");
     if (!empty($cleanBranches)) {
         $ins = $pdo->prepare(
-            "INSERT INTO settings_branches
-                (branch_name, branch_address, branch_mobile, branch_email)
+            "INSERT INTO settings_branches (branch_name, branch_address, branch_mobile, branch_email)
              VALUES (?, ?, ?, ?)"
         );
         foreach ($cleanBranches as $b) {
-            $ins->execute([
-                $b['branch_name'],
-                $b['branch_address'],
-                $b['branch_mobile'],
-                $b['branch_email']
-            ]);
+            $ins->execute([$b['branch_name'], $b['branch_address'], $b['branch_mobile'], $b['branch_email']]);
         }
     }
 
     $pdo->commit();
 
-    jsonResponse(true, 'All settings saved successfully.', [
-        'favicon_url'        => $newFavicon ? ADMIN_URL . $newFavicon : '',
-        'logo_url'           => $newLogo    ? ADMIN_URL . $newLogo    : '',
-        'today_offer_url'    => $newTodayOffer    ? ADMIN_URL . $newTodayOffer    : '',
-        'tomorrow_offer_url' => $newTomorrowOffer ? ADMIN_URL . $newTomorrowOffer : '',
-        'branches'           => $cleanBranches
-    ]);
-
+    jsonResponse(true, 'Settings saved successfully.', ['branches_count' => count($cleanBranches)]);
 } catch (PDOException $e) {
-    if ($pdo->inTransaction()) {
-        try { $pdo->rollBack(); } catch (PDOException $e2) { /* ignore */ }
-    }
-    jsonResponse(false, 'Failed to save settings: ' . $e->getMessage());
+    if ($pdo->inTransaction()) $pdo->rollBack();
+    jsonResponse(false, 'Server error: ' . $e->getMessage());
 }
