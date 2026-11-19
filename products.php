@@ -770,7 +770,7 @@ require_once './config/function.php';
                                 <th>Image</th>
                                 <th>Product</th>
                                 <th>Category</th>
-                                <th>Apartments</th>
+                               
                                 <th>Status</th>
                                 <th>Action</th>
                             </tr>

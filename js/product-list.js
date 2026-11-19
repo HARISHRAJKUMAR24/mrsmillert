@@ -286,7 +286,7 @@
                 <td>
                     <span class="prod-cat">${escapeHtml(p.category_name || "—")}</span>
                 </td>
-                <td>${renderAptChips(p.apartments)}</td>
+              
                 <td>
                     <span class="status-badge ${active ? "status-active" : "status-inactive"}">
                         <i class="bi bi-circle-fill"></i>
