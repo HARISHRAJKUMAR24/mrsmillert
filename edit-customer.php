@@ -80,7 +80,7 @@ function customerImageUrl($path)
     if (preg_match('#^https?://#i', $path) || strpos($path, '//') === 0) {
         return $path;
     }
-    return rtrim(MAIN_URL, '/') . '/' . ltrim($path, '/');
+    return rtrim(ADMIN_URL, '/') . '/' . ltrim($path, '/');
 }
 
 $parts = preg_split('/\s+/', trim($customer['full_name']));

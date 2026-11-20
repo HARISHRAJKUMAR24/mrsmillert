@@ -610,20 +610,47 @@ $sidebarGroup = function (
 
         ?>
 
-
         <!-- ==================================
-             REPORTS
-        ================================== -->
+     REPORTS DROPDOWN
+================================== -->
 
-        <?php if ($isAdminUser): ?>
+        <?php
 
-            <?= $sidebarLink(
-                'reports.php',
-                'Reports',
-                'bi-bar-chart'
-            ); ?>
+        $reportPages = [
+            'delivery-boys-report.php'
+        ];
 
-        <?php endif; ?>
+        $reportLinks = '';
+
+        // Admin can access both reports
+        if ($isAdminUser) {
+
+            $reportPages[] = 'report.php';
+
+            $reportLinks .= $sidebarLink(
+                'report.php',
+                'General Reports',
+                'bi-bar-chart-line'
+            );
+        }
+
+        // Both Admin and Staff can access Delivery Boys Report
+        $reportLinks .= $sidebarLink(
+            'delivery-boys-report.php',
+            'Delivery Boys Report',
+            'bi-truck'
+        );
+
+        echo $sidebarGroup(
+            'reports',
+            'Reports',
+            'bi-bar-chart',
+            $reportPages,
+            $reportLinks
+        );
+
+        ?>
+
 
 
 

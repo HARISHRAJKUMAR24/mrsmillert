@@ -2,11 +2,8 @@
 /* =========================================================
    MRS MILL@ — AJAX: GET ORDERS (admin panel)
    File: ./ajax/get-orders.php
-   - Joins customers for name + mobile
-   - Reads apartment_code / apartment_name / division /
-     full_address from orders.address_json
-   - Sends address_type so JS can show "Individual House"
-   - Sends order_note for the notes popup
+   - Menu is stored inside products_json (no menu_code column
+     on orders table) — extracted via JSON_EXTRACT.
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -53,10 +50,11 @@ if ($to !== '' && preg_match('/^\d{4}-\d{2}-\d{2}$/', $to)) {
     $params[] = $to;
 }
 
-/* ---------- Search ---------- */
+/* ---------- Search (includes menu name from products_json) ---------- */
 if ($q !== '') {
-    $where[] = "(o.order_code LIKE ? OR c.full_name LIKE ? OR c.mobile_number LIKE ?)";
+    $where[] = "(o.order_code LIKE ? OR c.full_name LIKE ? OR c.mobile_number LIKE ? OR o.products_json LIKE ?)";
     $like = '%' . $q . '%';
+    $params[] = $like;
     $params[] = $like;
     $params[] = $like;
     $params[] = $like;
@@ -75,6 +73,11 @@ try {
 
                 o.address_type,
                 o.order_note,
+
+                /* MENU — extracted from products_json[0].menu_code */
+                CASE WHEN JSON_VALID(o.products_json)
+                     THEN JSON_UNQUOTE(JSON_EXTRACT(o.products_json, '$[0].menu_code'))
+                     ELSE NULL END AS menu_code,
 
                 CASE WHEN JSON_VALID(o.address_json)
                      THEN JSON_UNQUOTE(JSON_EXTRACT(o.address_json, '$.apartment_code'))
@@ -102,7 +105,8 @@ try {
                 o.paid_at,
                 o.created_at,
                 b.full_name       AS boy_name,
-                b.delivery_code   AS boy_code
+                b.delivery_code   AS boy_code,
+                o.delivery_boy_id
             FROM orders o
             LEFT JOIN customers c     ON c.customer_id = o.customer_id
             LEFT JOIN delivery_boys b ON b.id          = o.delivery_boy_id
@@ -113,6 +117,22 @@ try {
     $stmt = $pdo->prepare($sql);
     $stmt->execute($params);
     $rows = $stmt->fetchAll();
+
+    /* Fetch menu names in one shot */
+    $menuCodes = [];
+    foreach ($rows as $r) {
+        $mc = trim((string)($r['menu_code'] ?? ''));
+        if ($mc !== '') $menuCodes[$mc] = true;
+    }
+    $menuMap = [];
+    if ($menuCodes) {
+        $in = implode(',', array_fill(0, count($menuCodes), '?'));
+        $mStmt = $pdo->prepare("SELECT menu_code, menu_name FROM menus WHERE menu_code IN ($in)");
+        $mStmt->execute(array_keys($menuCodes));
+        foreach ($mStmt->fetchAll() as $m) {
+            $menuMap[$m['menu_code']] = $m['menu_name'];
+        }
+    }
 
     $out = [];
 
@@ -136,12 +156,18 @@ try {
             $containerTotalAmt += $line;
         }
 
+        $mCode = trim((string)($r['menu_code'] ?? ''));
+
         $out[] = [
             'id'              => (int)$r['id'],
             'order_code'      => $r['order_code'],
             'customer_id'     => $r['customer_id'],
             'customer_name'   => $r['customer_name']   ?: '—',
             'customer_mobile' => $r['customer_mobile'] ?: '—',
+
+            /* MENU */
+            'menu_code'       => $mCode,
+            'menu_name'       => $mCode && isset($menuMap[$mCode]) ? $menuMap[$mCode] : '',
 
             'delivery_mode'   => $r['delivery_mode'] ?: 'delivery',
 
@@ -168,6 +194,7 @@ try {
             'paid_at'         => $r['paid_at'],
             'created_at'      => $r['created_at'],
 
+            'delivery_boy_id' => $r['delivery_boy_id'] !== null ? (int)$r['delivery_boy_id'] : 0,
             'boy_name'        => $r['boy_name'] ?: '—',
             'boy_code'        => $r['boy_code'] ?: '',
 
@@ -179,7 +206,6 @@ try {
     }
 
     jsonResponse(true, 'OK', $out);
-
 } catch (PDOException $e) {
     jsonResponse(false, 'Failed to load orders: ' . $e->getMessage());
 }

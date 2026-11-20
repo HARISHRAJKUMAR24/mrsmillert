@@ -12,40 +12,40 @@
     if (!BASE_URL.endsWith("/")) BASE_URL += "/";
 
     /* DOM */
-    const tbody       = document.getElementById("orTbody");
+    const tbody = document.getElementById("orTbody");
     const searchInput = document.getElementById("orSearch");
-    const tabs        = document.querySelectorAll(".or-tab");
-    const dateSelect  = document.getElementById("orDateFilter");
-    const dateFrom    = document.getElementById("orDateFrom");
-    const dateTo      = document.getElementById("orDateTo");
-    const dateCustom  = document.getElementById("orDateCustom");
+    const tabs = document.querySelectorAll(".or-tab");
+    const dateSelect = document.getElementById("orDateFilter");
+    const dateFrom = document.getElementById("orDateFrom");
+    const dateTo = document.getElementById("orDateTo");
+    const dateCustom = document.getElementById("orDateCustom");
 
-    const paginationWrap     = document.getElementById("orPagination");
-    const paginationInfo     = document.getElementById("paginationInfo");
+    const paginationWrap = document.getElementById("orPagination");
+    const paginationInfo = document.getElementById("paginationInfo");
     const paginationControls = document.getElementById("paginationControls");
-    const perPageSelect      = document.getElementById("perPageSelect");
+    const perPageSelect = document.getElementById("perPageSelect");
 
     const selectAllBox = document.getElementById("orSelectAll");
-    const bulkBar      = document.getElementById("orBulkBar");
-    const bulkCountEl  = document.getElementById("orBulkCount");
-    const bulkClear    = document.getElementById("orBulkClear");
-    const bulkSample   = document.getElementById("orBulkSample");
+    const bulkBar = document.getElementById("orBulkBar");
+    const bulkCountEl = document.getElementById("orBulkCount");
+    const bulkClear = document.getElementById("orBulkClear");
+    const bulkSample = document.getElementById("orBulkSample");
 
     /* Notes modal */
-    const noteOverlay  = document.getElementById("orNoteOverlay");
-    const noteClose    = document.getElementById("orNoteClose");
+    const noteOverlay = document.getElementById("orNoteOverlay");
+    const noteClose = document.getElementById("orNoteClose");
     const noteCloseBtn = document.getElementById("orNoteCloseBtn");
-    const noteCodeEl   = document.getElementById("orNoteCode");
-    const noteTextEl   = document.getElementById("orNoteText");
-    const noteBodyEl   = document.getElementById("orNoteBody");
-    const noteViewBtn  = document.getElementById("orNoteViewBtn");
+    const noteCodeEl = document.getElementById("orNoteCode");
+    const noteTextEl = document.getElementById("orNoteText");
+    const noteBodyEl = document.getElementById("orNoteBody");
+    const noteViewBtn = document.getElementById("orNoteViewBtn");
 
     /* Assign modal */
     const assignOverlay = document.getElementById("orAssignOverlay");
-    const assignClose   = document.getElementById("orAssignClose");
-    const assignCancel  = document.getElementById("orAssignCancel");
-    const assignCode    = document.getElementById("orAssignCode");
-    const assignBody    = document.getElementById("orAssignBody");
+    const assignClose = document.getElementById("orAssignClose");
+    const assignCancel = document.getElementById("orAssignCancel");
+    const assignCode = document.getElementById("orAssignCode");
+    const assignBody = document.getElementById("orAssignBody");
 
     /* Toast */
     const toastEl = document.getElementById("orToast");
@@ -54,13 +54,13 @@
 
     /* STATE */
     const DEFAULT_PAGE_SIZE = 10;
-    let pageSize     = DEFAULT_PAGE_SIZE;
-    let allRows      = [];
+    let pageSize = DEFAULT_PAGE_SIZE;
+    let allRows = [];
     let filteredRows = [];
-    let currentPage  = 1;
+    let currentPage = 1;
     let activeFilter = "all";
-    let activeDate   = "all";
-    let searchTerm   = "";
+    let activeDate = "all";
+    let searchTerm = "";
     let assigningOrderId = 0;
 
     const selectedIds = new Set();
@@ -86,9 +86,9 @@
         if (!str) return "—";
         const d = new Date(str.replace(" ", "T"));
         if (isNaN(d.getTime())) return str;
-        const dd  = String(d.getDate()).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
         const mon = d.toLocaleString("en-IN", { month: "short" });
-        const yr  = d.getFullYear();
+        const yr = d.getFullYear();
         let hours = d.getHours();
         const mins = String(d.getMinutes()).padStart(2, "0");
         const ampm = hours >= 12 ? "PM" : "AM";
@@ -100,11 +100,11 @@
 
     function orderStatusBadge(s) {
         const map = {
-            pending:    "status-pending",
-            confirmed:  "status-confirmed",
+            pending: "status-pending",
+            confirmed: "status-confirmed",
             processing: "status-processing",
-            delivered:  "status-delivered",
-            cancelled:  "status-cancelled"
+            delivered: "status-delivered",
+            cancelled: "status-cancelled"
         };
         return `<span class="order-status ${map[s] || "status-pending"}">${escapeHtml(s)}</span>`;
     }
@@ -116,12 +116,13 @@
 
     /* RENDER ROW */
     function renderRow(o) {
-        const initial   = (o.customer_name || "?").trim().charAt(0).toUpperCase();
-        const isPickup  = o.delivery_mode === "pickup";
-        const isHouse   = o.address_type === "individual_house";
+        const initial = (o.customer_name || "?").trim().charAt(0).toUpperCase();
+        const isPickup = o.delivery_mode === "pickup";
+        const isHouse = o.address_type === "individual_house";
         const isChecked = selectedIds.has(String(o.id));
-        const hasNote   = !!(o.order_note && String(o.order_note).trim() !== "");
-        const hasBoy    = !!(o.boy_name && String(o.boy_name).trim() !== "" && o.boy_name !== "—");
+        const hasNote = !!(o.order_note && String(o.order_note).trim() !== "");
+        const hasBoy = !!(o.boy_name && String(o.boy_name).trim() !== "" && o.boy_name !== "—");
+        const boyAssigned = (o.delivery_boy_id && Number(o.delivery_boy_id) > 0) || hasBoy;
 
         let modeCell = "";
         if (isPickup) {
@@ -149,14 +150,20 @@
                </div>`
             : ``;
 
-        /* Delivery boy cell — either show name or assign button */
+        /* Delivery boy cell — show name + unassign, or assign button */
         let boyCell = "";
         if (isPickup) {
             boyCell = `<span style="color:#948c82;font-size:11px;">—</span>`;
-        } else if (hasBoy) {
+        } else if (boyAssigned) {
             boyCell = `
-                <div class="cust-name">${escapeHtml(o.boy_name)}</div>
-                ${o.boy_code ? `<div class="cust-meta">#${escapeHtml(o.boy_code)}</div>` : ""}`;
+                <div class="cust-name">${escapeHtml(o.boy_name || "Assigned")}</div>
+                ${o.boy_code ? `<div class="cust-meta">#${escapeHtml(o.boy_code)}</div>` : ""}
+                <button type="button" class="unassign-boy-btn js-unassign-boy"
+                    data-order-id="${o.id}"
+                    data-order-code="${escapeHtml(o.order_code)}"
+                    data-boy-name="${escapeHtml(o.boy_name || "")}">
+                    <i class="bi bi-person-dash"></i> Unassign
+                </button>`;
         } else {
             boyCell = `
                 <button type="button" class="assign-boy-btn js-assign-boy"
@@ -175,11 +182,12 @@
                 <td>
                     <div class="order-cell">
                         <div class="order-avatar">${escapeHtml(initial)}</div>
-                        <div class="order-info">
-                            <div class="order-code">#${escapeHtml(o.order_code)}</div>
-                            <div class="order-time">${escapeHtml(formatDate(o.created_at))}</div>
-                            ${noteBtnHtml}
-                        </div>
+                       <div class="order-info">
+    <div class="order-code">#${escapeHtml(o.order_code)}</div>
+    ${o.menu_name ? `<div class="order-menu"><i class="bi bi-journal-text"></i> ${escapeHtml(o.menu_name)}${o.menu_code ? ` <span class="menu-code">(${escapeHtml(o.menu_code)})</span>` : ""}</div>` : ""}
+    <div class="order-time">${escapeHtml(formatDate(o.created_at))}</div>
+    ${noteBtnHtml}
+</div>
                     </div>
                 </td>
 
@@ -272,7 +280,7 @@
                             <div class="or-boy-item" data-boy-id="${b.id}" data-boy-name="${escapeHtml(b.full_name)}">
                                 <div class="or-boy-avatar">${escapeHtml((b.full_name || "?").trim().charAt(0).toUpperCase())}</div>
                                 <div class="or-boy-info">
-                                    <p class="or-boy-name">${escapeHtml(b.full_name)}</div>
+                                    <p class="or-boy-name">${escapeHtml(b.full_name)}</p>
                                     <div class="or-boy-code">#${escapeHtml(b.delivery_code)} · ${escapeHtml(b.mobile_number)}</div>
                                 </div>
                                 <div class="or-boy-pick">Select →</div>
@@ -282,7 +290,7 @@
                 `;
 
                 assignBody.querySelectorAll(".or-boy-item").forEach(item => {
-                    item.addEventListener("click", function() {
+                    item.addEventListener("click", function () {
                         const boyId = this.dataset.boyId;
                         const boyName = this.dataset.boyName;
                         assignBoy(assigningOrderId, boyId, boyName);
@@ -336,6 +344,37 @@
     });
 
     /* =========================================================
+       UNASSIGN DELIVERY BOY
+       ========================================================= */
+    function unassignBoy(orderId, orderCode, boyName) {
+        const label = boyName ? `"${boyName}"` : "the delivery boy";
+        if (!confirm(`Unassign ${label} from order #${orderCode}?`)) return;
+
+        const fd = new FormData();
+        fd.append("order_id", orderId);
+
+        showToast("Unassigning…");
+
+        fetch(BASE_URL + "ajax/unassign-delivery-boy.php", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin"
+        })
+            .then(r => r.json().catch(() => null))
+            .then(res => {
+                if (!res || !res.success) {
+                    showToast((res && res.message) || "Failed to unassign.", true);
+                    return;
+                }
+                showToast(res.message || "Delivery boy unassigned.");
+                loadOrders();
+            })
+            .catch(() => {
+                showToast("Unable to connect.", true);
+            });
+    }
+
+    /* =========================================================
        PAGINATION
        ========================================================= */
     function renderPage() {
@@ -362,7 +401,7 @@
         if (currentPage < 1) currentPage = 1;
 
         const start = (currentPage - 1) * pageSize;
-        const end   = Math.min(start + pageSize, total);
+        const end = Math.min(start + pageSize, total);
         const slice = filteredRows.slice(start, end);
 
         tbody.innerHTML = slice.map(renderRow).join("");
@@ -549,6 +588,19 @@
 
     /* EVENT DELEGATION */
     tbody.addEventListener("click", function (e) {
+
+        /* Unassign button */
+        const unassignBtn = e.target.closest(".js-unassign-boy");
+        if (unassignBtn) {
+            e.stopPropagation();
+            e.preventDefault();
+            unassignBoy(
+                Number(unassignBtn.dataset.orderId),
+                unassignBtn.dataset.orderCode,
+                unassignBtn.dataset.boyName
+            );
+            return;
+        }
 
         /* Assign button */
         const assignBtn = e.target.closest(".js-assign-boy");

@@ -518,6 +518,28 @@ try {
             margin-top: 2px;
         }
 
+        .order-menu {
+            font-size: 10.5px;
+            color: #6f675f;
+            font-weight: 700;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 200px;
+        }
+
+        .order-menu i {
+            color: #b51f2c;
+            font-size: 10px;
+            margin-right: 3px;
+        }
+
+        .order-menu .menu-code {
+            color: #948c82;
+            font-weight: 600;
+        }
+
         /* ✅ NOTES BUTTON — ALWAYS VISIBLE (no hover required) */
         .order-note-btn {
             display: inline-flex;
@@ -1361,6 +1383,35 @@ try {
             .or-stats {
                 grid-template-columns: 1fr;
             }
+        }
+
+        .unassign-boy-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            margin-top: 5px;
+            padding: 4px 10px;
+            border-radius: 7px;
+            background: #fff;
+            border: 1.5px solid #e4ddd3;
+            color: #6f675f;
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+            cursor: pointer;
+            transition: .18s ease;
+            white-space: nowrap;
+        }
+
+        .unassign-boy-btn:hover {
+            background: #fdeaea;
+            border-color: #b51f2c;
+            color: #b51f2c;
+        }
+
+        .unassign-boy-btn i {
+            font-size: 11px;
         }
     </style>
 
