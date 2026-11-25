@@ -33,50 +33,49 @@ try {
     $products = [];
 }
 
-/* LOAD RECENT MENUS */
+/* =========================================================
+   LOAD ALL MENUS FOR DUPLICATION (FIXED - NO FILTERS)
+   ========================================================= */
 $recentMenus = [];
 try {
-    $stmt = $pdo->query("SELECT m.id, m.menu_code, m.menu_name, m.start_at, m.end_at FROM menus m ORDER BY m.id DESC LIMIT 20");
+    // 1. Fetch ALL menus from database
+    $stmt = $pdo->query("SELECT id, menu_code, menu_name, start_at, end_at, status FROM menus ORDER BY id DESC");
     $recentMenus = $stmt->fetchAll();
+
     if (!empty($recentMenus)) {
-        $codes = array_column($recentMenus, 'menu_code');
-        $placeholders = implode(',', array_fill(0, count($codes), '?'));
-        $rStmt = $pdo->prepare("SELECT menu_code, product_code, variant_id, stock_unlimited, stock_count FROM menu_products WHERE menu_code IN ($placeholders) ORDER BY id ASC");
-        $rStmt->execute($codes);
+        // 2. Fetch ALL saved menu products
+        $rStmt = $pdo->query("SELECT menu_code, product_code, variant_id, stock_unlimited, stock_count FROM menu_products");
         $menuRows = $rStmt->fetchAll();
 
-        $liveVariantsByProduct = [];
-        if (!empty($menuRows)) {
-            $pCodes = array_unique(array_column($menuRows, 'product_code'));
-            $vPh = implode(',', array_fill(0, count($pCodes), '?'));
-            $liveStmt = $pdo->prepare("SELECT id, product_code FROM product_variants WHERE product_code IN ($vPh) AND status = 1 ORDER BY id ASC");
-            $liveStmt->execute($pCodes);
-            foreach ($liveStmt->fetchAll() as $v) {
-                $liveVariantsByProduct[$v['product_code']][] = (int)$v['id'];
+        // 3. Group them by Menu Code and Product Code
+        $grouped = [];
+        foreach ($menuRows as $row) {
+            $key = $row['menu_code'] . '|' . $row['product_code'];
+            if (!isset($grouped[$key])) {
+                $grouped[$key] = [
+                    'menu_code' => $row['menu_code'],
+                    'product_code' => $row['product_code'],
+                    'variant_data' => []
+                ];
             }
+            $grouped[$key]['variant_data'][] = [
+                'id' => (int)$row['variant_id'],
+                'stock_unlimited' => (int)$row['stock_unlimited'],
+                'stock_count' => (int)$row['stock_count']
+            ];
         }
 
-        $grouped = [];
-        $orphanCursor = [];
-        foreach ($menuRows as $row) {
-            $menuCode = $row['menu_code'];
-            $pcode = $row['product_code'];
-            $storedId = (int)$row['variant_id'];
-            $liveIds = $liveVariantsByProduct[$pcode] ?? [];
-            if (empty($liveIds)) continue;
-            $resolvedId = in_array($storedId, $liveIds, true) ? $storedId : $liveIds[($orphanCursor[$menuCode . '|' . $pcode] = ($orphanCursor[$menuCode . '|' . $pcode] ?? 0) + 1) % count($liveIds)];
-            $key = $menuCode . '|' . $pcode;
-            if (!isset($grouped[$key])) {
-                $grouped[$key] = ['menu_code' => $menuCode, 'product_code' => $pcode, 'variant_data' => []];
-            }
-            $grouped[$key]['variant_data'][$resolvedId] = ['id' => $resolvedId, 'stock_unlimited' => (int)$row['stock_unlimited'], 'stock_count' => (int)$row['stock_count']];
-        }
+        // 4. Attach grouped rows to each menu
         foreach ($recentMenus as &$m) {
-            $rows = [];
+            $m['rows'] = [];
             foreach ($grouped as $g) {
-                if ($g['menu_code'] === $m['menu_code']) $rows[] = ['product_code' => $g['product_code'], 'variant_data' => array_values($g['variant_data'])];
+                if ($g['menu_code'] === $m['menu_code']) {
+                    $m['rows'][] = [
+                        'product_code' => $g['product_code'],
+                        'variant_data' => $g['variant_data']
+                    ];
+                }
             }
-            $m['rows'] = $rows;
         }
         unset($m);
     }
@@ -84,6 +83,7 @@ try {
     $recentMenus = [];
 }
 
+// Helper for "Today / Yesterday" Labels
 function menuRecencyLabel(string $createdAt): string
 {
     $ts = strtotime($createdAt);
@@ -95,10 +95,14 @@ function menuRecencyLabel(string $createdAt): string
     if ($dateOnly === $yesterdayTs) return 'Yesterday';
     return date('d/m/Y', $ts);
 }
+
+// Apply Label and Status to all menus
 foreach ($recentMenus as &$m) {
     $m['label'] = menuRecencyLabel($m['start_at'] ?? date('Y-m-d'));
+    $m['status_label'] = ((int)($m['status'] ?? 1) === 1) ? 'Active' : 'Inactive';
 }
 unset($m);
+
 $today = date('Y-m-d');
 $tomorrow = date('Y-m-d', strtotime('+1 day'));
 ?>
@@ -849,7 +853,7 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
             background: #fffdf9;
         }
 
-        /* ===== SUCCESS / ERROR MODAL CSS ===== */
+        /* MODAL CSS */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -1082,7 +1086,7 @@ $tomorrow = date('Y-m-d', strtotime('+1 day'));
         </div>
     </div>
 
-    <!-- ✅ SUCCESS POPUP -->
+    <!-- SUCCESS POPUP -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog">
             <div class="mm-modal-icon success"><i class="bi bi-check-lg"></i></div>

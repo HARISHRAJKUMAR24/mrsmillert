@@ -45,15 +45,18 @@
     function escapeHtml(str) {
         return String(str ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
     }
+
     function setLoading(isLoading) {
         saveBtn.disabled = isLoading;
         saveText.innerHTML = isLoading ? '<span class="btn-spinner"></span> Saving...' : 'Save Menu';
     }
+
     function showError(message) {
         if (errorText) errorText.textContent = message || "Something went wrong.";
         errorOverlay.classList.add("show");
         errorOverlay.setAttribute("aria-hidden", "false");
     }
+
     if (errorOkBtn) errorOkBtn.addEventListener("click", () => errorOverlay.classList.remove("show"));
     errorOverlay.addEventListener("click", e => { if (e.target === errorOverlay) errorOverlay.classList.remove("show"); });
 
@@ -75,18 +78,21 @@
         if (ampm === "AM") { if (h === 12) h = 0; } else { if (h !== 12) h += 12; }
         return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
     }
+
     function getStartDateObj() {
         if (!startDate || !startTime) return null;
         const t = to24h(startTime.value, startAmPm ? startAmPm.value : "AM");
         const d = new Date(startDate.value + "T" + t + ":00");
         return isNaN(d.getTime()) ? null : d;
     }
+
     function getEndDateObj() {
         if (!endDate || !endTime) return null;
         const t = to24h(endTime.value, endAmPm ? endAmPm.value : "PM");
         const d = new Date(endDate.value + "T" + t + ":00");
         return isNaN(d.getTime()) ? null : d;
     }
+
     function updateDurationPreview() {
         if (!durationPreview) return;
         const s = getStartDateObj();
@@ -109,6 +115,7 @@
         if (m) parts.push(m + "m");
         durationPreview.textContent = "Duration: " + parts.join(" ");
     }
+
     [startDate, startTime, startAmPm, endDate, endTime, endAmPm].forEach(el => {
         if (el) { el.addEventListener("input", updateDurationPreview); el.addEventListener("change", updateDurationPreview); }
     });
@@ -116,11 +123,117 @@
     function closeAllDropdowns(except) {
         document.querySelectorAll(".dd.open").forEach(dd => { if (dd !== except) dd.classList.remove("open"); });
     }
+
     document.addEventListener("click", e => {
         if (!e.target.closest(".dd")) closeAllDropdowns();
         if (!e.target.closest("#duplicateWrap")) duplicateWrap?.classList.remove("open");
     });
 
+    /* =========================================================
+       DUPLICATE MENU LOGIC
+    ========================================================= */
+    function renderDuplicateList(filter) {
+        if (!duplicateList) return;
+        filter = (filter || "").toLowerCase().trim();
+
+        const filteredMenus = RECENT_MENUS.filter(m => {
+            if (!filter) return true;
+            const n = (m.menu_name || "").toLowerCase();
+            const c = (m.menu_code || "").toLowerCase();
+            return n.includes(filter) || c.includes(filter);
+        });
+
+        if (!filteredMenus.length) {
+            duplicateList.innerHTML = `<div style="padding:20px;text-align:center;font-size:11px;color:#948c82;">No menus found.</div>`;
+            return;
+        }
+
+        duplicateList.innerHTML = filteredMenus.map(m => {
+            const isActive = Number(m.status) === 1;
+            const statusColor = isActive ? '#2e7d32' : '#948c82';
+            const statusBg = isActive ? '#e8f6ea' : '#f5f2ec';
+
+            return `
+                <div class="duplicate-item" data-id="${m.id}">
+                    <div class="nm">
+                        ${escapeHtml(m.menu_name)} 
+                        <span class="when">${escapeHtml(m.label || "")}</span>
+                        <span style="font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;background:${statusBg};color:${statusColor};text-transform:uppercase;">${escapeHtml(m.status_label || "")}</span>
+                    </div>
+                    <span style="font-size:10px;color:#948c82;">#${escapeHtml(m.menu_code)}</span>
+                </div>
+            `;
+        }).join("");
+
+        duplicateList.querySelectorAll(".duplicate-item").forEach(item => {
+            item.addEventListener("click", function () {
+                const id = Number(this.dataset.id);
+                const menu = RECENT_MENUS.find(x => Number(x.id) === id);
+                if (menu) applyDuplicateMenu(menu);
+                duplicateWrap.classList.remove("open");
+            });
+        });
+    }
+
+    function applyDuplicateMenu(menu) {
+        if (menuNameInput) menuNameInput.value = menu.menu_name + " (Copy)";
+        if (statusInput) {
+            statusInput.checked = Number(menu.status) === 1;
+            applyStatusUI();
+        }
+
+        prodRows.innerHTML = "";
+        rowCounter = 0;
+
+        if (Array.isArray(menu.rows) && menu.rows.length > 0) {
+            menu.rows.forEach(rowData => {
+                const vData = (rowData.variant_data || []).map(v => ({
+                    id: Number(v.id),
+                    stock_unlimited: Number(v.stock_unlimited) || 0,
+                    stock_count: Number(v.stock_count) || 0
+                }));
+
+                addProductRow({
+                    product_code: rowData.product_code,
+                    variant_data: vData
+                });
+            });
+        } else {
+            addProductRow();
+        }
+
+        if (window.sToast) {
+            window.sToast("Menu duplicated! Review and click Save.", "success");
+        }
+    }
+
+    if (duplicateBtn) {
+        duplicateBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            const isOpen = duplicateWrap.classList.contains("open");
+            duplicateWrap.classList.toggle("open", !isOpen);
+
+            if (!isOpen) {
+                if (duplicateSearch) {
+                    duplicateSearch.value = "";
+                    renderDuplicateList("");
+                    setTimeout(() => duplicateSearch.focus(), 60);
+                } else {
+                    renderDuplicateList("");
+                }
+            }
+        });
+    }
+
+    if (duplicateSearch) {
+        duplicateSearch.addEventListener("input", function () {
+            renderDuplicateList(this.value);
+        });
+    }
+
+    /* =========================================================
+       PRODUCT SELECTION / DROPDOWN LOGIC
+    ========================================================= */
     function makeDropdown(config) {
         const dd = config.trigger.closest(".dd");
         function render() {
@@ -237,7 +350,7 @@
                 if (!pcode) return [];
                 const product = PRODUCTS.find(p => p.product_code === pcode);
                 if (!product || !Array.isArray(product.variants)) return [];
-                
+
                 const selectedData = JSON.parse(row.dataset.vdata || "[]");
                 const selectedIds = selectedData.map(v => Number(v.id));
 
@@ -247,16 +360,16 @@
             onPick: (vid) => {
                 vid = Number(vid);
                 let vData = JSON.parse(row.dataset.vdata || "[]");
-                
+
                 const exists = vData.find(v => Number(v.id) === vid);
                 if (exists) {
                     vData = vData.filter(v => Number(v.id) !== vid);
                 } else {
-                    vData.push({ id: vid, stock_unlimited: 0, stock_count: 100 }); 
+                    vData.push({ id: vid, stock_unlimited: 0, stock_count: 100 });
                 }
                 row.dataset.vdata = JSON.stringify(vData);
                 renderVariantChips(row);
-                renderVariantStockUI(row); 
+                renderVariantStockUI(row);
             }
         });
 
@@ -275,7 +388,7 @@
 
                 let validData = vDataInit.filter(item => product.variants.some(v => Number(v.id) === Number(item.id)));
                 row.dataset.vdata = JSON.stringify(validData);
-                
+
                 renderVariantChips(row);
                 renderVariantStockUI(row);
             } else {
@@ -291,7 +404,7 @@
         if (!product) return;
         const trigger = row.querySelector('.dd[data-kind="product"] .dd-trigger');
         trigger.querySelectorAll(".dd-chip, .dd-placeholder").forEach(c => c.remove());
-        
+
         const wrap = document.createElement("div");
         wrap.className = "dd-chips";
         wrap.innerHTML = `<span class="dd-chip">${escapeHtml(product.product_name)} <span class="meta" style="background:transparent;padding:0;">#${escapeHtml(product.product_code)}</span></span>`;
@@ -363,7 +476,7 @@
             const v = product.variants.find(x => Number(x.id) === Number(item.id));
             if (!v) return "";
             const isUnlimited = Number(item.stock_unlimited) === 1;
-            
+
             return `
                 <div class="variant-stock-card" data-vid="${v.id}">
                     <div class="variant-stock-header">
@@ -428,7 +541,7 @@
         rows.forEach((r, idx) => {
             const pcode = r.dataset.pcode || "";
             const vData = JSON.parse(r.dataset.vdata || "[]");
-            
+
             const variants = vData.map(v => ({
                 variant_id: Number(v.id),
                 stock_unlimited: Number(v.stock_unlimited),
@@ -454,7 +567,7 @@
         e.preventDefault();
         const name = menuNameInput.value.trim();
         if (!name) return showError("Menu name is required.");
-        
+
         const s = getStartDateObj(), en = getEndDateObj();
         if (!s || !en) return showError("Please choose valid start/end times.");
         if (en.getTime() <= s.getTime()) return showError("End time must be after start time.");
@@ -500,7 +613,11 @@
 
     if (successOverlay) successOverlay.addEventListener("click", e => { if (e.target === successOverlay) successOverlay.classList.remove("show"); });
 
+    // Initialize
     applyStatusUI();
     updateDurationPreview();
     addProductRow();
+
+    // Render Duplicate List on load
+    renderDuplicateList("");
 })();
