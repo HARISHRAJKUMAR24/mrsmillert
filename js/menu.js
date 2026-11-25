@@ -3,6 +3,7 @@
    File: ./js/menu.js
    - Live search + status filter
    - Client-side pagination with per-page selector
+   - Delivery status toggle (disabled when menu is expired)
    - Delete with confirm
    ========================================================= */
 
@@ -35,6 +36,7 @@
     const errorOkBtn = document.getElementById("errorOkBtn");
 
     const successOverlay = document.getElementById("successOverlay");
+    const successTitle = document.getElementById("successTitle");
     const successText = document.getElementById("successText");
     const successOkBtn = document.getElementById("successOkBtn");
 
@@ -45,8 +47,8 @@
     const DEFAULT_PAGE_SIZE = 10;
 
     let pageSize = DEFAULT_PAGE_SIZE;
-    let allRows = [];        // all <tr> elements (kept in original order)
-    let filteredRows = [];        // after search/filter
+    let allRows = [];
+    let filteredRows = [];
     let currentPage = 1;
     let currentDeleteId = null;
 
@@ -54,13 +56,12 @@
 
     function getDataRows() {
         return Array.from(tbody.querySelectorAll("tr"))
-            .filter(tr => !tr.querySelector(".table-empty"));
+            .filter(tr => !tr.querySelector(".table-empty") && !tr.classList.contains("js-empty-filter"));
     }
 
     /* ---------------- FILTER + PAGINATION ---------------- */
 
     function applyFilterAndRender(resetPage) {
-
         const q = (searchInput ? searchInput.value : "").toLowerCase().trim();
         const st = statusFilter ? statusFilter.value : "";
 
@@ -80,23 +81,19 @@
     }
 
     function renderPage() {
-
-        /* Hide all rows first */
         allRows.forEach(r => r.style.display = "none");
 
         const total = filteredRows.length;
 
         if (total === 0) {
-            /* Hide pagination, show "nothing" state if not already */
             if (paginationWrap) paginationWrap.style.display = "none";
 
-            /* Show a temporary empty notice if needed */
             let emptyRow = tbody.querySelector(".js-empty-filter");
             if (!emptyRow) {
                 emptyRow = document.createElement("tr");
                 emptyRow.className = "js-empty-filter";
                 emptyRow.innerHTML = `
-                    <td colspan="5">
+                    <td colspan="6">
                         <div class="table-empty">
                             <i class="bi bi-search"></i>
                             No menus match your filter.
@@ -109,7 +106,6 @@
             return;
         }
 
-        /* Remove empty-filter notice if present */
         const emptyRow = tbody.querySelector(".js-empty-filter");
         if (emptyRow) emptyRow.remove();
 
@@ -124,7 +120,6 @@
             row.style.display = "";
         });
 
-        /* Pagination info */
         if (paginationInfo) {
             paginationInfo.innerHTML =
                 'Showing <strong>' + (start + 1) + '</strong>–<strong>' + end +
@@ -136,7 +131,6 @@
     }
 
     function renderPaginationControls(totalPages) {
-
         if (!paginationControls) return;
 
         if (totalPages <= 1) {
@@ -210,10 +204,7 @@
 
             const card = document.querySelector(".menu-card");
             if (card) {
-                window.scrollTo({
-                    top: card.offsetTop - 20,
-                    behavior: "smooth"
-                });
+                window.scrollTo({ top: card.offsetTop - 20, behavior: "smooth" });
             }
         });
     }
@@ -280,19 +271,93 @@
     }
 
     if (deleteCancel) deleteCancel.addEventListener("click", closeDeleteModal);
-    deleteOverlay.addEventListener("click", e => {
+    if (deleteOverlay) deleteOverlay.addEventListener("click", e => {
         if (e.target === deleteOverlay) closeDeleteModal();
     });
 
     if (errorOkBtn) errorOkBtn.addEventListener("click", closeError);
-    errorOverlay.addEventListener("click", e => {
+    if (errorOverlay) errorOverlay.addEventListener("click", e => {
         if (e.target === errorOverlay) closeError();
     });
 
     if (successOkBtn) successOkBtn.addEventListener("click", closeSuccess);
-    successOverlay.addEventListener("click", e => {
+    if (successOverlay) successOverlay.addEventListener("click", e => {
         if (e.target === successOverlay) closeSuccess();
     });
+
+    /* =========================================================
+       ✅ DELIVERY STATUS TOGGLE
+       ========================================================= */
+
+    tbody.addEventListener("change", function (e) {
+        const toggle = e.target.closest(".js-delivery-toggle");
+        if (!toggle) return;
+
+        const id = Number(toggle.dataset.id || 0);
+        if (!id) return;
+
+        // If already disabled (expired) → ignore
+        if (toggle.disabled) return;
+
+        const wrap = toggle.closest(".delivery-toggle");
+        const labelEl = wrap ? wrap.parentElement.querySelector(".js-delivery-text") : null;
+        const newStatus = toggle.checked ? "enabled" : "disabled";
+
+        // Save previous state in case we need to revert
+        const previousChecked = !toggle.checked;
+
+        // Visual: mark as saving
+        if (wrap) wrap.classList.add("saving");
+        toggle.disabled = true;
+
+        const fd = new FormData();
+        fd.append("id", id);
+        fd.append("status", newStatus);
+
+        fetch(BASE_URL + "ajax/toggle-menu-delivery.php", {
+            method: "POST",
+            body: fd,
+            credentials: "same-origin"
+        })
+            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+            .then(data => {
+                if (wrap) wrap.classList.remove("saving");
+                toggle.disabled = false;
+
+                if (!data.success) {
+                    // Revert the checkbox
+                    toggle.checked = previousChecked;
+                    updateDeliveryLabel(labelEl, previousChecked);
+                    showError(data.message || "Failed to update delivery status.", "Update failed");
+                    return;
+                }
+
+                // Success: update label
+                updateDeliveryLabel(labelEl, toggle.checked);
+
+                // Small success toast via existing modal
+                if (successTitle) successTitle.textContent = "Delivery updated";
+                if (successText) {
+                    successText.textContent = data.message || "Delivery status saved.";
+                }
+                successOverlay.classList.add("show");
+                successOverlay.setAttribute("aria-hidden", "false");
+            })
+            .catch(() => {
+                if (wrap) wrap.classList.remove("saving");
+                toggle.disabled = false;
+                toggle.checked = previousChecked;
+                updateDeliveryLabel(labelEl, previousChecked);
+                showError("Unable to connect to server.", "Network error");
+            });
+    });
+
+    function updateDeliveryLabel(labelEl, isOn) {
+        if (!labelEl) return;
+        labelEl.textContent = isOn ? "Enabled" : "Disabled";
+        labelEl.classList.toggle("on", isOn);
+        labelEl.classList.toggle("off", !isOn);
+    }
 
     /* ---------------- DELETE ---------------- */
 
@@ -325,15 +390,11 @@
             })
                 .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
                 .then(data => {
-
                     deleteConfirm.disabled = false;
                     deleteConfirm.innerHTML = '<i class="bi bi-trash3"></i> Delete';
-
                     closeDeleteModal();
 
                     if (data.success) {
-
-                        /* Remove row from DOM + from state */
                         const row = tbody.querySelector(`.js-delete-btn[data-id="${id}"]`)?.closest("tr");
                         if (row) {
                             row.style.transition = "opacity .2s, transform .2s";
@@ -346,6 +407,7 @@
                             }, 200);
                         }
 
+                        if (successTitle) successTitle.textContent = "Deleted!";
                         if (successText) successText.textContent = data.message || "Menu deleted.";
                         successOverlay.classList.add("show");
                         successOverlay.setAttribute("aria-hidden", "false");
@@ -364,14 +426,11 @@
 
     /* ---------------- INIT ---------------- */
 
-    /* Collect all rows on first load */
     allRows = getDataRows();
 
-    /* If no menus exist, hide pagination */
     if (allRows.length === 0) {
         if (paginationWrap) paginationWrap.style.display = "none";
     } else {
         applyFilterAndRender(true);
     }
-
 })();

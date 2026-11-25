@@ -3,13 +3,12 @@ require_once './config/config.php';
 require_once './config/function.php';
 
 /* =========================================================
-   LOAD MENUS + COUNTS + TIMING STATUS
+   LOAD MENUS + COUNTS + TIMING STATUS + DELIVERY STATUS
    ========================================================= */
 
 $menus = [];
 
 try {
-
     $stmt = $pdo->query(
         "SELECT m.id,
                 m.menu_code,
@@ -17,6 +16,8 @@ try {
                 m.start_at,
                 m.end_at,
                 m.created_at,
+                m.status,
+                m.delivery_status,
                 (SELECT COUNT(DISTINCT product_code)
                    FROM menu_products
                   WHERE menu_code = m.menu_code) AS product_count,
@@ -26,7 +27,6 @@ try {
          FROM menus m
          ORDER BY m.id DESC"
     );
-
     $menus = $stmt->fetchAll();
 } catch (PDOException $e) {
     $menus = [];
@@ -45,7 +45,6 @@ function menuTimingStatus(string $startAt, string $endAt): array
     if ($start === false || $end === false) {
         return ['key' => 'expired', 'label' => 'Unknown'];
     }
-
     if ($now < $start) {
         return ['key' => 'upcoming', 'label' => 'Upcoming'];
     }
@@ -66,7 +65,6 @@ function fmtDateTime(string $dbDate): string
 <html lang="en">
 
 <head>
-
     <?php include './includes/head.php'; ?>
 
     <style>
@@ -184,8 +182,6 @@ function fmtDateTime(string $dbDate): string
             border-color: #d98a91;
             background: #fff;
         }
-
-        /* ---------- TABLE ---------- */
 
         .menu-table-wrap {
             border: 1px solid #f0ebe4;
@@ -362,6 +358,106 @@ function fmtDateTime(string $dbDate): string
             }
         }
 
+        /* =====================================================
+           DELIVERY TOGGLE
+        ===================================================== */
+        .delivery-toggle-wrap {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 150px;
+        }
+
+        .delivery-toggle {
+            position: relative;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
+        }
+
+        .delivery-toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+            position: absolute;
+        }
+
+        .delivery-toggle .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #d8cdbf;
+            border-radius: 24px;
+            transition: .25s ease;
+        }
+
+        .delivery-toggle .slider::before {
+            content: "";
+            position: absolute;
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            top: 3px;
+            background: #fff;
+            border-radius: 50%;
+            transition: .25s ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, .18);
+        }
+
+        .delivery-toggle input:checked+.slider {
+            background: #2e7d32;
+        }
+
+        .delivery-toggle input:checked+.slider::before {
+            transform: translateX(20px);
+        }
+
+        .delivery-toggle input:disabled+.slider {
+            background: #ece5da;
+            cursor: not-allowed;
+            opacity: .55;
+        }
+
+        .delivery-toggle input:disabled+.slider::before {
+            background: #f5f0e8;
+        }
+
+        .delivery-label {
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1.3;
+        }
+
+        .delivery-label.on {
+            color: #2e7d32;
+        }
+
+        .delivery-label.off {
+            color: #948c82;
+        }
+
+        .delivery-label.locked {
+            color: #b5aca2;
+            font-style: italic;
+            font-weight: 600;
+        }
+
+        .delivery-row-note {
+            font-size: 9.5px;
+            color: #b5aca2;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .3px;
+            margin-top: 2px;
+        }
+
+        /* saving spinner */
+        .delivery-toggle.saving .slider {
+            opacity: .5;
+            cursor: wait;
+        }
+
+        /* ---------- TABLE ACTIONS ---------- */
         .row-actions {
             display: flex;
             align-items: center;
@@ -418,9 +514,7 @@ function fmtDateTime(string $dbDate): string
             margin-bottom: 12px;
         }
 
-        /* =====================================================
-           PAGINATION
-        ===================================================== */
+        /* pagination */
         .menu-pagination {
             display: flex;
             align-items: center;
@@ -474,17 +568,6 @@ function fmtDateTime(string $dbDate): string
             background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 16 16'><path fill='%23817a71' d='M8 11L3 6h10z'/></svg>");
             background-repeat: no-repeat;
             background-position: right 9px center;
-            transition: .2s ease;
-        }
-
-        .pagination-perpage select:hover {
-            border-color: #e4ddd3;
-            background-color: #fff;
-        }
-
-        .pagination-perpage select:focus {
-            border-color: #d98a91;
-            box-shadow: 0 0 0 3px rgba(181, 31, 44, .06);
         }
 
         .pagination-controls {
@@ -546,7 +629,7 @@ function fmtDateTime(string $dbDate): string
             font-size: 12px;
         }
 
-        /* modal */
+        /* modals */
         .mm-modal-overlay {
             position: fixed;
             inset: 0;
@@ -738,24 +821,19 @@ function fmtDateTime(string $dbDate): string
             }
         }
     </style>
-
 </head>
 
 <body>
-
     <?php include './templates/sidebar.php'; ?>
-
     <main class="main">
-
         <?php include './templates/header.php'; ?>
-
 
         <div class="menu-page">
 
             <div class="menu-header">
                 <div class="menu-title">
                     <h1>Menus</h1>
-                    <p>All created menus with their product & variant counts.</p>
+                    <p>All created menus with their product &amp; variant counts.</p>
                 </div>
                 <?php if (isAdmin()): ?>
                     <a href="add-menu.php" class="btn-add">
@@ -764,30 +842,22 @@ function fmtDateTime(string $dbDate): string
                 <?php endif; ?>
             </div>
 
-
             <div class="menu-card">
 
                 <div class="menu-toolbar">
-
                     <div class="menu-search">
                         <i class="bi bi-search"></i>
-                        <input type="text"
-                            id="searchInput"
-                            placeholder="Search by name or code...">
+                        <input type="text" id="searchInput" placeholder="Search by name or code...">
                     </div>
-
                     <select id="statusFilter" class="menu-filter">
                         <option value="">All Status</option>
                         <option value="live">Live</option>
                         <option value="upcoming">Upcoming</option>
                         <option value="expired">Expired</option>
                     </select>
-
                 </div>
 
-
                 <div class="menu-table-wrap">
-
                     <table class="menu-table" id="menuTable">
                         <thead>
                             <tr>
@@ -795,13 +865,14 @@ function fmtDateTime(string $dbDate): string
                                 <th>Products</th>
                                 <th>Time Window</th>
                                 <th>Status</th>
-                                <?php if (isAdmin()): ?> <th style="text-align:right;">Actions</th><?php endif; ?>
+                                <th>Delivery</th>
+                                <?php if (isAdmin()): ?><th style="text-align:right;">Actions</th><?php endif; ?>
                             </tr>
                         </thead>
                         <tbody id="menuTbody">
                             <?php if (empty($menus)): ?>
                                 <tr>
-                                    <td colspan="5">
+                                    <td colspan="6">
                                         <div class="table-empty">
                                             <i class="bi bi-journal-x"></i>
                                             No menus yet. Click <strong>Add Menu</strong> to create one.
@@ -810,8 +881,9 @@ function fmtDateTime(string $dbDate): string
                                 </tr>
                             <?php else: ?>
                                 <?php foreach ($menus as $m):
-
                                     $t = menuTimingStatus($m['start_at'], $m['end_at']);
+                                    $isExpired = ($t['key'] === 'expired');
+                                    $deliveryOn = ($m['delivery_status'] === 'enabled');
                                 ?>
                                     <tr
                                         data-code="<?= htmlspecialchars(strtolower($m['menu_code'])) ?>"
@@ -860,16 +932,42 @@ function fmtDateTime(string $dbDate): string
                                                 <?= $t['label'] ?>
                                             </span>
                                         </td>
+
+                                        <!-- DELIVERY TOGGLE -->
+                                        <td>
+                                            <div class="delivery-toggle-wrap">
+                                                <label class="delivery-toggle <?= $isExpired ? 'is-locked' : '' ?>"
+                                                    data-id="<?= (int) $m['id'] ?>">
+                                                    <input type="checkbox"
+                                                        class="js-delivery-toggle"
+                                                        data-id="<?= (int) $m['id'] ?>"
+                                                        <?= $deliveryOn ? 'checked' : '' ?>
+                                                        <?= $isExpired ? 'disabled' : '' ?>>
+                                                    <span class="slider"></span>
+                                                </label>
+                                                <div>
+                                                    <?php if ($isExpired): ?>
+                                                        <div class="delivery-label locked">Not Active</div>
+                                                        <div class="delivery-row-note">Menu expired</div>
+                                                    <?php else: ?>
+                                                        <div class="delivery-label <?= $deliveryOn ? 'on' : 'off' ?> js-delivery-text">
+                                                            <?= $deliveryOn ? 'Enabled' : 'Disabled' ?>
+                                                        </div>
+                                                        <div class="delivery-row-note">
+                                                            <?= $t['key'] === 'upcoming' ? 'Starts soon' : 'Live now' ?>
+                                                        </div>
+                                                    <?php endif; ?>
+                                                </div>
+                                            </div>
+                                        </td>
+
                                         <?php if (isAdmin()): ?>
                                             <td>
                                                 <div class="row-actions">
-
                                                     <a href="edit-menu.php?id=<?= (int) $m['id'] ?>"
-                                                        class="row-btn edit"
-                                                        title="Edit">
+                                                        class="row-btn edit" title="Edit">
                                                         <i class="bi bi-pencil"></i>
                                                     </a>
-
                                                     <button type="button"
                                                         class="row-btn delete js-delete-btn"
                                                         data-id="<?= (int) $m['id'] ?>"
@@ -877,7 +975,6 @@ function fmtDateTime(string $dbDate): string
                                                         title="Delete">
                                                         <i class="bi bi-trash3"></i>
                                                     </button>
-
                                                 </div>
                                             </td>
                                         <?php endif; ?>
@@ -886,22 +983,14 @@ function fmtDateTime(string $dbDate): string
                             <?php endif; ?>
                         </tbody>
                     </table>
-
                 </div>
 
-
-                <!-- =====================================================
-                     PAGINATION
-                ====================================================== -->
-
+                <!-- PAGINATION -->
                 <div class="menu-pagination" id="menuPagination" style="display:none;">
-
                     <div class="pagination-left">
-
                         <div class="pagination-info" id="paginationInfo">
                             Showing <strong>0</strong>–<strong>0</strong> of <strong>0</strong>
                         </div>
-
                         <label class="pagination-perpage">
                             Show
                             <select id="perPageSelect">
@@ -912,32 +1001,20 @@ function fmtDateTime(string $dbDate): string
                             </select>
                             entries
                         </label>
-
                     </div>
-
-                    <div class="pagination-controls" id="paginationControls">
-                        <!-- filled by JS -->
-                    </div>
-
+                    <div class="pagination-controls" id="paginationControls"></div>
                 </div>
 
             </div>
-
         </div>
-
     </main>
-
 
     <!-- DELETE CONFIRM -->
     <div class="mm-modal-overlay" id="deleteOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon danger">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
+            <div class="mm-modal-icon danger"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <h3 class="mm-modal-title">Delete Menu?</h3>
-            <p class="mm-modal-text" id="deleteText">
-                This will permanently remove the menu and its products.
-            </p>
+            <p class="mm-modal-text" id="deleteText">This will permanently remove the menu and its products.</p>
             <div class="mm-modal-actions">
                 <button type="button" class="mm-btn mm-btn-ghost" id="deleteCancel">Cancel</button>
                 <button type="button" class="mm-btn mm-btn-danger" id="deleteConfirm">
@@ -947,13 +1024,10 @@ function fmtDateTime(string $dbDate): string
         </div>
     </div>
 
-
     <!-- ERROR -->
     <div class="mm-modal-overlay" id="errorOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon error">
-                <i class="bi bi-exclamation-triangle-fill"></i>
-            </div>
+            <div class="mm-modal-icon error"><i class="bi bi-exclamation-triangle-fill"></i></div>
             <h3 class="mm-modal-title" id="errorTitle">Oops!</h3>
             <p class="mm-modal-text" id="errorText">Something went wrong.</p>
             <div class="mm-modal-actions">
@@ -962,15 +1036,12 @@ function fmtDateTime(string $dbDate): string
         </div>
     </div>
 
-
     <!-- SUCCESS -->
     <div class="mm-modal-overlay" id="successOverlay" aria-hidden="true">
         <div class="mm-modal" role="dialog" aria-modal="true">
-            <div class="mm-modal-icon success">
-                <i class="bi bi-check-lg"></i>
-            </div>
-            <h3 class="mm-modal-title">Deleted!</h3>
-            <p class="mm-modal-text" id="successText">Menu deleted successfully.</p>
+            <div class="mm-modal-icon success"><i class="bi bi-check-lg"></i></div>
+            <h3 class="mm-modal-title" id="successTitle">Done!</h3>
+            <p class="mm-modal-text" id="successText">Saved successfully.</p>
             <div class="mm-modal-actions">
                 <button type="button" class="mm-btn mm-btn-primary" id="successOkBtn">
                     <i class="bi bi-check2"></i> Done
@@ -979,7 +1050,6 @@ function fmtDateTime(string $dbDate): string
         </div>
     </div>
 
-
     <script>
         window.ADMIN_URL = "<?= ADMIN_URL; ?>";
     </script>
@@ -987,7 +1057,6 @@ function fmtDateTime(string $dbDate): string
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL; ?>js/main.js"></script>
     <script src="<?= ADMIN_URL; ?>js/menu.js"></script>
-
 </body>
 
 </html>

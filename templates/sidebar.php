@@ -523,8 +523,8 @@ $sidebarGroup = function (
         ?>
 
         <!-- ==================================
-     CUSTOMERS
-================================== -->
+             CUSTOMERS
+        ================================== -->
 
         <?php
 
@@ -565,8 +565,7 @@ $sidebarGroup = function (
             'apartment.php',
             'delivery-boys.php',
             'order-allocations.php',
-            'urgency-assign-orders.php',
-            'address-requests-list.php'
+            'urgency-assign-orders.php'
         ];
 
         $deliveryLinks =
@@ -591,15 +590,6 @@ $sidebarGroup = function (
                 'bi-alarm-fill'
             );
 
-        if ($isAdminUser) {
-
-            $deliveryLinks .= $sidebarLink(
-                'address-requests-list.php',
-                'Apartment Requests',
-                'bi-building-add'
-            );
-        }
-
         echo $sidebarGroup(
             'delivery',
             'Apartments & Delivery',
@@ -611,8 +601,60 @@ $sidebarGroup = function (
         ?>
 
         <!-- ==================================
-     REPORTS DROPDOWN
-================================== -->
+             REQUESTS DROPDOWN (NEW)
+        ================================== -->
+        <?php
+
+        $requestPages = [
+            'address-requests-list.php',
+            'password-requests.php',
+            'admin-requests.php'
+        ];
+
+        $requestLinks = '';
+
+        // Admin can see all requests
+        if ($isAdminUser) {
+            $requestLinks .= $sidebarLink(
+                'address-requests-list.php',
+                'Apartment Requests',
+                'bi-building-add'
+            );
+
+            $requestLinks .= $sidebarLink(
+                'password-requests.php',
+                'Password Requests',
+                'bi-key'
+            );
+
+            $requestLinks .= $sidebarLink(
+                'admin-requests.php',
+                'Delivery Boy Requests',
+                'bi-person-badge'
+            );
+        } else {
+            // Staff only sees address requests (if applicable)
+            $requestLinks .= $sidebarLink(
+                'address-requests-list.php',
+                'Apartment Requests',
+                'bi-building-add'
+            );
+        }
+
+        echo $sidebarGroup(
+            'requests',
+            'Requests',
+            'bi-bell',
+            $requestPages,
+            $requestLinks
+        );
+
+        ?>
+
+
+        <!-- ==================================
+             REPORTS DROPDOWN
+        ================================== -->
 
         <?php
 
@@ -652,9 +694,6 @@ $sidebarGroup = function (
         ?>
 
 
-
-
-
         <!-- ==================================
              ADMIN MANAGEMENT
         ================================== -->
@@ -664,7 +703,6 @@ $sidebarGroup = function (
             <?php
             $managementPages = [
                 'discounts.php',
-                'admin-requests.php',   /* ✅ NEW */
                 'staff.php',
                 'settings.php'
             ];
@@ -674,11 +712,6 @@ $sidebarGroup = function (
                     'discounts.php',
                     'Discounts',
                     'bi-percent'
-                )
-                . $sidebarLink(
-                    'admin-requests.php',   /* ✅ NEW */
-                    'Delivery Boy Requests',
-                    'bi-inbox'
                 )
                 . $sidebarLink(
                     'staff.php',
