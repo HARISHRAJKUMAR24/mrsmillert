@@ -104,6 +104,8 @@
     let historyLoaded = false;
     let houseImgData = "";
     let aptImgData = "";
+    let houseImgFile = null;   /* real file sent to server */
+    let aptImgFile = null;
 
     let hxCurrentPage = 1;
     let hxPerPage = 10;
@@ -515,13 +517,40 @@ function mapsEmbedUrl(url) {
     }
 
     /* Images */
+
+    /* Shrink the photo in the browser so the server never rejects it as too large */
+    function compressImage(file) {
+        return new Promise(resolve => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = function () {
+                const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                canvas.toBlob(blob => {
+                    resolve(blob ? new File([blob], "house.jpg", { type: "image/jpeg" }) : file);
+                }, "image/jpeg", 0.8);
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+            img.src = url;
+        });
+    }
+
     if (aptImgDrop) aptImgDrop.addEventListener("click", () => { if (aptImg) aptImg.click(); });
     if (aptImg) {
         aptImg.addEventListener("change", function () {
             const file = this.files && this.files[0];
             if (!file) return;
             if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
-            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            if (file.size > 15 * 1024 * 1024) { showErrorPopup("Image must be under 15 MB."); return; }
+            aptImgFile = compressImage(file);
+            this.value = ""; /* allows choosing the same photo again */
             const reader = new FileReader();
             reader.onload = function (evt) {
                 aptImgData = evt.target.result;
@@ -539,7 +568,9 @@ function mapsEmbedUrl(url) {
             const file = this.files && this.files[0];
             if (!file) return;
             if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
-            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            if (file.size > 15 * 1024 * 1024) { showErrorPopup("Image must be under 15 MB."); return; }
+            houseImgFile = compressImage(file);
+            this.value = ""; /* allows choosing the same photo again */
             const reader = new FileReader();
             reader.onload = function (evt) {
                 houseImgData = evt.target.result;
@@ -606,7 +637,7 @@ function mapsEmbedUrl(url) {
                 if (existingImgEl && existingImgEl.src) {
                     const src = existingImgEl.src;
                     if (src.indexOf(BASE_URL) === 0) {
-                        addressJson.house_image = src.substring(BASE_URL.length);
+                        addressJson.house_image = src.substring(BASE_URL.length).split("?")[0];
                     }
                 }
             }
@@ -630,7 +661,7 @@ function mapsEmbedUrl(url) {
                 if (existingImgEl && existingImgEl.src) {
                     const src = existingImgEl.src;
                     if (src.indexOf(BASE_URL) === 0) {
-                        addressJson.house_image = src.substring(BASE_URL.length);
+                        addressJson.house_image = src.substring(BASE_URL.length).split("?")[0];
                     }
                 }
             }
@@ -647,15 +678,30 @@ function mapsEmbedUrl(url) {
         fd.append("address_type", ADDRESS_TYPE);
         fd.append("address_json", JSON.stringify(addressJson));
 
-        if (ADDRESS_TYPE === "individual_house" && houseImgData) fd.append("house_image_data", houseImgData);
-        if (ADDRESS_TYPE === "apartment" && aptImgData) fd.append("apt_house_image_data", aptImgData);
+        /* Send the image as a file (not base64 text) to avoid 413 error */
+        const imgFile = ADDRESS_TYPE === "apartment" ? aptImgFile : houseImgFile;
 
-        fetch(BASE_URL + "ajax/add-customer-save.php", { method: "POST", body: fd, credentials: "same-origin" })
-            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+        Promise.resolve(imgFile)
+            .then(file => {
+                if (file) fd.append("house_image", file);
+                return fetch(BASE_URL + "ajax/add-customer-save.php", { method: "POST", body: fd, credentials: "same-origin" });
+            })
+            .then(r => r.json().catch(() => ({
+                success: false,
+                message: r.status === 413
+                    ? "Image is too large for the server."
+                    : "Unexpected server response (HTTP " + r.status + ")."
+            })))
             .then(data => {
                 setCustomerLoading(false);
-                if (data.success) showSuccessPopup(data.message || "Customer updated successfully.", password);
-                else showErrorPopup(data.message || "Failed to update customer.");
+                if (data.success) {
+                    /* image already saved - don't upload it again on the next save */
+                    houseImgFile = null;
+                    aptImgFile = null;
+                    showSuccessPopup(data.message || "Customer updated successfully.", password);
+                } else {
+                    showErrorPopup(data.message || "Failed to update customer.");
+                }
             })
             .catch(() => {
                 setCustomerLoading(false);

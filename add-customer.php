@@ -1173,7 +1173,7 @@ $settings = getSettings($pdo);
     </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
-    <script src="<?= ADMIN_URL ?>js/add-customer.js"></script>
+    <script src="<?= ADMIN_URL ?>js/add-customer.js?v=<?= @filemtime(__DIR__ . '/js/add-customer.js') ?>"></script>
 </body>
 
 </html>

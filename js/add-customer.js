@@ -89,6 +89,8 @@
     let aptMapLink = "";
     let houseImgData = "";
     let aptImgData = "";
+    let houseImgFile = null;   /* shrunk file sent to server */
+    let aptImgFile = null;
     let aptBusy = false;
     let houseBusy = false;
 
@@ -438,6 +440,30 @@
         });
     }
 
+    /* Shrink the photo in the browser so the server never rejects it as too large */
+    function compressImage(file) {
+        return new Promise(resolve => {
+            const url = URL.createObjectURL(file);
+            const img = new Image();
+            img.onload = function () {
+                const scale = Math.min(1, 1280 / Math.max(img.width, img.height));
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.max(1, Math.round(img.width * scale));
+                canvas.height = Math.max(1, Math.round(img.height * scale));
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#fff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                URL.revokeObjectURL(url);
+                canvas.toBlob(blob => {
+                    resolve(blob ? new File([blob], "house.jpg", { type: "image/jpeg" }) : file);
+                }, "image/jpeg", 0.8);
+            };
+            img.onerror = function () { URL.revokeObjectURL(url); resolve(file); };
+            img.src = url;
+        });
+    }
+
     if (aptImgDrop && aptImg) {
         aptImgDrop.addEventListener("click", function (e) {
             if (e.target === aptImg) return;
@@ -451,7 +477,8 @@
             const file = this.files && this.files[0];
             if (!file) return;
             if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
-            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            if (file.size > 15 * 1024 * 1024) { showErrorPopup("Image must be under 15 MB."); return; }
+            aptImgFile = compressImage(file);
             const reader = new FileReader();
             reader.onload = function (evt) {
                 aptImgData = evt.target.result;
@@ -477,7 +504,8 @@
             const file = this.files && this.files[0];
             if (!file) return;
             if (!/^image\//.test(file.type)) { showErrorPopup("Please choose an image file."); return; }
-            if (file.size > 3 * 1024 * 1024) { showErrorPopup("Image must be under 3 MB."); return; }
+            if (file.size > 15 * 1024 * 1024) { showErrorPopup("Image must be under 15 MB."); return; }
+            houseImgFile = compressImage(file);
             const reader = new FileReader();
             reader.onload = function (evt) {
                 houseImgData = evt.target.result;
@@ -577,11 +605,20 @@
         fd.append("init_wallet", walletEnabled ? initWallet : "0");
         fd.append("init_wallet_note", initNote);
 
-        if (addressType === "individual_house" && houseImgData) fd.append("house_image_data", houseImgData);
-        if (addressType === "apartment" && aptImgData) fd.append("apt_house_image_data", aptImgData);
+        /* Send the image as a file (not base64 text) to avoid 413 error */
+        const imgFile = addressType === "apartment" ? aptImgFile : houseImgFile;
 
-        fetch(BASE_URL + "ajax/add-customer-save.php", { method: "POST", body: fd, credentials: "same-origin" })
-            .then(r => r.json().catch(() => ({ success: false, message: "Unexpected server response." })))
+        Promise.resolve(imgFile)
+            .then(file => {
+                if (file) fd.append("house_image", file);
+                return fetch(BASE_URL + "ajax/add-customer-save.php", { method: "POST", body: fd, credentials: "same-origin" });
+            })
+            .then(r => r.json().catch(() => ({
+                success: false,
+                message: r.status === 413
+                    ? "Image is too large for the server."
+                    : "Unexpected server response (HTTP " + r.status + ")."
+            })))
             .then(data => {
                 if (data.success) {
                     const code = data.data && data.data.code ? data.data.code : "";
@@ -600,13 +637,13 @@
                     if (aptLocBtn) { aptLocBtn.disabled = false; aptLocBtn.classList.remove("success"); }
                     if (aptLocBtnText) aptLocBtnText.textContent = "Get My Current Location";
                     if (aptMapPreview) { aptMapPreview.style.display = "none"; aptMapPreview.innerHTML = ""; }
-                    aptMapLink = ""; aptImgData = "";
+                    aptMapLink = ""; aptImgData = ""; aptImgFile = null;
                     if (aptImg) aptImg.value = "";
                     if (aptImgPreview) { aptImgPreview.classList.add("img-drop-empty"); aptImgPreview.innerHTML = '<i class="bi bi-image"></i><span>Tap to upload a photo of the apartment building / flat</span>'; }
                     divisionsCache = []; divInput.value = ""; divChargeInput.value = 0; divDdToggle.disabled = true; divDdLabel.textContent = "Select apartment first"; divDdLabel.classList.add("placeholder"); divDdToggle.classList.remove("has-value"); divDdList.innerHTML = ""; divHint.textContent = "";
 
                     // House resets
-                    houseMapLink = ""; houseImgData = "";
+                    houseMapLink = ""; houseImgData = ""; houseImgFile = null;
                     if (houseMap) houseMap.value = "";
                     if (houseChargeInput) houseChargeInput.value = "0";
                     if (houseLocBtn) { houseLocBtn.disabled = false; houseLocBtn.classList.remove("success"); }

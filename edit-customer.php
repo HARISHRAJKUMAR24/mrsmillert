@@ -80,7 +80,10 @@ function customerImageUrl($path)
     if (preg_match('#^https?://#i', $path) || strpos($path, '//') === 0) {
         return $path;
     }
-    return rtrim(ADMIN_URL, '/') . '/' . ltrim($path, '/');
+    /* ?v= changes after every save, so the browser loads the new image */
+    global $customer;
+    $version = strtotime((string)($customer['updated_at'] ?? '')) ?: time();
+    return rtrim(ADMIN_URL, '/') . '/' . ltrim($path, '/') . '?v=' . $version;
 }
 
 $parts = preg_split('/\s+/', trim($customer['full_name']));
@@ -1777,7 +1780,7 @@ $initials = strtoupper(
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="<?= ADMIN_URL ?>js/main.js"></script>
-    <script src="<?= ADMIN_URL ?>js/edit-customer.js"></script>
+    <script src="<?= ADMIN_URL ?>js/edit-customer.js?v=<?= @filemtime(__DIR__ . '/js/edit-customer.js') ?>"></script>
 
 </body>
 

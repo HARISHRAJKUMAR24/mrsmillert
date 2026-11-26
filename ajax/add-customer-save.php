@@ -2,8 +2,12 @@
 /* =========================================================
    MRS MILL@ — AJAX: ADD / UPDATE CUSTOMER
    File: ./ajax/add-customer-save.php
-   Saves images to BOTH admin + customer app folders so
-   MAIN_URL can serve them.
+
+   Image storage policy:
+   - Saved ONLY inside the admin app (ADMIN_URL document root)
+   - Path: uploads/houses/<Y>/<m>/<d>/customer_<id>/house.<ext>
+   - Re-upload on the same day OVERWRITES the previous image
+   - Old image from a previous day is deleted when a new one is saved
    ========================================================= */
 
 require_once __DIR__ . '/../config/config.php';
@@ -41,13 +45,17 @@ if (!is_array($addressJson)) {
     jsonResponse(false, 'Invalid address data.');
 }
 
+/* Remove "?v=..." from an existing image path before saving */
+if (!empty($addressJson['house_image'])) {
+    $addressJson['house_image'] = explode('?', (string)$addressJson['house_image'])[0];
+}
+
 /* Validate */
 if ($addressType === 'apartment') {
-    if (empty($addressJson['apartment_id'])) jsonResponse(false, 'Please select an apartment.');
+    if (empty($addressJson['apartment_id']))  jsonResponse(false, 'Please select an apartment.');
     if (empty($addressJson['division_label'])) jsonResponse(false, 'Please select a division.');
 } else {
     if (empty($addressJson['full_address'])) jsonResponse(false, 'Full address is required.');
-    /* map_link is OPTIONAL */
 }
 
 /* =========================================================
@@ -68,74 +76,133 @@ function generateCustomerId($pdo)
 }
 
 /* =========================================================
-   Save base64 image to admin + customer app folders
-   Returns the relative path (e.g. uploads/houses/20261105/xxx/house.jpg)
+   ABSOLUTE PATH OF THE ADMIN APP (where images must live)
+   Derived from ADMIN_URL so it always matches your config.
+   Falls back to __DIR__/.. if ADMIN_URL can't be resolved.
    ========================================================= */
-function saveBase64Image($b64, $folderRoot = 'uploads/houses/')
+function adminAppRoot(): string
 {
-    if ($b64 === '') return null;
+    if (defined('ADMIN_URL')) {
+        $u = parse_url(ADMIN_URL);
+        if (!empty($u['path'])) {
+            $docroot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/\\');
+            if ($docroot !== '') {
+                return $docroot . rtrim($u['path'], '/');
+            }
+        }
+    }
+    // fallback: this file is in <admin>/ajax/, so <admin> = __DIR__/..
+    return rtrim(__DIR__ . '/..', '/\\');
+}
+
+/* =========================================================
+   Save base64 image into ADMIN-ONLY, DATE-FOLDERED customer path.
+   Path: uploads/houses/<Y>/<m>/<d>/customer_<id>/house.<ext>
+   Overwrites any previous image for that customer on the same day.
+   Deletes the old image file stored in $oldRelPath (if any) so
+   only one image per customer exists on disk.
+   Returns relative path (e.g. uploads/houses/2026/11/26/customer_12/house.jpg)
+   ========================================================= */
+function saveCustomerImage(string $b64, int $customerId, ?string $oldRelPath = null): ?string
+{
+    if ($b64 === '' || $customerId <= 0) return null;
     if (!preg_match('/^data:image\/(png|jpe?g|webp|gif);base64,/i', $b64, $m)) return null;
 
     $ext  = strtolower($m[1]) === 'jpeg' ? 'jpg' : strtolower($m[1]);
     $data = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $b64));
     if ($data === false || strlen($data) > 3 * 1024 * 1024) return null;
 
-    $folder  = $folderRoot . date('Ymd') . '/' . bin2hex(random_bytes(5));
+    $root   = adminAppRoot();
+
+    /* --- Date / month / year folder --- */
+    $y   = date('Y');
+    $mo  = date('m');
+    $d   = date('d');
+
+    $relDir = 'uploads/houses/' . $y . '/' . $mo . '/' . $d . '/customer_' . $customerId;
+    $absDir = rtrim($root, '/\\') . '/' . $relDir;
+
+    if (!is_dir($absDir) && !@mkdir($absDir, 0775, true) && !is_dir($absDir)) {
+        return null;
+    }
+
     $fileName = 'house.' . $ext;
+    $absFile  = $absDir . '/' . $fileName;
 
-    /* --- Admin app folder (where this script lives) --- */
-    $adminBase = rtrim(__DIR__ . '/../', '/\\') . '/' . $folder;
-    if (!is_dir($adminBase)) @mkdir($adminBase, 0775, true);
-    $adminFile = $adminBase . '/' . $fileName;
+    /* Write to a temp file first, then OVERWRITE the old one.
+       If anything fails, the old image stays safe. */
+    $tmpFile = $absDir . '/tmp_' . bin2hex(random_bytes(6));
+    if (@file_put_contents($tmpFile, $data) === false) return null;
+    @chmod($tmpFile, 0644);
 
-    $adminOk = @file_put_contents($adminFile, $data) !== false;
+    if (!@rename($tmpFile, $absFile)) {
+        @unlink($tmpFile);
+        return null;
+    }
 
-    /* --- Customer app folder (sibling of admin app) ---
-       Try several common locations.
-       Expected layout: /htdocs/mrs.millet.admin/  and  /htdocs/mrs.millet.customer/
-       __DIR__ = /htdocs/mrs.millet.admin/ajax
-       Customer app root = __DIR__/../../mrs.millet.customer
-    */
-    $candidates = [
-        // sibling folder next to admin app
-        rtrim(__DIR__ . '/../../mrs.millet.customer/', '/\\'),
-        // in case docroot layout differs
-        rtrim(__DIR__ . '/../../../mrs.millet.customer/', '/\\'),
-        // try to derive from MAIN_URL
-        (function () {
-            if (!defined('MAIN_URL')) return '';
-            $u = parse_url(MAIN_URL);
-            if (empty($u['path'])) return '';
-            $docroot = rtrim($_SERVER['DOCUMENT_ROOT'] ?? '', '/\\');
-            return $docroot . rtrim($u['path'], '/');
-        })(),
-    ];
+    /* Same day, different extension (house.png -> house.jpg): remove the others */
+    foreach (glob($absDir . '/house.*') ?: [] as $other) {
+        if (basename($other) !== $fileName && is_file($other)) @unlink($other);
+    }
 
-    foreach ($candidates as $custRoot) {
-        if ($custRoot === '') continue;
-        $custDir = rtrim($custRoot, '/\\') . '/' . $folder;
-        if (!is_dir($custDir)) @mkdir($custDir, 0775, true);
-        if (is_dir($custDir)) {
-            @file_put_contents($custDir . '/' . $fileName, $data);
+    /* Remove the previous image if it was in another folder (older day) */
+    if ($oldRelPath) {
+        $oldReal = realpath($root . '/' . ltrim($oldRelPath, '/\\'));
+        $newReal = realpath($absFile);
+        $upReal  = realpath($root . '/uploads/houses');
+        if ($oldReal && $upReal && $oldReal !== $newReal && strpos($oldReal, $upReal) === 0) {
+            @unlink($oldReal);
         }
     }
 
-    return $adminOk ? ($folder . '/' . $fileName) : null;
+    return $relDir . '/' . $fileName;
 }
 
-/* Save apartment image */
-if ($addressType === 'apartment' && $aptImgB64 !== '') {
-    $path = saveBase64Image($aptImgB64);
-    if ($path) $addressJson['house_image'] = $path;
+/* ---------------------------------------------------------
+   Convert a normal file upload into a data URI,
+   so saveCustomerImage() can handle it.
+   --------------------------------------------------------- */
+function uploadedImageToBase64(string $field): string
+{
+    if (!isset($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) return '';
+
+    $f = $_FILES[$field];
+    if ($f['error'] !== UPLOAD_ERR_OK) jsonResponse(false, 'Image upload failed (code ' . $f['error'] . ').');
+    if ($f['size'] > 3 * 1024 * 1024) jsonResponse(false, 'Image must be under 3 MB.');
+
+    $mime = (new finfo(FILEINFO_MIME_TYPE))->file($f['tmp_name']);
+    if (!in_array($mime, ['image/jpeg', 'image/png', 'image/webp', 'image/gif'], true)) {
+        jsonResponse(false, 'Only JPG, PNG, WEBP or GIF allowed.');
+    }
+
+    return 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($f['tmp_name']));
 }
 
-/* Save individual house image */
-if ($addressType === 'individual_house' && $houseImgB64 !== '') {
-    $path = saveBase64Image($houseImgB64);
-    if ($path) $addressJson['house_image'] = $path;
+$uploaded = uploadedImageToBase64('house_image');
+if ($uploaded !== '') {
+    if ($addressType === 'apartment') $aptImgB64 = $uploaded;
+    else $houseImgB64 = $uploaded;
 }
 
-$addressJsonFinal = json_encode($addressJson, JSON_UNESCAPED_UNICODE);
+/* ---------------------------------------------------------
+   Preload existing image path (so we can clean it up)
+   --------------------------------------------------------- */
+$oldImageRel = '';
+if ($id > 0) {
+    try {
+        $stmt = $pdo->prepare("SELECT address_json FROM customers WHERE id = ? LIMIT 1");
+        $stmt->execute([$id]);
+        $cur = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (PDOException $e) {
+        $cur = false;
+    }
+    if (!empty($cur['address_json'])) {
+        $oldAddr = json_decode($cur['address_json'], true);
+        if (is_array($oldAddr) && !empty($oldAddr['house_image'])) {
+            $oldImageRel = (string)$oldAddr['house_image'];
+        }
+    }
+}
 
 try {
     /* Duplicate mobile */
@@ -150,7 +217,9 @@ try {
     $dup->execute($dupParams);
     if ($dup->fetch()) jsonResponse(false, 'A customer with this mobile already exists.');
 
-    /* UPDATE */
+    /* =========================================================
+       UPDATE
+       ========================================================= */
     if ($id > 0) {
         $check = $pdo->prepare("SELECT id, customer_id FROM customers WHERE id = ? LIMIT 1");
         $check->execute([$id]);
@@ -165,6 +234,23 @@ try {
         if ($customerId === '' || $customerId === null) {
             $customerId = generateCustomerId($pdo);
         }
+
+        /* --- Image handling: save AFTER we know the id --- */
+        $incomingB64 = ($addressType === 'apartment') ? $aptImgB64 : $houseImgB64;
+        if ($incomingB64 !== '') {
+            $newRel = saveCustomerImage($incomingB64, $id, $oldImageRel);
+            if ($newRel === null) {
+                jsonResponse(false, 'Could not save the image. Please check the uploads folder permission.');
+            }
+            $addressJson['house_image'] = $newRel;
+        }
+
+        /* Keep the old image if no new one was uploaded */
+        if (empty($addressJson['house_image']) && $oldImageRel !== '') {
+            $addressJson['house_image'] = $oldImageRel;
+        }
+
+        $addressJsonFinal = json_encode($addressJson, JSON_UNESCAPED_UNICODE);
 
         $sql = "UPDATE customers SET
                     customer_id = ?,
@@ -192,13 +278,16 @@ try {
         ]);
     }
 
-    /* INSERT */
+    /* =========================================================
+       INSERT
+       ========================================================= */
     if ($password === '')      jsonResponse(false, 'Password is required.');
     if (strlen($password) < 3) jsonResponse(false, 'Password must be at least 3 characters.');
 
     $hash       = password_hash($password, PASSWORD_DEFAULT);
     $customerId = generateCustomerId($pdo);
 
+    /* Insert first without image so we get the id, then save image. */
     $ins = $pdo->prepare(
         "INSERT INTO customers
             (customer_id, full_name, mobile_number, address_type, address_json,
@@ -211,13 +300,24 @@ try {
         $fullName,
         $mobileNumber,
         $addressType,
-        $addressJsonFinal,
+        json_encode($addressJson, JSON_UNESCAPED_UNICODE), // no image yet
         $hash,
         $initWallet > 0 ? $initWallet : 0,
         $status
     ]);
 
     $newId = (int)$pdo->lastInsertId();
+
+    /* Now save image (if any) into uploads/houses/<Y>/<m>/<d>/customer_<newId>/house.<ext> */
+    $incomingB64 = ($addressType === 'apartment') ? $aptImgB64 : $houseImgB64;
+    if ($incomingB64 !== '') {
+        $newRel = saveCustomerImage($incomingB64, $newId, null);
+        if ($newRel !== null) {
+            $addressJson['house_image'] = $newRel;
+            $pdo->prepare("UPDATE customers SET address_json = ? WHERE id = ?")
+                ->execute([json_encode($addressJson, JSON_UNESCAPED_UNICODE), $newId]);
+        }
+    }
 
     /* Wallet transaction log */
     if ($initWallet > 0) {
@@ -230,13 +330,18 @@ try {
                      created_by_id, created_by_name, created_at)
                  VALUES (?, ?, ?, ?, 'credit', ?, 0, ?, 'admin', ?, ?, ?, NOW())"
             )->execute([
-                $newId, $fullName, $mobileNumber, $txn,
-                $initWallet, $initWallet,
+                $newId,
+                $fullName,
+                $mobileNumber,
+                $txn,
+                $initWallet,
+                $initWallet,
                 $initNote !== '' ? $initNote : 'Initial wallet balance',
                 (int)$_SESSION['admin_id'],
                 $_SESSION['admin_name'] ?? 'Admin'
             ]);
-        } catch (PDOException $e) { /* ignore */ }
+        } catch (PDOException $e) { /* ignore */
+        }
     }
 
     jsonResponse(true, 'Customer added successfully.', [
@@ -244,7 +349,6 @@ try {
         'customer_id' => $customerId,
         'code'        => $customerId
     ]);
-
 } catch (PDOException $e) {
     jsonResponse(false, 'Server error: ' . $e->getMessage());
 }
